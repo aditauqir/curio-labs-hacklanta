@@ -180,6 +180,7 @@ npm run typecheck   # next typegen && tsc --noEmit
 npm run build       # production build
 npm run check       # secret scan + lint + typecheck
 npm run check:secrets  # just the secret scan
+npm run test:e2e    # Playwright browser and API suite
 ```
 
 In opencode, `/check` runs lint, typecheck, and build and fixes failures. `opencode.json` enables the built-in TypeScript and ESLint language servers.
@@ -203,7 +204,7 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 - Fonts use `next/font/google`. Builds need outbound network access to fetch them.
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
-- The browser test suites (Playwright) that verified this work were ad hoc and are **not in the repo**. See next steps.
+- The committed Playwright suite covers the public API contracts, no-database fallback, mobile workspace, local director edits, panel switching, and JSON export. Voice hardware and production Gemini/Whisper flows still need separate integration coverage.
 - Anonymous instance cookies identify a workspace but are not authentication. The future auth service must bind authenticated users to these instance records before exposing profile/password operations broadly.
 - Instance files are capped at 10 MB and shared library assets at 25 MB. Library writes require `LIBRARY_WRITE_TOKEN` until the auth service exists.
 
@@ -212,12 +213,11 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 In priority order, matching the build phases:
 
 1. **HTTPS and a hostname** so the mic works in production (section 5).
-2. **Put the browser and API tests in the repo** (`scripts/e2e/`, Playwright) and run them in CI. The Gemini and voice suites covered: keep-layout enforcement, hostile model output, fallback on outage and 429, full voice loop with a fake microphone, permission errors, silence, rate limiting, and key-leak scans.
-3. **Connect the future auth service** to `curio_instance_id` and gate profile/password operations and library writes by authenticated identity.
-4. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
-5. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
-6. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
-7. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
+2. **Connect the future auth service** to `curio_instance_id` and gate profile/password operations and library writes by authenticated identity.
+3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
+4. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
+5. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
+6. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
 
 ## Branch log
 
@@ -230,11 +230,11 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | merged | Carried into main by PR #2 (it was the base of `gemini-voice-integration`) |
 | `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | merged | PR #2, squash-merged as `3fbdc3c`. Also carried `handoff-and-env-setup`. Deployed and verified live |
 | `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | merged | PR #3, squash-merged as `1ac666d`; deployed and verified live |
-| `handoff-whisper-merged` | 2026-10-10 | Mark the offline Whisper branch merged and record its live deployment | in progress | |
+| `handoff-whisper-merged` | 2026-10-10 | Mark the offline Whisper branch merged and record its live deployment | merged | PR #4; deployed and verified live |
 | `persist-user-instances` | 2026-10-10 | Persist anonymous user instances, profiles, workspace state, chat history, and associated files in PostgreSQL | merged | PR #5; production database smoke-tested |
 | `asset-suggestion-reliability` | 2026-10-10 | Ensure Gemini surfaces exact shared library asset suggestions | merged | PR #6; production Gemini asset suggestion smoke-tested |
 | `handoff-database-verified` | 2026-10-10 | Record merged persistence and asset suggestion verification | merged | PR #7 |
 | `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | merged | PR #8; README and submission documentation deployed |
-| `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | PR open | PR #9 |
+| `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | merged | PR #9 |
 | `committed-browser-api-tests` | 2026-10-10 | Add committed Playwright browser and API coverage | in progress | |
 <!-- BRANCH-LOG-INSERT -->

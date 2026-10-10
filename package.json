@@ -11,6 +11,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check": "npm run check:secrets && npm run lint && npm run typecheck",
+    "test:e2e": "playwright test",
     "branch": "node scripts/new-branch.mjs"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

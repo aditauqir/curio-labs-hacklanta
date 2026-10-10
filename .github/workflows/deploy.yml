@@ -45,6 +45,12 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser and API tests
+        run: npm run test:e2e
+
   deploy:
     name: Deploy to Vultr
     needs: build
