@@ -42,6 +42,7 @@ export type StudioAction =
   | { type: "setSpacing"; value: Spacing }
   | { type: "setMood"; value: string }
   | { type: "addMessages"; messages: ChatMessage[] }
+  | { type: "restoreState"; state: StudioState }
   | { type: "resetDesign" }
   | { type: "resetProject" };
 
@@ -150,6 +151,8 @@ export function studioReducer(
         ...state,
         messages: [...state.messages, ...action.messages].slice(-MAX_MESSAGES),
       };
+    case "restoreState":
+      return action.state;
     case "resetDesign":
       return {
         ...state,
@@ -293,6 +296,24 @@ function sanitizeMessages(raw: unknown): ChatMessage[] {
             .filter((entry): entry is string => typeof entry === "string")
             .map((entry) => entry.slice(0, 120))
             .slice(0, 8)
+        : undefined,
+      assetSuggestions: Array.isArray(item.assetSuggestions)
+        ? item.assetSuggestions
+            .filter(
+              (entry): entry is { id: string; kind: string; name: string; description: string | null } =>
+                isRecord(entry) &&
+                typeof entry.id === "string" &&
+                typeof entry.kind === "string" &&
+                typeof entry.name === "string" &&
+                (entry.description === null || typeof entry.description === "string"),
+            )
+            .map((entry) => ({
+              id: entry.id.slice(0, 120),
+              kind: entry.kind.slice(0, 40),
+              name: entry.name.slice(0, 160),
+              description: entry.description ? entry.description.slice(0, 240) : null,
+            }))
+            .slice(0, 5)
         : undefined,
     });
   }

@@ -28,6 +28,7 @@ Live verification on 2026-10-10 (public HTTP API): Gemini is configured, the liv
 | Independent edits: headline, copy, accent, alignment, spacing, font pairing, palette | Working |
 | Creative brief reflecting and editing the live design | Working |
 | LocalStorage persistence with validation of stored data | Working |
+| PostgreSQL persistence | Built on this branch. Anonymous instances have separate profiles, hashed passwords, workspace state, chat history, and files; the shared library seeds fonts, palettes, and references for Gemini context. No login UI yet. |
 | PNG export (renders the same layout model as the screen) and brief JSON export | Working |
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
@@ -55,8 +56,8 @@ app/
   page.tsx              Server component that renders <StudioLoader />
   globals.css           Tailwind import and the neutral UI palette tokens
 components/studio/
-  studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from LocalStorage
-  studio-workspace.tsx  Header, mobile tabs, useReducer, persistence effect
+  studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from browser/database persistence
+  studio-workspace.tsx  Header, mobile tabs, useReducer, database/local fallback persistence
   creative-director.tsx Left panel: chat UI, suggestion chips, microphone and spoken replies
   design-canvas.tsx     Centre panel: poster, direction switch, editing controls
   poster.tsx            Renders the poster as real SVG elements from the layout model
@@ -76,7 +77,11 @@ app/api/
   creative-director/route.ts  Gemini design edits. Validates input, rate limits, never returns upstream error text
   voice/transcribe/route.ts   Audio upload -> text (Whisper, ElevenLabs fallback)
   voice/speak/route.ts        Text -> MP3 (ElevenLabs), streamed
-lib/ (server only: gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
+  workspace/route.ts           Anonymous instance workspace load/save
+  instance/route.ts            Anonymous profile metadata and password hash updates
+  files/route.ts, files/[id]   Instance-owned file upload, listing, download, delete
+  assets/route.ts, assets/[id] Shared font/media library listing and token-gated ingestion
+lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.ts, gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
   ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
   director-client.ts    Browser fetch for the director with a timeout
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
@@ -106,6 +111,7 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | App directory | `/var/www/curiolabs` (a git clone of this repo, tracks `main`) |
 | Process manager | PM2, process name `curiolabs`, serves Next on `127.0.0.1:3000` |
 | Offline transcription | PM2, process name `whisper`, `whisper.cpp` server on `127.0.0.1:8178`, `base.en` model in `/home/linuxuser/.curio-whisper` |
+| Database | TigerData/Timescale PostgreSQL; connection string is in `/var/www/curiolabs/.env.local` only |
 | Reverse proxy | nginx on :80 -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
 | Firewall | ufw: 22, 80, 443 open |
 
@@ -138,6 +144,8 @@ nginx's default `client_max_body_size` is 1 MB. Voice clips are capped at 30 sec
 | `GEMINI_API_KEY` | Gemini calls (server only, never `NEXT_PUBLIC_`) | `.env.local` locally; `/var/www/curiolabs/.env.local` on the server (mode 600) |
 | `ELEVENLABS_API_KEY` | Spoken replies, and backup speech-to-text | same as above |
 | `WHISPER_URL`, `WHISPER_ENABLED` | Optional local Whisper URL and opt-out switch; defaults to `http://127.0.0.1:8178` and enabled | same as above |
+| `DATABASE_URL` | TigerData/Timescale PostgreSQL connection string for anonymous instances, workspace state, chat, files, and the shared asset library | same as above |
+| `LIBRARY_WRITE_TOKEN` | Optional server-only token required to upload shared font/media assets; reads remain available without it | same as above |
 | `GEMINI_MODEL`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_STT_MODEL` | Optional model and voice overrides | same as above |
 | GitHub Actions secrets | `VULTR_HOST`, `VULTR_USER`, `VULTR_SSH_KEY`, `VULTR_KNOWN_HOSTS` | GitHub repo settings. App keys are intentionally **not** here |
 
@@ -154,6 +162,7 @@ Keys are read only from `process.env` at runtime, never written in code. `npm ru
 1. Rotate the Gemini key and the ElevenLabs key.
 2. Rotate the `linuxuser` server password and consider disabling SSH password login, since CI uses key auth.
 3. After rotating, update both `.env.local` files and restart PM2 with `pm2 restart curiolabs --update-env`.
+4. Rotate the TigerData database credential because it was shared in chat, then update the server `.env.local` and restart PM2.
 
 ## 7. Run it locally
 
@@ -195,6 +204,8 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
 - The browser test suites (Playwright) that verified this work were ad hoc and are **not in the repo**. See next steps.
+- Anonymous instance cookies identify a workspace but are not authentication. The future auth service must bind authenticated users to these instance records before exposing profile/password operations broadly.
+- Instance files are capped at 10 MB and shared library assets at 25 MB. Library writes require `LIBRARY_WRITE_TOKEN` until the auth service exists.
 
 ## 10. Where to work next
 
@@ -202,7 +213,8 @@ In priority order, matching the build phases:
 
 1. **HTTPS and a hostname** so the mic works in production (section 5).
 2. **Put the browser and API tests in the repo** (`scripts/e2e/`, Playwright) and run them in CI. The Gemini and voice suites covered: keep-layout enforcement, hostile model output, fallback on outage and 429, full voice loop with a fake microphone, permission errors, silence, rate limiting, and key-leak scans.
-3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
+3. **Connect the future auth service** to `curio_instance_id` and gate profile/password operations and library writes by authenticated identity.
+4. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
 5. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
 6. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
 7. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
@@ -219,4 +231,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | merged | PR #2, squash-merged as `3fbdc3c`. Also carried `handoff-and-env-setup`. Deployed and verified live |
 | `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | merged | PR #3, squash-merged as `1ac666d`; deployed and verified live |
 | `handoff-whisper-merged` | 2026-10-10 | Mark the offline Whisper branch merged and record its live deployment | in progress | |
+| `persist-user-instances` | 2026-10-10 | Persist anonymous user instances, profiles, workspace state, chat history, and associated files in PostgreSQL | PR open | PR #5 |
 <!-- BRANCH-LOG-INSERT -->
