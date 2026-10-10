@@ -236,4 +236,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-database-verified` | 2026-10-10 | Record merged persistence and asset suggestion verification | merged | PR #7 |
 | `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | merged | PR #8; README and submission documentation deployed |
 | `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | PR open | PR #9 |
+| `committed-browser-api-tests` | 2026-10-10 | Add committed Playwright browser and API coverage | in progress | |
 <!-- BRANCH-LOG-INSERT -->
