@@ -234,4 +234,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `persist-user-instances` | 2026-10-10 | Persist anonymous user instances, profiles, workspace state, chat history, and associated files in PostgreSQL | merged | PR #5; production database smoke-tested |
 | `asset-suggestion-reliability` | 2026-10-10 | Ensure Gemini surfaces exact shared library asset suggestions | merged | PR #6; production Gemini asset suggestion smoke-tested |
 | `handoff-database-verified` | 2026-10-10 | Record merged persistence and asset suggestion verification | PR open | PR #7 |
+| `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | in progress | |
 <!-- BRANCH-LOG-INSERT -->
