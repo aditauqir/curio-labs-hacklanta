@@ -59,11 +59,31 @@ jobs:
           newline=$'\n'
           normalized_key="${SSH_KEY//\\n/$newline}"
           normalized_key="${normalized_key//$'\r'/}"
+          if [[ "$normalized_key" == \"*\" ]]; then
+            normalized_key="${normalized_key:1:${#normalized_key}-2}"
+          fi
+
           printf '%s\n' "$normalized_key" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
           if ! ssh-keygen -y -P "" -f ~/.ssh/id_ed25519 > /dev/null 2>&1; then
-            echo "VULTR_SSH_KEY is not a readable, unencrypted private SSH key"
+            if [[ "$normalized_key" != *"PRIVATE KEY"* ]]; then
+              decoded_key=$(mktemp)
+              if printf '%s' "$normalized_key" | base64 --decode > "$decoded_key" 2>/dev/null; then
+                chmod 600 "$decoded_key"
+                if ssh-keygen -y -P "" -f "$decoded_key" > /dev/null 2>&1; then
+                  mv "$decoded_key" ~/.ssh/id_ed25519
+                else
+                  rm -f "$decoded_key"
+                fi
+              else
+                rm -f "$decoded_key"
+              fi
+            fi
+          fi
+
+          if ! ssh-keygen -y -P "" -f ~/.ssh/id_ed25519 > /dev/null 2>&1; then
+            echo "VULTR_SSH_KEY must be an unencrypted private SSH key, plain or base64 encoded"
             exit 1
           fi
 
