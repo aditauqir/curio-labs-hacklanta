@@ -217,5 +217,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `app-setup-1` | 2026-10-09 | Curio Labs workspace UI, CI checks, rollback-safe deploy, opencode LSP config | merged | PR #1, squash-merged |
 | `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | merged | Carried into main by PR #2 (it was the base of `gemini-voice-integration`) |
 | `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | merged | PR #2, squash-merged as `3fbdc3c`. Also carried `handoff-and-env-setup`. Deployed and verified live |
-| `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | in progress | |
+| `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | PR open | PR #3 |
 <!-- BRANCH-LOG-INSERT -->
