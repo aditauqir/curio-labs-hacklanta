@@ -219,4 +219,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | merged | PR #2, squash-merged as `3fbdc3c`. Also carried `handoff-and-env-setup`. Deployed and verified live |
 | `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | merged | PR #3, squash-merged as `1ac666d`; deployed and verified live |
 | `handoff-whisper-merged` | 2026-10-10 | Mark the offline Whisper branch merged and record its live deployment | in progress | |
+| `persist-user-instances` | 2026-10-10 | Persist anonymous user instances, profiles, workspace state, chat history, and associated files in PostgreSQL | in progress | |
 <!-- BRANCH-LOG-INSERT -->
