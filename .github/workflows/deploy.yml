@@ -16,21 +16,28 @@ concurrency:
 
 jobs:
   build:
-    name: Build Next.js
+    name: Lint, typecheck and build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Build application
         run: npm run build
@@ -39,6 +46,7 @@ jobs:
     name: Deploy to Vultr
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Configure SSH
@@ -107,6 +115,19 @@ jobs:
 
             cd /var/www/curiolabs
 
+            previous_sha=$(git rev-parse HEAD)
+
+            rollback() {
+              echo "Deployment failed. Restoring previous release ${previous_sha}..."
+              if [ "$(git rev-parse HEAD)" != "$previous_sha" ]; then
+                git reset --hard "$previous_sha"
+                npm ci
+                npm run build
+                pm2 restart curiolabs --update-env
+              fi
+            }
+            trap rollback ERR
+
             echo "Fetching latest code..."
             git fetch origin main
             git merge --ff-only origin/main
@@ -125,5 +146,17 @@ jobs:
               --retry 10 --retry-delay 2 --retry-connrefused \
               http://127.0.0.1:3000/ > /dev/null
 
+            trap - ERR
+            echo "Deployed $(git rev-parse --short HEAD)"
             echo "Deployment successful!"
           EOF
+
+      - name: Verify public endpoint
+        env:
+          VULTR_HOST: ${{ secrets.VULTR_HOST }}
+        run: |
+          curl --fail --silent --show-error \
+            --retry 10 --retry-delay 3 --retry-connrefused \
+            --max-time 15 \
+            "http://${VULTR_HOST}/" > /dev/null
+          echo "Public endpoint is responding."
