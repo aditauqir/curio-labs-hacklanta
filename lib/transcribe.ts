@@ -5,14 +5,11 @@ import { VoiceError } from "./voice-error";
 
 export type Transcriber = "whisper" | "elevenlabs";
 
-/**
- * Offline Whisper first: it is free, private, and needs no key. ElevenLabs is the
- * backup when the Whisper server is not running or fails.
- */
+/** ElevenLabs is the primary provider; local Whisper remains the offline fallback. */
 export async function availableTranscribers(): Promise<Transcriber[]> {
   const providers: Transcriber[] = [];
-  if (await isWhisperUp()) providers.push("whisper");
   if (isElevenLabsConfigured()) providers.push("elevenlabs");
+  if (await isWhisperUp()) providers.push("whisper");
   return providers;
 }
 

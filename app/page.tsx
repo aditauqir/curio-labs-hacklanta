@@ -1,5 +1,5 @@
-import StudioLoader from "@/components/studio/studio-loader";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return <StudioLoader />;
+export default function RootPage() {
+  redirect("/home");
 }

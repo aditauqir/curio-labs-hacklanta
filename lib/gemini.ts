@@ -7,7 +7,7 @@ import {
   fontPairs,
 } from "./design-presets";
 import type { AssetSuggestion, DesignState } from "./design-types";
-import { libraryContext } from "./library";
+import { LIBRARY_KINDS, libraryContext, searchLibraryAssets, type LibraryKind } from "./library";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Pinned models get retired (gemini-2.5-flash is already closed to new keys),
@@ -237,6 +237,236 @@ export async function askGemini(input: {
       skipped,
       model,
       assetSuggestions,
+    };
+  }
+
+  throw new GeminiError("upstream", `Gemini is unavailable (last status ${lastStatus})`);
+}
+
+const COACH_SYSTEM_PROMPT = `You are the visual coach beside Curio Labs' poster editor.
+
+Give one concrete, kind piece of layout feedback based only on the poster state provided. Focus on hierarchy, alignment, spacing, contrast, or type scale. Never claim to see pixels that are not represented in the state. If a reference, font, palette, or library asset would make the advice more specific, call search_library_assets first. Keep the final answer to two short plain sentences. Do not suggest changing everything at once.`;
+
+const COACH_TOOLS = [
+  {
+    functionDeclarations: [
+      {
+        name: "search_library_assets",
+        description:
+          "Search the TigerData-backed Curio library for references, fonts, palettes, or media relevant to a visual coaching question.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            query: {
+              type: "STRING",
+              description: "A short search phrase such as Swiss grid, jazz poster, or display type.",
+            },
+            kind: {
+              type: "STRING",
+              enum: [...LIBRARY_KINDS],
+              description: "Optional asset kind to narrow the search.",
+            },
+            limit: {
+              type: "INTEGER",
+              description: "Maximum number of matching assets, from 1 to 6.",
+            },
+          },
+          required: ["query"],
+        },
+      },
+    ],
+  },
+];
+
+type CoachContent = {
+  role?: string;
+  parts?: Array<Record<string, unknown>>;
+};
+
+type CoachFunctionCall = {
+  id?: string;
+  name: string;
+  args: Record<string, unknown>;
+};
+
+export type CoachResult = {
+  feedback: string;
+  focus: "hierarchy" | "alignment" | "spacing" | "contrast" | "type";
+  model: string;
+  usedTool: boolean;
+  assets: AssetSuggestion[];
+};
+
+function coachCandidate(value: unknown) {
+  const candidate = (value as { candidates?: Array<{ content?: CoachContent }> } | null)?.candidates?.[0];
+  const content = candidate?.content;
+  const parts = Array.isArray(content?.parts) ? content.parts : [];
+  const text = parts
+    .map((part) => (typeof part.text === "string" ? part.text : ""))
+    .join("")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .trim()
+    .slice(0, 500);
+  const functionCallPart = parts.find((part) => {
+    const call = part.functionCall;
+    return typeof call === "object" && call !== null && typeof (call as { name?: unknown }).name === "string";
+  });
+  const call = functionCallPart?.functionCall as { id?: unknown; name?: unknown; args?: unknown } | undefined;
+  return {
+    content,
+    text,
+    functionCall:
+      call && typeof call.name === "string"
+        ? {
+            id: typeof call.id === "string" ? call.id : undefined,
+            name: call.name,
+            args:
+              typeof call.args === "object" && call.args !== null && !Array.isArray(call.args)
+                ? (call.args as Record<string, unknown>)
+                : {},
+          }
+        : null,
+  };
+}
+
+function coachFocus(text: string): CoachResult["focus"] {
+  const lower = text.toLocaleLowerCase();
+  if (lower.includes("align") || lower.includes("margin") || lower.includes("grid")) return "alignment";
+  if (lower.includes("space") || lower.includes("breath") || lower.includes("crowd")) return "spacing";
+  if (lower.includes("contrast") || lower.includes("read") || lower.includes("dark")) return "contrast";
+  if (lower.includes("type") || lower.includes("font") || lower.includes("headline")) return "type";
+  return "hierarchy";
+}
+
+function coachAssets(value: unknown): AssetSuggestion[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((asset): asset is Record<string, unknown> => typeof asset === "object" && asset !== null)
+    .map((asset) => ({
+      id: typeof asset.id === "string" ? asset.id : "",
+      kind: typeof asset.kind === "string" ? asset.kind : "reference",
+      name: typeof asset.name === "string" ? asset.name : "Library reference",
+      description: typeof asset.description === "string" ? asset.description : null,
+    }))
+    .filter((asset) => asset.id)
+    .slice(0, 3);
+}
+
+async function executeCoachTool(call: CoachFunctionCall, instanceId?: string) {
+  if (call.name !== "search_library_assets") {
+    return { error: "Unknown tool" };
+  }
+
+  const query = typeof call.args.query === "string" ? call.args.query.trim().slice(0, 80) : "poster design";
+  const kind = typeof call.args.kind === "string" && LIBRARY_KINDS.includes(call.args.kind as LibraryKind)
+    ? (call.args.kind as LibraryKind)
+    : undefined;
+  const limit = typeof call.args.limit === "number" ? Math.min(6, Math.max(1, Math.round(call.args.limit))) : 6;
+
+  try {
+    const assets = await searchLibraryAssets(query, { kind, limit, ownerInstanceId: instanceId });
+    return {
+      query,
+      assets: assets.map(({ id, kind: assetKind, name, description, tags, sourceUrl }) => ({
+        id,
+        kind: assetKind,
+        name,
+        description,
+        tags,
+        sourceUrl,
+      })),
+    };
+  } catch {
+    return { query, assets: [], error: "The shared library is unavailable right now." };
+  }
+}
+
+/** Gemini's coaching pass has a real function-call round trip into TigerData. */
+export async function askGeminiCoach(input: {
+  design: DesignState;
+  question?: string;
+  instanceId?: string;
+}): Promise<CoachResult> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new GeminiError("not_configured", "GEMINI_API_KEY is not set");
+
+  const prompt = `${input.question?.trim() || "Check this poster layout."}\n\nPoster state:\n${describeDesign(input.design, null)}`;
+  let lastStatus = 0;
+
+  for (const model of modelChain()) {
+    const contents: CoachContent[] = [{ role: "user", parts: [{ text: prompt }] }];
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: COACH_SYSTEM_PROMPT }] },
+      contents,
+      tools: COACH_TOOLS,
+      toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+      generationConfig: { temperature: 0.35, maxOutputTokens: 240 },
+    });
+
+    let response: Response;
+    try {
+      response = await callModel(model, apiKey, body);
+    } catch {
+      continue;
+    }
+    lastStatus = response.status;
+    if (response.status === 400 || response.status === 401 || response.status === 403) {
+      throw new GeminiError("upstream", `Gemini rejected the coaching request (${response.status})`);
+    }
+    if (!response.ok) continue;
+
+    const firstJson: unknown = await response.json().catch(() => null);
+    const first = coachCandidate(firstJson);
+    let final = first;
+    let usedTool = false;
+    let assets: AssetSuggestion[] = [];
+
+    if (first.content && first.functionCall) {
+      usedTool = true;
+      const toolResponse = await executeCoachTool(first.functionCall, input.instanceId);
+      assets = coachAssets((toolResponse as { assets?: unknown }).assets);
+      contents.push(first.content);
+      contents.push({
+        role: "user",
+        parts: [
+          {
+            functionResponse: {
+              id: first.functionCall.id,
+              name: first.functionCall.name,
+              response: toolResponse,
+            },
+          },
+        ],
+      });
+
+      let finalResponse: Response;
+      try {
+        finalResponse = await callModel(
+          model,
+          apiKey,
+          JSON.stringify({
+            systemInstruction: { parts: [{ text: COACH_SYSTEM_PROMPT }] },
+            contents,
+            tools: COACH_TOOLS,
+            toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+            generationConfig: { temperature: 0.35, maxOutputTokens: 240 },
+          }),
+        );
+      } catch {
+        finalResponse = new Response(null, { status: 599 });
+      }
+      if (finalResponse.ok) {
+        final = coachCandidate(await finalResponse.json().catch(() => null));
+      }
+    }
+
+    if (!final.text) throw new GeminiError("bad_output", "Gemini returned no coaching feedback");
+    return {
+      feedback: final.text,
+      focus: coachFocus(final.text),
+      model,
+      usedTool,
+      assets,
     };
   }
 

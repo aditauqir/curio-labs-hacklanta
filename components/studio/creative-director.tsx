@@ -13,9 +13,10 @@ import { directionConfigs } from "@/lib/design-presets";
 import { interpretRequest } from "@/lib/demo-director";
 import { askDirector, DirectorError } from "@/lib/director-client";
 import { makeId, type StudioAction } from "@/lib/design-state";
-import { MicIcon, MicOffIcon, SendIcon, StopIcon } from "./icons";
+import { MicIcon, MicOffIcon, SendIcon } from "./icons";
 import { useCapabilities } from "./use-capabilities";
 import { useVoice } from "./use-voice";
+import { VoiceKeyframes } from "./voice-keyframes";
 
 const MAX_MESSAGE = 500;
 
@@ -68,19 +69,21 @@ export function CreativeDirector({
   design,
   selectedPaletteId,
   dispatch,
+  initialPrompt,
 }: {
   messages: ChatMessage[];
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
+  initialPrompt?: string | null;
 }) {
   const capabilities = useCapabilities();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [heard, setHeard] = useState<{ text: string; provider: string | null } | null>(null);
-  const [speakReplies, setSpeakReplies] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef(false);
+  const initialPromptRef = useRef<string | null>(null);
   const sendRef = useRef<(text: string, spoken?: boolean) => void>(() => undefined);
 
   const voice = useVoice({
@@ -164,7 +167,7 @@ export function CreativeDirector({
           },
         ],
       });
-      if (spoken || speakReplies) void speak(outcome.reply);
+      if (spoken || voice.canSpeak) void speak(outcome.reply);
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -174,6 +177,12 @@ export function CreativeDirector({
   useEffect(() => {
     sendRef.current = (text, spoken) => void send(text, spoken);
   });
+
+  useEffect(() => {
+    if (!initialPrompt || initialPromptRef.current === initialPrompt || !capabilities.loaded) return;
+    initialPromptRef.current = initialPrompt;
+    sendRef.current(initialPrompt);
+  }, [capabilities.loaded, initialPrompt]);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -210,17 +219,24 @@ export function CreativeDirector({
       aria-label="Creative director"
       className="flex min-h-0 flex-1 flex-col bg-panel"
     >
-      <div className="border-b border-line px-5 py-4">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
-          Creative director
-        </h2>
-        <p className="mt-1 text-xs text-muted">
-          {!capabilities.loaded
-            ? "Checking which services are available..."
-            : capabilities.gemini
-              ? "Powered by Gemini. Every change is validated before it touches your poster."
-              : "Demo mode: no Gemini key is configured, so replies come from local rules, not an AI model."}
-        </p>
+      <div className="director-header border-b border-line px-5 py-4">
+        <div className="director-heading-row">
+          <span className="director-mascot" aria-hidden="true">
+            <VoiceKeyframes active={voice.phase === "speaking"} />
+          </span>
+          <div>
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
+              Creative director
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              {!capabilities.loaded
+                ? "Checking which services are available..."
+                : capabilities.gemini
+                  ? "Powered by Gemini. Every change is validated before it touches your poster."
+                  : "Demo mode: local rules are guiding the direction until Gemini is available."}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5" aria-live="polite">
@@ -333,7 +349,12 @@ export function CreativeDirector({
           </p>
         ) : null}
 
-        <form onSubmit={onSubmit} className="flex items-center gap-2">
+        <form
+          onSubmit={onSubmit}
+          aria-label="Chat with the creative director"
+          data-testid="editor-chat-box"
+          className="director-chat-box flex items-center gap-2 rounded-2xl border border-line bg-paper p-1.5"
+        >
           <button
             type="button"
             disabled={micDisabled}
@@ -341,13 +362,19 @@ export function CreativeDirector({
             aria-pressed={listening}
             title={voice.block ? voiceStatus : micLabel}
             onClick={() => (listening ? voice.stop() : void voice.start())}
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-md border transition-colors disabled:opacity-50 ${
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition-colors disabled:opacity-50 ${
               listening
                 ? "border-ink bg-ink text-paper"
                 : "border-line text-ink hover:border-ink"
             }`}
           >
-            {voice.block ? <MicOffIcon /> : listening ? <StopIcon /> : <MicIcon />}
+            {voice.block ? (
+              <MicOffIcon />
+            ) : voice.phase === "speaking" ? (
+              <VoiceKeyframes active />
+            ) : (
+              <MicIcon />
+            )}
           </button>
           <input
             type="text"
@@ -356,13 +383,13 @@ export function CreativeDirector({
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Describe a change or a direction"
             aria-label="Message the creative director"
-            className="h-10 min-w-0 flex-1 rounded-md border border-line bg-paper px-3 text-sm text-ink placeholder:text-muted"
+            className="h-10 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
           />
           <button
             type="submit"
             disabled={pending || !draft.trim()}
             aria-label="Send message"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-ink text-paper transition-opacity disabled:opacity-30"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper transition-opacity disabled:opacity-30"
           >
             <SendIcon />
           </button>
@@ -379,6 +406,7 @@ export function CreativeDirector({
               "Transcribing..."
             ) : voice.phase === "speaking" ? (
               <span className="inline-flex items-center gap-2 text-ink">
+                <VoiceKeyframes active />
                 Speaking...
                 <button
                   type="button"
@@ -393,19 +421,9 @@ export function CreativeDirector({
             )}
           </p>
 
-          <label
-            className={`flex shrink-0 items-center gap-1.5 text-[11px] ${
-              voice.canSpeak ? "text-muted" : "text-muted opacity-50"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={speakReplies}
-              disabled={!voice.canSpeak}
-              onChange={(event) => setSpeakReplies(event.target.checked)}
-            />
-            Speak replies
-          </label>
+          <span className={`shrink-0 text-[11px] ${voice.canSpeak ? "text-ink" : "text-muted"}`}>
+            {voice.canSpeak ? "ElevenLabs voice on" : "Text replies only"}
+          </span>
         </div>
 
         {voice.error ? (

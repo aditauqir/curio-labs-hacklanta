@@ -19,10 +19,13 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 Live at **https://idkjustmakeitlookgood.gay/** and **https://155-138-194-120.sslip.io/**. Deployed from `main` on every merge.
 
-Live verification on 2026-10-10: Gemini and ElevenLabs returned successful responses, Whisper is online on the server, HTTPS is active, and the browser reports a secure context with the microphone control enabled.
+Live verification on 2026-10-10: Gemini and ElevenLabs returned successful responses, Whisper is online on the server, HTTPS is active, and the browser reports a secure context with the microphone control enabled. Local verification also confirmed the wireframe start screen, tldraw board, and Gemini coaching tool loop.
 
 | Area | Status |
 | --- | --- |
+| Start, director, and full editor screen states | Working locally. The start screen gathers an idea, the director screen owns the conversation, and the full editor combines chat, canvas, and references/inspector. |
+| Entry route | Working locally. The root route redirects to `/home`; the supplied wireframe-led start-to-director-to-editor flow lives there. |
+| Onboarding/editor visual workflow | Working locally. The wireframe-led start screen uses `voice_key1.svg` as the mascot, a centered bundled Redaction 20 Curio Labs wordmark, and real start/director/editor transitions; the full editor uses a references/fonts rail above an always-speaking director rail beside the live canvas. |
 | Three-panel workspace (director, canvas, inspiration) | Working |
 | Three poster directions (Vintage Jazz, Modern Minimal, Experimental Editorial) | Working |
 | Independent edits: headline, copy, accent, alignment, spacing, font pairing, palette | Working |
@@ -31,12 +34,14 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | PostgreSQL persistence | Working. Anonymous instances have separate profiles, hashed passwords, workspace state, chat history, and files; the shared library seeds fonts, palettes, and references for Gemini context. |
 | Account sessions and ownership | Built on `user-persistence-refresh`; local checks, a real TigerData smoke test, and production API verification pass. |
 | PNG export (renders the same layout model as the screen) and brief JSON export | Working |
+| Poster export formats | Working locally. PNG and JPG are raster exports; PSD is a real layered Photoshop-compatible document with background, graphics, and typography layers. |
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
+| Viewport behavior | Working locally. The document and all top-level screens are locked to `100dvh` with no page scroll; long chat, inspiration, and canvas content stays inside its own panel. |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
-| Gemini integration | Built. `POST /api/creative-director`. Output is validated against whitelists and reconciled with the user's intent (see section 4). |
+| Gemini integration | Built. `POST /api/creative-director` returns validated reducer patches. `POST /api/creative-coach` performs a Gemini function-call round trip into the TigerData library before returning placement feedback. |
 | Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Production microphone access is enabled over HTTPS. |
-| Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
-| Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
+| Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Director replies speak automatically whenever ElevenLabs is configured; voice requests also speak automatically. Default voice is `ZoiZ8fuDWInAcwPXaVeq`; `ELEVENLABS_VOICE_ID` can override it. Works over plain HTTP. |
+| Visual reference cards | Working locally. 31 distinct Pinterest poster searches are source-linked in the inspiration rail; Curio renders original abstract thumbnails rather than copying remote poster images. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
@@ -44,7 +49,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 
 ## 3. Stack
 
-Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (strict), Tailwind CSS 4, npm. Hosted on a Vultr VPS, not Vercel.
+Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui source components backed by Radix, tldraw for the freeform board, npm. The poster itself stays a reducer-driven SVG for crisp text/export performance; PhotoCraft was evaluated as a Rust/WebAssembly GPU image editor, but is not bundled into the poster path. Hosted on a Vultr VPS, not Vercel.
 
 **Next.js 16 has breaking changes versus older versions.** Read the matching guide in `node_modules/next/dist/docs/` before writing Next-specific code (see `AGENTS.md`).
 `LayoutProps` is a generated global type. A bare `tsc` fails on a clean checkout, so always use `npm run typecheck`, which runs `next typegen` first.
@@ -53,14 +58,15 @@ Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (
 
 ```
 app/
-  layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; sets metadata
+  layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; bundled Neue Montreal, Apfel Grotezk, and Redaction 20 assets load from globals.css
   page.tsx              Server component that renders <StudioLoader />
   globals.css           Tailwind import and the neutral UI palette tokens
 components/studio/
   studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from browser/database persistence
   studio-workspace.tsx  Header, mobile tabs, useReducer, database/local fallback persistence
   creative-director.tsx Left panel: chat UI, suggestion chips, microphone and spoken replies
-  design-canvas.tsx     Centre panel: poster, direction switch, editing controls
+  design-canvas.tsx     Centre panel: poster, direction switch, editing controls, Gemini/TigerData coach and embedded tldraw board
+  tldraw-board.tsx      Embedded freeform ideation board; separate from the export source of truth
   poster.tsx            Renders the poster as real SVG elements from the layout model
   inspiration-board.tsx Right panel shell, reference thumbnails
   creative-brief.tsx    Editable brief rows
@@ -76,6 +82,7 @@ lib/
 app/api/
   status/route.ts             Which integrations are configured (booleans only). Uses connection() so it is not prerendered
   creative-director/route.ts  Gemini design edits. Validates input, rate limits, never returns upstream error text
+  creative-coach/route.ts     Gemini visual coaching with a TigerData library search tool
   voice/transcribe/route.ts   Audio upload -> text (Whisper, ElevenLabs fallback)
   voice/speak/route.ts        Text -> MP3 (ElevenLabs), streamed
   workspace/route.ts           Anonymous instance workspace load/save
@@ -85,7 +92,9 @@ app/api/
 lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.ts, gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
   ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
   director-client.ts    Browser fetch for the director with a timeout
+  coach-client.ts       Browser fetch for the Gemini/TigerData coaching route
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
+components/ui/             shadcn/ui source primitives used by the workflow
 scripts/new-branch.mjs  Creates a branch and logs it here (see Working agreement)
 scripts/check-secrets.mjs  Fails if a credential-shaped string is in a committable file
 scripts/add-domain-ssl.sh  Server-side: add a domain to nginx and expand the Let's Encrypt certificate
@@ -217,7 +226,7 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 - Fonts use `next/font/google`. Builds need outbound network access to fetch them.
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
-- The committed Playwright suite covers the public API contracts, no-database fallback, mobile workspace, local director edits, panel switching, and JSON export. Voice hardware and production Gemini/Whisper flows still need separate integration coverage.
+- The committed Playwright suite covers the public API contracts, no-database fallback, onboarding, start-to-director-to-editor navigation, mobile workspace, local director edits, a mocked Gemini-to-editor patch, panel switching, JSON export, JPG/PSD export, and warm tooltips. Voice hardware and production Gemini/Whisper flows still need separate integration coverage.
 - Anonymous instance cookies identify a workspace but are not authentication. The future auth service must bind authenticated users to these instance records before exposing profile/password operations broadly.
 - Instance files are capped at 10 MB and shared library assets at 25 MB. Library writes require `LIBRARY_WRITE_TOKEN` until the auth service exists.
 
@@ -225,10 +234,10 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 In priority order, matching the build phases:
 
-1. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
-2. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
-3. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
-4. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
+1. **Merge and deploy `tldraw-voice-onboarding`.** Review the wireframe start, director, full editor, tldraw board, Gemini/TigerData coach, and PNG/JPG/PSD export flows before promoting it to `main`.
+2. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
+3. **Reference depth.** Replace or supplement the 31 source-linked Pinterest searches with legally usable, verified assets when licensing/attribution requirements are settled.
+4. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
 
 ## Branch log
 
@@ -251,5 +260,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
-| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas and animated chat voice input | in progress | |
+| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, and exact ElevenLabs voice default added; typecheck, lint, build, and 15 Playwright tests pass; not deployed |
 <!-- BRANCH-LOG-INSERT -->

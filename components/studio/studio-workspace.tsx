@@ -3,19 +3,23 @@
 import { useEffect, useReducer, useState } from "react";
 import { createDefaultState, sanitizeState, studioReducer } from "@/lib/design-state";
 import { loadStudioSnapshot, loadStudioState, markStudioStateSynced, saveStudioState } from "@/lib/storage";
+import { ChatScreen } from "./chat-screen";
 import { CreativeDirector } from "./creative-director";
 import { DesignCanvas } from "./design-canvas";
 import { ExportControls } from "./export-controls";
 import { InspirationBoard } from "./inspiration-board";
-import { AccountControl } from "./account-control";
+import { OnboardingStudio, type StartDestination } from "./onboarding-studio";
 
 type Tab = "chat" | "canvas" | "inspiration";
+type StudioView = "start" | "chat" | "editor";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "chat", label: "Director" },
   { id: "canvas", label: "Canvas" },
   { id: "inspiration", label: "Inspiration" },
 ];
+
+const ONBOARDING_KEY = "curio-onboarding-complete-v1";
 
 export default function StudioWorkspace() {
   const [state, dispatch] = useReducer(
@@ -24,6 +28,15 @@ export default function StudioWorkspace() {
     createDefaultState,
   );
   const [tab, setTab] = useState<Tab>("canvas");
+  const [view, setView] = useState<StudioView>(
+    () =>
+      typeof window === "undefined"
+        ? "start"
+        : window.localStorage.getItem(ONBOARDING_KEY) === "true"
+          ? "editor"
+          : "start",
+  );
+  const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
   const [persistence, setPersistence] = useState<{
     ready: boolean;
     instanceId: string | null;
@@ -102,7 +115,6 @@ export default function StudioWorkspace() {
   }, [persistence, state]);
 
   const { design, messages, selectedPaletteId } = state;
-  const show = (target: Tab) => (tab === target ? "flex" : "hidden");
 
   function resetProject() {
     if (window.confirm("Reset the whole project, including the conversation?")) {
@@ -110,9 +122,50 @@ export default function StudioWorkspace() {
     }
   }
 
+  function startStudio(prompt?: string, destination: StartDestination = prompt ? "chat" : "editor") {
+    window.localStorage.setItem(ONBOARDING_KEY, "true");
+    setInitialPrompt(prompt?.trim() || null);
+    setView(destination);
+  }
+
+  function openChat() {
+    setInitialPrompt(null);
+    setView("chat");
+  }
+
+  function openEditor() {
+    setInitialPrompt(null);
+    setView("editor");
+  }
+
+  function openStart() {
+    window.localStorage.removeItem(ONBOARDING_KEY);
+    setInitialPrompt(null);
+    setView("start");
+  }
+
+  if (view === "start") return <OnboardingStudio onStart={startStudio} projectName={design.projectName} />;
+
+  if (view === "chat") {
+    return (
+      <ChatScreen
+        design={design}
+        messages={messages}
+        selectedPaletteId={selectedPaletteId}
+        dispatch={dispatch}
+        initialPrompt={initialPrompt}
+        onBack={openStart}
+        onOpenEditor={openEditor}
+      />
+    );
+  }
+
   return (
-    <div className="flex h-dvh flex-col bg-paper text-ink">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel px-4 py-3 sm:px-5">
+    <div
+      className="studio-editor-shell flex h-dvh flex-col bg-paper text-ink"
+      data-testid="editor-screen"
+    >
+      <header className="studio-editor-header flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-baseline gap-4">
           <h1 className="font-display whitespace-nowrap text-lg font-bold tracking-[0.18em] sm:text-xl">
             CURIO LABS
@@ -123,6 +176,14 @@ export default function StudioWorkspace() {
         </div>
 
         <div className="order-3 flex w-full min-w-0 items-center justify-between gap-3 sm:order-2 sm:w-auto sm:justify-start">
+          <div className="studio-view-switcher" aria-label="Studio views">
+            <button type="button" aria-label="Open director" onClick={openChat}>
+              Director
+            </button>
+            <button type="button" aria-current="page" className="is-active">
+              Editor
+            </button>
+          </div>
           <label className="flex min-w-0 items-center gap-2 text-xs text-muted">
             <span>Project</span>
             <input
@@ -143,11 +204,24 @@ export default function StudioWorkspace() {
           >
             Reset project
           </button>
+          <button
+            type="button"
+            onClick={openStart}
+            className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
+          >
+            Start screen
+          </button>
+          <button
+            type="button"
+            onClick={openStart}
+            className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
+          >
+            Exit
+          </button>
         </div>
 
         <div className="order-2 sm:order-3">
           <div className="flex items-center gap-2">
-            <AccountControl />
             <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
           </div>
         </div>
@@ -174,26 +248,27 @@ export default function StudioWorkspace() {
         ))}
       </div>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)_380px]">
-        <div className={`${show("chat")} min-h-0 flex-col border-line lg:flex lg:border-r`}>
-          <CreativeDirector
-            messages={messages}
-            design={design}
-            selectedPaletteId={selectedPaletteId}
-            dispatch={dispatch}
-          />
-        </div>
-        <div className={`${show("canvas")} min-h-0 min-w-0 flex-col lg:flex`}>
+      <main className="studio-editor-grid min-h-0 flex-1" data-tab={tab}>
+        <aside className="studio-editor-rail min-h-0 border-line lg:border-r">
+          <div className="studio-rail-panel studio-rail-inspiration">
+            <InspirationBoard
+              design={design}
+              selectedPaletteId={selectedPaletteId}
+              dispatch={dispatch}
+            />
+          </div>
+          <div className="studio-rail-panel studio-rail-chat border-line lg:border-t">
+            <CreativeDirector
+              messages={messages}
+              design={design}
+              selectedPaletteId={selectedPaletteId}
+              dispatch={dispatch}
+              initialPrompt={initialPrompt}
+            />
+          </div>
+        </aside>
+        <div className="studio-editor-canvas min-h-0 min-w-0">
           <DesignCanvas design={design} dispatch={dispatch} />
-        </div>
-        <div
-          className={`${show("inspiration")} min-h-0 flex-col border-line lg:flex lg:border-l`}
-        >
-          <InspirationBoard
-            design={design}
-            selectedPaletteId={selectedPaletteId}
-            dispatch={dispatch}
-          />
         </div>
       </main>
     </div>

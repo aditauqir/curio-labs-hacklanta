@@ -1,3 +1,4 @@
+import { writePsd } from "ag-psd";
 import type { DesignState } from "./design-types";
 import { getBrief } from "./design-state";
 import {
@@ -112,8 +113,23 @@ function drawText(
   }
 }
 
-/** Renders the same poster model the screen uses and downloads it as a PNG. */
-export async function exportPosterAsPng(design: DesignState) {
+export type PosterExportFormat = "png" | "jpg" | "psd";
+
+type PosterLayers = {
+  composite: HTMLCanvasElement;
+  background: HTMLCanvasElement;
+  graphics: HTMLCanvasElement;
+  typography: HTMLCanvasElement;
+};
+
+function createCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = POSTER_WIDTH;
+  canvas.height = POSTER_HEIGHT;
+  return canvas;
+}
+
+async function prepareFonts(design: DesignState) {
   const headingStack = resolveFontStack(design.typography.headingFont);
   const bodyStack = resolveFontStack(design.typography.bodyFont);
 
@@ -124,25 +140,91 @@ export async function exportPosterAsPng(design: DesignState) {
     document.fonts.load(`600 24px ${bodyStack}`),
   ]).catch(() => undefined);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = POSTER_WIDTH;
-  canvas.height = POSTER_HEIGHT;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas export is not supported in this browser.");
+  return { headingStack, bodyStack };
+}
 
-  ctx.fillStyle = design.colors.background;
-  ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
-
+function drawPosterLayers(
+  design: DesignState,
+  headingStack: string,
+  bodyStack: string,
+): PosterLayers {
+  const composite = createCanvas();
+  const background = createCanvas();
+  const graphics = createCanvas();
+  const typography = createCanvas();
   const { shapes, texts } = buildPoster(design);
-  shapes.forEach((shape) => drawShape(ctx, shape));
-  texts.forEach((item) => drawText(ctx, item, headingStack, bodyStack));
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/png"),
+  const backgroundContext = background.getContext("2d");
+  const graphicsContext = graphics.getContext("2d");
+  const typographyContext = typography.getContext("2d");
+  const compositeContext = composite.getContext("2d");
+  if (!backgroundContext || !graphicsContext || !typographyContext || !compositeContext) {
+    throw new Error("Canvas export is not supported in this browser.");
+  }
+
+  backgroundContext.fillStyle = design.colors.background;
+  backgroundContext.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+  compositeContext.drawImage(background, 0, 0);
+
+  shapes.forEach((shape) => {
+    drawShape(graphicsContext, shape);
+    drawShape(compositeContext, shape);
+  });
+  texts.forEach((item) => {
+    drawText(typographyContext, item, headingStack, bodyStack);
+    drawText(compositeContext, item, headingStack, bodyStack);
+  });
+
+  return { composite, background, graphics, typography };
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+/** Renders the same poster model the screen uses and downloads a raster image. */
+export async function exportPosterAsImage(design: DesignState, format: "png" | "jpg") {
+  const { headingStack, bodyStack } = await prepareFonts(design);
+  const { composite } = drawPosterLayers(design, headingStack, bodyStack);
+  const mime = format === "jpg" ? "image/jpeg" : "image/png";
+  const blob = await canvasBlob(composite, mime, format === "jpg" ? 0.92 : undefined);
+  if (!blob) throw new Error(`Could not create a ${format.toUpperCase()} from the poster.`);
+
+  downloadBlob(blob, `${slug(design.projectName)}-poster.${format}`);
+}
+
+/** Renders a layered PSD that opens in Photoshop and other PSD-compatible editors. */
+export async function exportPosterAsPsd(design: DesignState) {
+  const { headingStack, bodyStack } = await prepareFonts(design);
+  const layers = drawPosterLayers(design, headingStack, bodyStack);
+  const buffer = writePsd({
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
+    canvas: layers.composite,
+    children: [
+      { name: "Typography", canvas: layers.typography },
+      { name: "Graphics", canvas: layers.graphics },
+      { name: "Background", canvas: layers.background }
+    ]
+  });
+
+  downloadBlob(
+    new Blob([buffer], { type: "image/vnd.adobe.photoshop" }),
+    `${slug(design.projectName)}-poster.psd`,
   );
-  if (!blob) throw new Error("Could not create a PNG from the poster.");
+}
 
-  downloadBlob(blob, `${slug(design.projectName)}-poster.png`);
+export async function exportPoster(design: DesignState, format: PosterExportFormat) {
+  if (format === "psd") {
+    await exportPosterAsPsd(design);
+    return;
+  }
+  await exportPosterAsImage(design, format);
+}
+
+/** Backwards-compatible PNG export used by callers that do not need format selection. */
+export async function exportPosterAsPng(design: DesignState) {
+  await exportPosterAsImage(design, "png");
 }
 
 export function exportBriefAsJson(
