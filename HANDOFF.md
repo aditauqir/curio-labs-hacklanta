@@ -1,6 +1,6 @@
 # Curio Labs: Handoff
 
-Last updated: 2026-10-10
+Last updated: 2026-10-09
 
 Read this first. It is the single source of truth for where the project stands and where to work next.
 If you create a branch, you must also log it in the [Branch log](#branch-log). See [Working agreement](#working-agreement).
@@ -114,6 +114,8 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 
 Both app keys were checked against their APIs on 2026-10-09 (HTTP 200). Nothing in the code reads them yet.
 
+Keys are read only from `process.env` at runtime, never written in code. `npm run check:secrets` (part of `npm run check`, and a step in both CI workflows) fails the build if a credential-shaped string appears in any file git would commit. Gitignored files such as `.env.local` are skipped on purpose.
+
 - Google Cloud project for Gemini: **Hacklanta 2**, project number `145508307041`.
 - Gemini text models that were available to the key: `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.5-flash`, `gemini-3.6-flash`, `gemini-3.7-flash`, `gemini-3.8-flash`, plus `*-latest` aliases. Re-list before relying on a name; they change.
 - A new server needs the same `.env.local` created by hand. `git pull` will not bring it, by design.
@@ -137,7 +139,8 @@ Checks (run these before opening a PR; CI runs the same):
 npm run lint        # eslint, zero warnings allowed
 npm run typecheck   # next typegen && tsc --noEmit
 npm run build       # production build
-npm run check       # lint + typecheck
+npm run check       # secret scan + lint + typecheck
+npm run check:secrets  # just the secret scan
 ```
 
 In opencode, `/check` runs lint, typecheck, and build and fixes failures. `opencode.json` enables the built-in TypeScript and ESLint language servers.
@@ -180,5 +183,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | --- | --- | --- | --- | --- |
 | `main` | 2026-10-09 | Production. Auto-deploys to the Vultr server | live | Protected by convention: PRs only |
 | `app-setup-1` | 2026-10-09 | Curio Labs workspace UI, CI checks, rollback-safe deploy, opencode LSP config | merged | PR #1, squash-merged |
-| `handoff-and-env-setup` | 2026-10-10 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | in progress | |
+| `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | in progress | |
 <!-- BRANCH-LOG-INSERT -->

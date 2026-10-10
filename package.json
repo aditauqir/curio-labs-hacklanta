@@ -9,7 +9,9 @@
     "lint": "eslint --max-warnings=0",
     "lint:fix": "eslint --fix",
     "typecheck": "next typegen && tsc --noEmit",
-    "check": "npm run lint && npm run typecheck"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check": "npm run check:secrets && npm run lint && npm run typecheck",
+    "branch": "node scripts/new-branch.mjs"
   },
   "dependencies": {
     "next": "16.4.0",
