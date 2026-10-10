@@ -235,5 +235,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `asset-suggestion-reliability` | 2026-10-10 | Ensure Gemini surfaces exact shared library asset suggestions | merged | PR #6; production Gemini asset suggestion smoke-tested |
 | `handoff-database-verified` | 2026-10-10 | Record merged persistence and asset suggestion verification | merged | PR #7 |
 | `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | merged | PR #8; README and submission documentation deployed |
-| `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | in progress | |
+| `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | PR open | PR #9 |
 <!-- BRANCH-LOG-INSERT -->
