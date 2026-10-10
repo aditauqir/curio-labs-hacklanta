@@ -25,7 +25,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | --- | --- |
 | Start, director, and full editor screen states | Working locally. The start screen gathers an idea, the director screen owns the conversation, and the full editor combines chat, canvas, and references/inspector. |
 | Entry route | Working locally. The apex `/` redirects to `/home`; the app-subdomain root renders the editor, and `/director` plus `/editor` remain direct aliases. Live `app.` DNS/nginx/TLS is still pending. |
-| Onboarding/editor visual workflow | Working locally. The wireframe-led start screen uses `voice_key1.svg` as the mascot, a centered bundled Redaction 20 Curio Labs wordmark, and real start/director/editor transitions; the full editor uses a references/fonts rail above an always-speaking director rail beside the live canvas. |
+| Onboarding/editor visual workflow | Working locally. The wireframe-led start screen uses `voice_key1.svg` as the mascot, a centered bundled Redaction 20 Curio Labs wordmark, Gemini-backed starter chips with a static fallback, a live microphone level orb, and the supplied landscape reference as a low-opacity right-side fade. Real start/director/editor transitions remain intact; the full editor uses a references/fonts rail above an always-speaking director rail beside the live canvas. |
 | Three-panel workspace (director, canvas, inspiration) | Working |
 | Three poster directions (Vintage Jazz, Modern Minimal, Experimental Editorial) | Working |
 | Independent edits: headline, copy, accent, alignment, spacing, font pairing, palette | Working |
@@ -64,8 +64,9 @@ app/
   home/page.tsx          Addressable start screen at /home
   director/page.tsx      Addressable director screen at /director
   editor/page.tsx        Addressable full editor at /editor
-  globals.css           Tailwind import and the neutral UI palette tokens
+  globals.css           Tailwind import, neutral UI palette tokens, and the no-scroll onboarding visual treatment
 components/studio/
+  onboarding-studio.tsx Client home prompt, Gemini starter chips, microphone level orb, and onboarding transitions
   studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from browser/database persistence
   studio-workspace.tsx  Header, mobile tabs, useReducer, database/local fallback persistence
   creative-director.tsx Left panel: chat UI, suggestion chips, microphone and spoken replies
@@ -86,6 +87,7 @@ lib/
   export.ts             PNG (canvas) and brief JSON export
 app/api/
   status/route.ts             Which integrations are configured (booleans only). Uses connection() so it is not prerendered
+  onboarding-suggestions/route.ts Gemini-generated home starter chips with rate limiting and fallback-safe errors
   creative-director/route.ts  Gemini design edits. Validates input, rate limits, never returns upstream error text
   creative-coach/route.ts     Gemini visual coaching with a TigerData library search tool
   voice/transcribe/route.ts   Audio upload -> text (Whisper, ElevenLabs fallback)
@@ -94,6 +96,8 @@ app/api/
   instance/route.ts            Anonymous profile metadata and password hash updates
   files/route.ts, files/[id]   Instance-owned file upload, listing, download, delete
   assets/route.ts, assets/[id] Shared font/media library listing and token-gated ingestion
+public/
+  home-landscape.png          Supplied light landscape reference used as the home screen's right-side fade
 lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.ts, gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
   ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
   director-client.ts    Browser fetch for the director with a timeout
@@ -265,5 +269,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
-| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, and app-subdomain routing added; typecheck, lint, and the route regression pass; production DNS/nginx/TLS still pending |
+| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, Gemini-generated starter chips with fallback, audio-reactive home mic orb, low-opacity landscape treatment, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, and app-subdomain routing added; `npm run check` and the route regression pass; production DNS/nginx/TLS still pending |
 <!-- BRANCH-LOG-INSERT -->

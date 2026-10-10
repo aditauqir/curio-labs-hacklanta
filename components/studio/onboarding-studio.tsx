@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { VoiceBeam } from "voice-glow";
 import { Card } from "@/components/ui/card";
 import { MicIcon, SendIcon } from "./icons";
@@ -8,11 +8,88 @@ import { useCapabilities } from "./use-capabilities";
 import { useVoice } from "./use-voice";
 import { VoiceMascot } from "./voice-keyframes";
 
-const STARTER_PROMPTS = [
+const FALLBACK_STARTER_PROMPTS = [
   "A poster for a late-night jazz set",
   "A warm identity for my small business",
   "Something strange, loud, and editorial",
 ];
+
+function useVoiceLevel(stream: MediaStream | null, active: boolean) {
+  const [level, setLevel] = useState(0);
+
+  useEffect(() => {
+    if (!stream || !active) {
+      return;
+    }
+
+    const AudioContextConstructor =
+      window.AudioContext ??
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return;
+
+    const context = new AudioContextConstructor();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.72;
+    const source = context.createMediaStreamSource(stream);
+    source.connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    let frame = 0;
+
+    const sample = () => {
+      analyser.getByteTimeDomainData(samples);
+      let energy = 0;
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128;
+        energy += normalized * normalized;
+      }
+      const rms = Math.sqrt(energy / samples.length);
+      const nextLevel = Math.min(1, Math.max(0, (rms - 0.015) * 8));
+      setLevel((previous) => (Math.abs(previous - nextLevel) < 0.015 ? previous : nextLevel));
+      frame = window.requestAnimationFrame(sample);
+    };
+
+    void context.resume();
+    frame = window.requestAnimationFrame(sample);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      source.disconnect();
+      analyser.disconnect();
+      void context.close();
+    };
+  }, [active, stream]);
+
+  return level;
+}
+
+function VoiceActivityOrb({ active, level, processing }: { active: boolean; level: number; processing: boolean }) {
+  const barFactors = [0.5, 0.85, 1.15, 1.45, 1.15, 0.85, 0.5];
+  const style = {
+    "--voice-level": level,
+    "--voice-scale": active ? 0.92 + level * 0.14 : 0.7,
+    "--voice-border-color": `rgba(36, 36, 36, ${active ? 0.16 + level * 0.42 : 0.16})`,
+    "--voice-shadow-size": `${active ? 0.65 + level * 0.9 : 0}rem`,
+    "--voice-shadow-color": `rgba(36, 36, 36, ${active ? 0.08 + level * 0.12 : 0})`,
+  } as CSSProperties;
+
+  return (
+    <span className={`voice-activity-orb ${active ? "is-active" : ""} ${processing ? "is-processing" : ""}`} style={style}>
+      <span className="voice-activity-bars">
+        {barFactors.map((factor, index) => (
+          <span
+            key={factor}
+            className="voice-activity-bar"
+            style={{
+              "--bar-height": `${0.2 + level * factor}rem`,
+              "--bar-delay": `${index * 45}ms`,
+            } as CSSProperties}
+          />
+        ))}
+      </span>
+    </span>
+  );
+}
 
 export type StartDestination = "chat" | "editor";
 
@@ -25,11 +102,34 @@ export function OnboardingStudio({
 }) {
   const capabilities = useCapabilities();
   const [draft, setDraft] = useState("");
+  const [starterPrompts, setStarterPrompts] = useState(FALLBACK_STARTER_PROMPTS);
+  const [suggestionSource, setSuggestionSource] = useState<"fallback" | "gemini">("fallback");
   const voice = useVoice({
     canListen: capabilities.listen,
     canSpeak: false,
     onTranscript: (text) => onStart(text, "chat"),
   });
+  const voiceLevel = useVoiceLevel(voice.stream, voice.phase === "listening");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/onboarding-suggestions", { signal: controller.signal, cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("suggestions"))))
+      .then((json: { suggestions?: unknown }) => {
+        const suggestions = Array.isArray(json.suggestions)
+          ? json.suggestions.filter((item): item is string => typeof item === "string").slice(0, 3)
+          : [];
+        if (suggestions.length === 3) {
+          setStarterPrompts(suggestions);
+          setSuggestionSource("gemini");
+        }
+      })
+      .catch(() => {
+        // Static prompts remain available when Gemini is unavailable.
+      });
+
+    return () => controller.abort();
+  }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -39,6 +139,7 @@ export function OnboardingStudio({
 
   const listening = voice.phase === "listening";
   const processing = voice.phase === "transcribing";
+  const voiceActive = listening || processing;
   const micDisabled = voice.block !== null || voice.phase === "transcribing";
   const micLabel = listening ? "Stop recording and start" : "Start voice input";
 
@@ -82,17 +183,20 @@ export function OnboardingStudio({
                     aria-label="Describe what you are making"
                     autoComplete="off"
                   />
-                  <button
-                    type="button"
-                    disabled={micDisabled}
-                    aria-label={micLabel}
-                    aria-pressed={listening}
-                    title={voice.block ? "Voice input is unavailable" : micLabel}
-                    onClick={() => (listening ? voice.stop() : void voice.start())}
-                    className={`onboarding-icon-button ${listening ? "is-listening" : ""}`}
-                  >
-                    <MicIcon />
-                  </button>
+                  <span className={`onboarding-mic-control ${voiceActive ? "is-active" : ""}`}>
+                    <VoiceActivityOrb active={voiceActive} level={listening ? voiceLevel : 0} processing={processing} />
+                    <button
+                      type="button"
+                      disabled={micDisabled}
+                      aria-label={micLabel}
+                      aria-pressed={listening}
+                      title={voice.block ? "Voice input is unavailable" : micLabel}
+                      onClick={() => (listening ? voice.stop() : void voice.start())}
+                      className={`onboarding-icon-button ${listening ? "is-listening" : ""}`}
+                    >
+                      <MicIcon />
+                    </button>
+                  </span>
                   <button
                     type="submit"
                     disabled={!draft.trim() || listening || voice.phase === "transcribing"}
@@ -115,8 +219,8 @@ export function OnboardingStudio({
               {voice.error ? <p className="onboarding-error" role="alert">{voice.error}</p> : null}
             </form>
 
-            <div className="starter-prompts" aria-label="Starter ideas">
-              {STARTER_PROMPTS.map((prompt) => (
+            <div className="starter-prompts" aria-label={suggestionSource === "gemini" ? "Gemini starter ideas" : "Starter ideas"}>
+              {starterPrompts.map((prompt) => (
                 <button key={prompt} type="button" onClick={() => onStart(prompt, "chat")}>
                   {prompt}
                 </button>
@@ -153,7 +257,7 @@ export function OnboardingStudio({
             <button
               type="button"
               className="onboarding-project-card"
-              onClick={() => onStart(STARTER_PROMPTS[1], "chat")}
+              onClick={() => onStart(starterPrompts[1], "chat")}
             >
               <span className="onboarding-project-index">02</span>
               <span>
@@ -165,7 +269,7 @@ export function OnboardingStudio({
             <button
               type="button"
               className="onboarding-project-card"
-              onClick={() => onStart(STARTER_PROMPTS[2], "chat")}
+              onClick={() => onStart(starterPrompts[2], "chat")}
             >
               <span className="onboarding-project-index">03</span>
               <span>

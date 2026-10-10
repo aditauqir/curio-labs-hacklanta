@@ -1486,11 +1486,39 @@ select {
 
 /* Wireframe-led start screen: the first decision stays light, open, and immediate. */
 .onboarding-wireframe-shell {
+  position: relative;
+  isolation: isolate;
   background: #fff;
   color: #161616;
 }
 
+.onboarding-wireframe-shell::before,
+.onboarding-wireframe-shell::after {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+}
+
+.onboarding-wireframe-shell::before {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(56vw, 56rem);
+  background: url("/home-landscape.png") center right / cover no-repeat;
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.22) 28%, #000 62%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.22) 28%, #000 62%, #000 100%);
+}
+
+.onboarding-wireframe-shell::after {
+  inset: 0;
+  background: linear-gradient(90deg, #fff 0%, rgba(255, 255, 255, 0.97) 23%, rgba(255, 255, 255, 0.45) 63%, rgba(255, 255, 255, 0) 100%);
+}
+
 .onboarding-wireframe-shell .onboarding-topbar {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1502,7 +1530,7 @@ select {
 .onboarding-wireframe-shell .brand-lockup {
   font-family: "Redaction 20", var(--curio-heading-font);
   font-size: clamp(0.95rem, 1.25vw, 1.2rem);
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -1511,16 +1539,20 @@ select {
 }
 
 .onboarding-wireframe-shell .onboarding-content {
+  position: relative;
+  z-index: 1;
   display: flex;
+  align-items: center;
   min-height: 0;
   flex: 1 1 auto;
   width: min(calc(100% - 2rem), 78rem);
-  margin: clamp(0.75rem, 2.5vh, 2rem) auto;
+  margin: 0 auto;
+  padding: clamp(1rem, 4dvh, 3.25rem) 0;
 }
 
 .onboarding-wireframe-card {
   width: 100%;
-  height: 100%;
+  height: min(100%, 46rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.42fr);
   min-height: 0;
@@ -1537,7 +1569,7 @@ select {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: clamp(2rem, 7vw, 6.5rem) clamp(1.25rem, 8vw, 8rem);
+  padding: clamp(1.5rem, 5dvh, 4.5rem) clamp(1.25rem, 6vw, 6.5rem);
   text-align: center;
 }
 
@@ -1557,7 +1589,8 @@ select {
 .onboarding-wireframe-hero h1 {
   max-width: 35rem;
   margin-top: 1rem;
-  font-size: clamp(2.7rem, 6vw, 5.4rem);
+  font-size: clamp(2.7rem, 5.2vw, 4.8rem);
+  font-weight: 700;
   letter-spacing: -0.085em;
   line-height: 0.92;
 }
@@ -1574,10 +1607,97 @@ select {
   background: #f1f0ee;
 }
 
+.onboarding-mic-control {
+  position: relative;
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.onboarding-mic-control .onboarding-icon-button {
+  position: relative;
+  z-index: 4;
+  border-radius: 50%;
+}
+
+.voice-activity-orb {
+  --voice-level: 0;
+  --voice-scale: 0.7;
+  --voice-border-color: rgba(36, 36, 36, 0.16);
+  --voice-shadow-size: 0rem;
+  --voice-shadow-color: rgba(36, 36, 36, 0);
+  position: absolute;
+  z-index: 1;
+  inset: -0.35rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(36, 36, 36, 0.16);
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.7);
+  transition: opacity 220ms ease, transform 220ms var(--curio-ease), box-shadow 220ms ease;
+}
+
+.voice-activity-orb.is-active {
+  border-color: var(--voice-border-color);
+  opacity: 1;
+  transform: scale(var(--voice-scale));
+  box-shadow: 0 0 var(--voice-shadow-size) var(--voice-shadow-color);
+}
+
+.voice-activity-orb.is-processing {
+  animation: voice-orb-processing 1.3s ease-in-out infinite;
+}
+
+.voice-activity-bars {
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  height: 1.35rem;
+  transform: translateX(-50%);
+}
+
+.voice-activity-bar {
+  display: block;
+  width: 0.14rem;
+  height: var(--bar-height, 0.2rem);
+  max-height: none;
+  border-radius: 999px;
+  background: #242424;
+  transform-origin: center;
+  transition: height 100ms ease;
+}
+
+.voice-activity-orb.is-active .voice-activity-bar {
+  animation: voice-bar-breathe 720ms ease-in-out var(--bar-delay) infinite alternate;
+}
+
+@keyframes voice-bar-breathe {
+  from { transform: scaleY(0.72); }
+  to { transform: scaleY(1.08); }
+}
+
+@keyframes voice-orb-processing {
+  0%, 100% { box-shadow: 0 0 0 rgba(36, 36, 36, 0.04); }
+  50% { box-shadow: 0 0 1rem rgba(36, 36, 36, 0.16); }
+}
+
 .onboarding-wireframe-shell .onboarding-submit,
 .onboarding-wireframe-shell .onboarding-icon-button.is-listening {
-  border-radius: 0.15rem;
   background: #242424;
+}
+
+.onboarding-wireframe-shell .onboarding-icon-button.is-listening {
+  border-radius: 50%;
 }
 
 .onboarding-wireframe-shell .starter-prompts {
@@ -1591,6 +1711,10 @@ select {
   border-color: #dedbd4;
   background: #fff;
   color: #66635d;
+}
+
+.onboarding-wireframe-shell .starter-prompts button {
+  font-weight: 600;
 }
 
 .onboarding-wireframe-shell .onboarding-skip {
@@ -1638,13 +1762,13 @@ select {
 
 .onboarding-project-card:hover,
 .onboarding-project-card:focus-visible {
-  background: #f7f6f2;
+  background: transparent;
   padding-right: 0.6rem;
   padding-left: 0.6rem;
 }
 
 .onboarding-project-card.is-current {
-  background: #f7f6f2;
+  background: transparent;
 }
 
 .onboarding-project-index {
@@ -1688,15 +1812,30 @@ select {
 }
 
 @media (max-width: 720px) {
+  .onboarding-wireframe-shell::before {
+    top: auto;
+    width: 100%;
+    height: 38%;
+    opacity: 0.2;
+    -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.18) 72%, transparent 100%);
+    mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.18) 72%, transparent 100%);
+  }
+
+  .onboarding-wireframe-shell::after {
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.18) 0%, #fff 46%, #fff 100%);
+  }
+
   .onboarding-wireframe-shell .onboarding-content {
     min-height: 0;
     flex: 1 1 auto;
     width: min(calc(100% - 1rem), 42rem);
-    margin-top: 0.75rem;
-    margin-bottom: 0.75rem;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: 0.5rem 0;
   }
 
   .onboarding-wireframe-card {
+    height: 100%;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) minmax(12rem, 15rem);
   }
@@ -1781,7 +1920,7 @@ select {
 
 .onboarding-wireframe-shell .onboarding-project-card:hover,
 .onboarding-wireframe-shell .onboarding-project-card:focus-visible {
-  background: #faf9f6;
+  background: transparent;
   padding-right: 0.15rem;
   padding-left: 0.15rem;
   transform: translateY(-1px);
@@ -1806,6 +1945,11 @@ select {
   .onboarding-wireframe-shell .onboarding-skip,
   .onboarding-wireframe-shell .preview-chat-button {
     transition: none;
+  }
+
+  .onboarding-wireframe-shell .voice-activity-orb.is-processing,
+  .onboarding-wireframe-shell .voice-activity-orb.is-active .voice-activity-bar {
+    animation: none;
   }
 }
 

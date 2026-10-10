@@ -243,6 +243,87 @@ export async function askGemini(input: {
   throw new GeminiError("upstream", `Gemini is unavailable (last status ${lastStatus})`);
 }
 
+const STARTER_SUGGESTION_SYSTEM_PROMPT = `You create the three small idea chips shown on Curio Labs' welcome screen.
+
+Return exactly three distinct, vivid starter prompts for a person who wants to make a poster, identity, or editorial visual. Keep each prompt between 6 and 12 words. Make them concrete and varied: one can be event-led, one can be brand-led, and one can be experimental. Do not use quotes, numbering, markdown, or filler. Never mention being an AI.`;
+
+const STARTER_SUGGESTION_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    suggestions: {
+      type: "ARRAY",
+      items: { type: "STRING" },
+    },
+  },
+  required: ["suggestions"],
+} as const;
+
+export async function suggestStarterPrompts(): Promise<{ suggestions: string[]; model: string }> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new GeminiError("not_configured", "GEMINI_API_KEY is not set");
+
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: STARTER_SUGGESTION_SYSTEM_PROMPT }] },
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: "Generate three fresh starter prompts for this visit." }],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.85,
+      maxOutputTokens: 180,
+      responseMimeType: "application/json",
+      responseSchema: STARTER_SUGGESTION_SCHEMA,
+    },
+  });
+
+  let lastStatus = 0;
+  for (const model of modelChain()) {
+    let response: Response;
+    try {
+      response = await callModel(model, apiKey, body);
+    } catch {
+      lastStatus = 0;
+      continue;
+    }
+
+    lastStatus = response.status;
+    if (response.status === 400 || response.status === 401 || response.status === 403) {
+      throw new GeminiError("upstream", `Gemini rejected the request (${response.status})`);
+    }
+    if (!response.ok) continue;
+
+    const json: unknown = await response.json().catch(() => null);
+    const text = (json as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null)
+      ?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "")
+      .join("");
+    if (!text) throw new GeminiError("bad_output", "Gemini returned no content");
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new GeminiError("bad_output", "Gemini returned invalid JSON");
+    }
+
+    const rawSuggestions =
+      typeof parsed === "object" && parsed !== null && Array.isArray((parsed as { suggestions?: unknown }).suggestions)
+        ? (parsed as { suggestions: unknown[] }).suggestions
+        : [];
+    const suggestions = rawSuggestions
+      .filter((suggestion): suggestion is string => typeof suggestion === "string")
+      .map((suggestion) => suggestion.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, 120))
+      .filter(Boolean)
+      .slice(0, 3);
+
+    if (suggestions.length !== 3) throw new GeminiError("bad_output", "Gemini returned incomplete suggestions");
+    return { suggestions, model };
+  }
+
+  throw new GeminiError("upstream", `Gemini is unavailable (last status ${lastStatus})`);
+}
+
 const COACH_SYSTEM_PROMPT = `You are the visual coach beside Curio Labs' poster editor.
 
 Give one concrete, kind piece of layout feedback based only on the poster state provided. Focus on hierarchy, alignment, spacing, contrast, or type scale. Never claim to see pixels that are not represented in the state. If a reference, font, palette, or library asset would make the advice more specific, call search_library_assets first. Keep the final answer to two short plain sentences. Do not suggest changing everything at once.`;
