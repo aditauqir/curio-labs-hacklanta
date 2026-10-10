@@ -233,4 +233,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-whisper-merged` | 2026-10-10 | Mark the offline Whisper branch merged and record its live deployment | in progress | |
 | `persist-user-instances` | 2026-10-10 | Persist anonymous user instances, profiles, workspace state, chat history, and associated files in PostgreSQL | PR open | PR #5 |
 | `asset-suggestion-reliability` | 2026-10-10 | Ensure Gemini surfaces exact shared library asset suggestions | PR open | PR #6 |
+| `handoff-database-verified` | 2026-10-10 | Record merged persistence and asset suggestion verification | in progress | |
 <!-- BRANCH-LOG-INSERT -->
