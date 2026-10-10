@@ -238,5 +238,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | merged | PR #8; README and submission documentation deployed |
 | `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | merged | PR #9 |
 | `committed-browser-api-tests` | 2026-10-10 | Add committed Playwright browser and API coverage | in progress | |
-| `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | in progress | |
+| `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | PR open | PR #11; local and TigerData smoke checks pass |
 <!-- BRANCH-LOG-INSERT -->
