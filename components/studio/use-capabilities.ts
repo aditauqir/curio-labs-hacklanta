@@ -9,7 +9,7 @@ export type Capabilities = {
   /** True when the server has a speech-to-text provider, so the microphone can work. */
   listen: boolean;
   /** Which provider will transcribe speech first. */
-  transcriber: "openai" | "elevenlabs" | null;
+  transcriber: "whisper" | "elevenlabs" | null;
   /** True when the server can speak replies aloud (ElevenLabs). */
   speak: boolean;
 };
@@ -41,7 +41,7 @@ export function useCapabilities(): Capabilities {
             loaded: true,
             gemini: json.director?.provider === "gemini",
             listen: json.voice?.listen === true,
-            transcriber: transcriber === "openai" || transcriber === "elevenlabs" ? transcriber : null,
+            transcriber: transcriber === "whisper" || transcriber === "elevenlabs" ? transcriber : null,
             speak: json.voice?.speak === true,
           });
         },

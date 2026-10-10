@@ -9,7 +9,7 @@ import { availableTranscribers } from "@/lib/transcribe";
 export async function GET() {
   await connection();
 
-  const transcribers = availableTranscribers();
+  const transcribers = await availableTranscribers();
 
   return Response.json(
     {

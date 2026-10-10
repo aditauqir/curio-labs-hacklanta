@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { recordingToWav } from "@/lib/audio-capture";
 
 export type VoicePhase = "idle" | "listening" | "transcribing" | "speaking";
 
@@ -117,8 +118,8 @@ export function useVoice({
   }, [releaseAudio, setPhase]);
 
   const upload = useCallback(
-    async (blob: Blob, type: string) => {
-      if (blob.size < 800) {
+    async (recording: Blob, type: string) => {
+      if (recording.size < 800) {
         setPhase("idle");
         setError("I didn't catch any audio. Try again.");
         return;
@@ -126,8 +127,26 @@ export function useVoice({
 
       setPhase("transcribing");
       try {
+        // Whisper needs 16 kHz mono WAV, and converting here keeps the server
+        // from having to decode untrusted media. If the browser cannot decode its
+        // own recording, send it as-is and let the server's backup handle it.
+        let body: Blob = recording;
+        let filename = `speech.${extensionFor(type)}`;
+        try {
+          const converted = await recordingToWav(recording);
+          if (converted.silent) {
+            setPhase("idle");
+            setError("I didn't hear anything. Check your microphone and try again.");
+            return;
+          }
+          body = converted.wav;
+          filename = "speech.wav";
+        } catch {
+          // fall through with the original recording
+        }
+
         const form = new FormData();
-        form.append("audio", blob, `speech.${extensionFor(type)}`);
+        form.append("audio", body, filename);
         const response = await fetch("/api/voice/transcribe", { method: "POST", body: form });
 
         if (response.status === 429) {

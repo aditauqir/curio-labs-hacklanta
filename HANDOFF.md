@@ -19,7 +19,7 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 Live at **http://155.138.194.120/** (plain HTTP, no domain or HTTPS yet). Deployed from `main` on every merge.
 
-Live verification on 2026-10-09 (real browser against the public URL): Gemini edit with the keep-layout rule enforced, spoken replies over HTTP, and the microphone correctly disabled with an HTTPS explanation. The full mic loop was verified locally, not on the server, because the server has no HTTPS yet.
+Live verification on 2026-10-09 (real browser against the public URL): Gemini edit with the keep-layout rule enforced, spoken replies over HTTP, and the microphone correctly disabled with an HTTPS explanation. The Whisper server and HTTP transcription path were verified on Vultr; the live browser mic still needs HTTPS.
 
 | Area | Status |
 | --- | --- |
@@ -32,7 +32,7 @@ Live verification on 2026-10-09 (real browser against the public URL): Gemini ed
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
 | Gemini integration | Built. `POST /api/creative-director`. Output is validated against whitelists and reconciled with the user's intent (see section 4). |
-| Microphone (speech to text) | Built. Records in the browser, `POST /api/voice/transcribe`. Uses **OpenAI** (`gpt-transcribe`) when `OPENAI_API_KEY` is set, otherwise or on failure **ElevenLabs**. Needs HTTPS or localhost (see section 5). |
+| Microphone (speech to text) | Built on this branch. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Needs HTTPS or localhost (see section 5). |
 | Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
 | Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
 | Auth0 | Not built. App is open, no login. |
@@ -57,7 +57,7 @@ app/
 components/studio/
   studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from LocalStorage
   studio-workspace.tsx  Header, mobile tabs, useReducer, persistence effect
-  creative-director.tsx Left panel: chat UI, suggestion chips, disabled mic
+  creative-director.tsx Left panel: chat UI, suggestion chips, microphone and spoken replies
   design-canvas.tsx     Centre panel: poster, direction switch, editing controls
   poster.tsx            Renders the poster as real SVG elements from the layout model
   inspiration-board.tsx Right panel shell, reference thumbnails
@@ -74,9 +74,9 @@ lib/
 app/api/
   status/route.ts             Which integrations are configured (booleans only). Uses connection() so it is not prerendered
   creative-director/route.ts  Gemini design edits. Validates input, rate limits, never returns upstream error text
-  voice/transcribe/route.ts   Audio upload -> text (OpenAI, ElevenLabs fallback)
+  voice/transcribe/route.ts   Audio upload -> text (Whisper, ElevenLabs fallback)
   voice/speak/route.ts        Text -> MP3 (ElevenLabs), streamed
-lib/ (server only: gemini.ts, openai.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
+lib/ (server only: gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
   ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
   director-client.ts    Browser fetch for the director with a timeout
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
@@ -105,13 +105,14 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | SSH user | `linuxuser` (CI uses an SSH key; no password is used by automation) |
 | App directory | `/var/www/curiolabs` (a git clone of this repo, tracks `main`) |
 | Process manager | PM2, process name `curiolabs`, serves Next on `127.0.0.1:3000` |
+| Offline transcription | PM2, process name `whisper`, `whisper.cpp` server on `127.0.0.1:8178`, `base.en` model in `/home/linuxuser/.curio-whisper` |
 | Reverse proxy | nginx on :80 -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
 | Firewall | ufw: 22, 80, 443 open |
 
 ### Pipelines (`.github/workflows/`)
 
 - **`ci.yml`**: runs on pull requests to `main`. Lint (zero warnings), typecheck, build, non-blocking `npm audit`.
-- **`deploy.yml`**: runs on push to `main` (every merge) and manually. Job 1 lints, typechecks, and builds. Job 2 SSHes in, fast-forwards the server to `origin/main`, runs `npm ci` and `npm run build`, restarts PM2, and health-checks `127.0.0.1:3000`. If any step fails it restores the previous commit, rebuilds, and restarts. Job 3 checks the public URL.
+- **`deploy.yml`**: runs on push to `main` (every merge) and manually. Job 1 lints, typechecks, and builds. Job 2 SSHes in, fast-forwards the server to `origin/main`, runs `npm ci` and `npm run build`, restarts PM2, and health-checks `127.0.0.1:3000`. If any step fails it restores the previous commit, rebuilds, and restarts. Job 3 checks the public URL. The separately installed `whisper` PM2 process is not rebuilt by application deploys.
 
 ### Microphone needs HTTPS (important)
 
@@ -136,8 +137,8 @@ nginx's default `client_max_body_size` is 1 MB. Voice clips are capped at 30 sec
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Gemini calls (server only, never `NEXT_PUBLIC_`) | `.env.local` locally; `/var/www/curiolabs/.env.local` on the server (mode 600) |
 | `ELEVENLABS_API_KEY` | Spoken replies, and backup speech-to-text | same as above |
-| `OPENAI_API_KEY` | Preferred speech-to-text (`gpt-transcribe`). **Not set yet.** Until it is, ElevenLabs transcribes | same as above |
-| `GEMINI_MODEL`, `OPENAI_STT_MODEL`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_STT_MODEL` | Optional overrides. Comma-separated lists are tried in order | same as above |
+| `WHISPER_URL`, `WHISPER_ENABLED` | Optional local Whisper URL and opt-out switch; defaults to `http://127.0.0.1:8178` and enabled | same as above |
+| `GEMINI_MODEL`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_STT_MODEL` | Optional model and voice overrides | same as above |
 | GitHub Actions secrets | `VULTR_HOST`, `VULTR_USER`, `VULTR_SSH_KEY`, `VULTR_KNOWN_HOSTS` | GitHub repo settings. App keys are intentionally **not** here |
 
 Gemini and ElevenLabs keys were checked against their APIs on 2026-10-09 and are now used by the app. `GET /api/status` reports which are configured (booleans only).
@@ -146,7 +147,7 @@ Keys are read only from `process.env` at runtime, never written in code. `npm ru
 
 - Google Cloud project for Gemini: **Hacklanta 2**, project number `145508307041`.
 - **Gemini model choice (measured, not assumed).** `gemini-2.5-flash` is listed by the API but is **retired for new keys** (404). `gemini-3.8-flash` took about 36 s for a trivial prompt and hung with `thinkingBudget:0`. The flash-lite models answer in about 1 s. Default chain is `gemini-3.5-flash-lite` then `gemini-flash-lite-latest` (an alias, so a retirement cannot break the app). Expect occasional latency spikes (one 7 s call was observed). Re-list models before relying on a name; they change.
-- OpenAI docs (checked 2026-10-09) recommend `gpt-transcribe` for file transcription, at `POST /v1/audio/transcriptions`. The code falls back to `gpt-4o-mini-transcribe` then `whisper-1`. **This path has not been tested against a real OpenAI key yet.** Only its failure/fallback behavior has been verified, using a deliberately invalid key.
+- Whisper was built and smoke-tested on the Vultr server and locally with `whisper.cpp` `v1.9.5` and the `base.en` model. A 3.5-second clip transcribed in about 1.4 seconds on the server. `whisper-server` returns empty text for tested silence when started with `--suppress-nst`; the app also gates low-amplitude WAVs before inference.
 - A new server needs the same `.env.local` created by hand. `git pull` will not bring it, by design.
 
 **Security TODOs (the keys and the server password were shared in chat, so treat them as exposed):**
@@ -199,7 +200,7 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 In priority order, matching the build phases:
 
-1. **HTTPS and a hostname** so the mic works in production (section 5). Then add `OPENAI_API_KEY` on the server and test the OpenAI transcription path with a real key.
+1. **HTTPS and a hostname** so the mic works in production (section 5).
 2. **Put the browser and API tests in the repo** (`scripts/e2e/`, Playwright) and run them in CI. The Gemini and voice suites covered: keep-layout enforcement, hostile model output, fallback on outage and 429, full voice loop with a fake microphone, permission errors, silence, rate limiting, and key-leak scans.
 3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
 5. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
