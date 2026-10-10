@@ -19,7 +19,7 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 Live at **http://155.138.194.120/** (plain HTTP, no domain or HTTPS yet). Deployed from `main` on every merge.
 
-Live verification on 2026-10-09 (real browser against the public URL): Gemini edit with the keep-layout rule enforced, spoken replies over HTTP, and the microphone correctly disabled with an HTTPS explanation. The Whisper server and HTTP transcription path were verified on Vultr; the live browser mic still needs HTTPS.
+Live verification on 2026-10-10 (public HTTP API): Gemini is configured, the live status reports Whisper as the active transcriber, the public transcription endpoint returned the expected speech, and both PM2 processes are online. The browser mic still needs HTTPS.
 
 | Area | Status |
 | --- | --- |
@@ -32,7 +32,7 @@ Live verification on 2026-10-09 (real browser against the public URL): Gemini ed
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
 | Gemini integration | Built. `POST /api/creative-director`. Output is validated against whitelists and reconciled with the user's intent (see section 4). |
-| Microphone (speech to text) | Built on this branch. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Needs HTTPS or localhost (see section 5). |
+| Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Needs HTTPS or localhost (see section 5). |
 | Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
 | Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
 | Auth0 | Not built. App is open, no login. |
@@ -217,6 +217,6 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `app-setup-1` | 2026-10-09 | Curio Labs workspace UI, CI checks, rollback-safe deploy, opencode LSP config | merged | PR #1, squash-merged |
 | `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | merged | Carried into main by PR #2 (it was the base of `gemini-voice-integration`) |
 | `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | merged | PR #2, squash-merged as `3fbdc3c`. Also carried `handoff-and-env-setup`. Deployed and verified live |
-| `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | PR open | PR #3 |
+| `offline-whisper-stt` | 2026-10-10 | Replace the OpenAI API transcription path with offline Whisper (whisper.cpp) running on the Vultr server; flow is Whisper -> Gemini -> ElevenLabs | merged | PR #3, squash-merged as `1ac666d`; deployed and verified live |
 | `handoff-whisper-merged` | 2026-10-10 | Mark the offline Whisper branch merged and record its live deployment | in progress | |
 <!-- BRANCH-LOG-INSERT -->
