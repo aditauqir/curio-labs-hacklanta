@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
-import { getInstanceContext, isInstanceId } from "@/lib/instance";
+import { getAccountContext, isInstanceId } from "@/lib/instance";
 import { deleteFile, getFile } from "@/lib/instance-store";
 
 type RouteProps = { params: Promise<{ id: string }> };
@@ -12,7 +12,7 @@ function validFileId(value: string) {
 export async function GET(request: Request, { params }: RouteProps) {
   const { id } = await params;
   if (!validFileId(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
 
   try {
     const file = await getFile(instance.id, id);
@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: RouteProps) {
 export async function DELETE(request: Request, { params }: RouteProps) {
   const { id } = await params;
   if (!validFileId(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   try {
     await deleteFile(instance.id, id);
     const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });

@@ -1,6 +1,7 @@
 import { sanitizeState } from "@/lib/design-state";
 import { askGemini, GeminiError, isGeminiConfigured, type HistoryItem } from "@/lib/gemini";
 import { rateLimited } from "@/lib/rate-limit";
+import { getAccountContext } from "@/lib/instance";
 
 const MAX_BODY_CHARS = 20_000;
 const MAX_MESSAGE_CHARS = 500;
@@ -52,11 +53,13 @@ export async function POST(request: Request) {
   if (!state) return fail(400, "invalid_design");
 
   try {
+    const instance = await getAccountContext();
     const result = await askGemini({
       message: cleanMessage,
       design: state.design,
       paletteId: state.selectedPaletteId,
       history: parseHistory(history),
+      instanceId: instance.id,
     });
 
     return Response.json(

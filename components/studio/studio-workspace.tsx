@@ -2,11 +2,12 @@
 
 import { useEffect, useReducer, useState } from "react";
 import { createDefaultState, sanitizeState, studioReducer } from "@/lib/design-state";
-import { loadStudioState, saveStudioState } from "@/lib/storage";
+import { loadStudioSnapshot, loadStudioState, markStudioStateSynced, saveStudioState } from "@/lib/storage";
 import { CreativeDirector } from "./creative-director";
 import { DesignCanvas } from "./design-canvas";
 import { ExportControls } from "./export-controls";
 import { InspirationBoard } from "./inspiration-board";
+import { AccountControl } from "./account-control";
 
 type Tab = "chat" | "canvas" | "inspiration";
 
@@ -35,12 +36,16 @@ export default function StudioWorkspace() {
 
     fetch("/api/workspace", { signal: controller.signal, cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("workspace"))))
-      .then((json: { instanceId?: unknown; state?: unknown; persistent?: unknown }) => {
+      .then((json: { instanceId?: unknown; state?: unknown; updatedAt?: unknown; persistent?: unknown }) => {
         if (!active) return;
         const instanceId = typeof json.instanceId === "string" ? json.instanceId : null;
         const remote = sanitizeState(json.state);
-        const local = instanceId ? loadStudioState(instanceId) : loadStudioState();
-        const restored = remote ?? local;
+        const local = instanceId ? loadStudioSnapshot(instanceId) ?? loadStudioSnapshot() : loadStudioSnapshot();
+        const remoteUpdatedAt = typeof json.updatedAt === "string" ? Date.parse(json.updatedAt) : NaN;
+        const restored =
+          local && (!Number.isFinite(remoteUpdatedAt) || local.savedAt > remoteUpdatedAt)
+            ? local.state
+            : remote ?? local?.state ?? null;
         if (restored) dispatch({ type: "restoreState", state: restored });
         setPersistence({
           ready: true,
@@ -66,14 +71,34 @@ export default function StudioWorkspace() {
     saveStudioState(state, persistence.instanceId ?? undefined);
     if (!persistence.persistent || !persistence.instanceId) return;
 
-    const timer = window.setTimeout(() => {
-      void fetch("/api/workspace", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state }),
-      });
-    }, 500);
-    return () => window.clearTimeout(timer);
+    const controller = new AbortController();
+    const saveRemote = async (keepalive = false) => {
+      try {
+        const response = await fetch("/api/workspace", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state }),
+          keepalive,
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const json = (await response.json().catch(() => null)) as { updatedAt?: unknown } | null;
+          if (typeof json?.updatedAt === "string" && persistence.instanceId) {
+            markStudioStateSynced(state, persistence.instanceId, json.updatedAt);
+          }
+        }
+      } catch {
+        // LocalStorage remains the source for the next refresh when the server is unavailable.
+      }
+    };
+    const timer = window.setTimeout(() => void saveRemote(), 500);
+    const flushOnPageHide = () => void saveRemote(true);
+    window.addEventListener("pagehide", flushOnPageHide);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+      window.removeEventListener("pagehide", flushOnPageHide);
+    };
   }, [persistence, state]);
 
   const { design, messages, selectedPaletteId } = state;
@@ -121,7 +146,10 @@ export default function StudioWorkspace() {
         </div>
 
         <div className="order-2 sm:order-3">
-          <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
+          <div className="flex items-center gap-2">
+            <AccountControl />
+            <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
+          </div>
         </div>
       </header>
 

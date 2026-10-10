@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
-import { attachInstanceCookie, getInstanceContext } from "@/lib/instance";
+import { attachInstanceCookie, getAccountContext } from "@/lib/instance";
 import { getProfile, makePasswordHash, updateProfile } from "@/lib/instance-store";
 
 const MAX_BODY_BYTES = 8 * 1024;
@@ -12,7 +12,7 @@ function responseWithProfile(request: Request, instanceId: string, isNew: boolea
 }
 
 export async function GET(request: Request) {
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   try {
     return responseWithProfile(request, instance.id, instance.isNew, await getProfile(instance.id));
   } catch {
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_BODY_BYTES) return NextResponse.json({ error: "too_large" }, { status: 413 });
 

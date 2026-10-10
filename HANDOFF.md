@@ -28,7 +28,8 @@ Live verification on 2026-10-10 (public HTTP API): Gemini is configured, the liv
 | Independent edits: headline, copy, accent, alignment, spacing, font pairing, palette | Working |
 | Creative brief reflecting and editing the live design | Working |
 | LocalStorage persistence with validation of stored data | Working |
-| PostgreSQL persistence | Working. Anonymous instances have separate profiles, hashed passwords, workspace state, chat history, and files; the shared library seeds fonts, palettes, and references for Gemini context. No login UI yet. |
+| PostgreSQL persistence | Working. Anonymous instances have separate profiles, hashed passwords, workspace state, chat history, and files; the shared library seeds fonts, palettes, and references for Gemini context. |
+| Account sessions and ownership | Built on `user-persistence-refresh`; local checks and a real TigerData smoke test pass. Registration/login/logout, account-scoped workspace/files/assets, session cookies, and LocalStorage refresh reconciliation still need production verification before merge. |
 | PNG export (renders the same layout model as the screen) and brief JSON export | Working |
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
@@ -213,7 +214,7 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 In priority order, matching the build phases:
 
 1. **HTTPS and a hostname** so the mic works in production (section 5).
-2. **Connect the future auth service** to `curio_instance_id` and gate profile/password operations and library writes by authenticated identity.
+2. **Open and merge account sessions** after reviewing the real-database smoke result; then expand authenticated profile/password controls and library-write permissions.
 3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
 4. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
 5. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
@@ -237,4 +238,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | merged | PR #8; README and submission documentation deployed |
 | `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | merged | PR #9 |
 | `committed-browser-api-tests` | 2026-10-10 | Add committed Playwright browser and API coverage | in progress | |
+| `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | PR open | PR #11; local and TigerData smoke checks pass |
 <!-- BRANCH-LOG-INSERT -->

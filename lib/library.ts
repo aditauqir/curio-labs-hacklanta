@@ -44,6 +44,7 @@ type LibraryRow = {
   sourceUrl: string | null;
   contentType: string | null;
   sizeBytes: number | null;
+  owner_instance_id: string | null;
   createdAt: Date | string;
 };
 
@@ -58,23 +59,27 @@ function summary(asset: LibraryRow): AssetSuggestion {
   };
 }
 
-export async function listLibraryAssets(kind?: LibraryKind, limit = 60): Promise<LibraryAsset[]> {
+export async function listLibraryAssets(kind?: LibraryKind, limit = 60, ownerInstanceId?: string): Promise<LibraryAsset[]> {
   const sql = await getDatabase();
+  const ownerFilter = ownerInstanceId
+    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${ownerInstanceId}::uuid)`
+    : sql`AND owner_instance_id IS NULL`;
   const rows = kind
     ? await sql<LibraryRow[]>`
         SELECT id, kind, name, description, tags, metadata,
-               source_url AS "sourceUrl", content_type AS "contentType",
+               source_url AS "sourceUrl", content_type AS "contentType", owner_instance_id,
                size_bytes AS "sizeBytes", created_at AS "createdAt"
         FROM curio_library_assets
-        WHERE kind = ${kind}
+        WHERE kind = ${kind} ${ownerFilter}
         ORDER BY name ASC
         LIMIT ${limit}
       `
     : await sql<LibraryRow[]>`
         SELECT id, kind, name, description, tags, metadata,
-               source_url AS "sourceUrl", content_type AS "contentType",
+               source_url AS "sourceUrl", content_type AS "contentType", owner_instance_id,
                size_bytes AS "sizeBytes", created_at AS "createdAt"
         FROM curio_library_assets
+        WHERE TRUE ${ownerFilter}
         ORDER BY kind ASC, name ASC
         LIMIT ${limit}
       `;
@@ -82,9 +87,9 @@ export async function listLibraryAssets(kind?: LibraryKind, limit = 60): Promise
 }
 
 /** Context sent to Gemini. Failure is intentionally non-fatal: the poster still works. */
-export async function libraryContext() {
+export async function libraryContext(ownerInstanceId?: string) {
   try {
-    return await listLibraryAssets(undefined, 60);
+    return await listLibraryAssets(undefined, 60, ownerInstanceId);
   } catch {
     return [];
   }
@@ -99,12 +104,13 @@ export async function createLibraryAsset(input: {
   sourceUrl: string | null;
   contentType: string | null;
   data: Buffer | null;
+  ownerInstanceId?: string;
 }) {
   const sql = await getDatabase();
   const id = `asset:${randomUUID()}`;
   const rows = await sql<LibraryRow[]>`
     INSERT INTO curio_library_assets
-      (id, kind, name, description, tags, metadata, source_url, content_type, size_bytes, data)
+      (id, kind, name, description, tags, metadata, source_url, content_type, size_bytes, data, owner_instance_id)
     VALUES (
       ${id},
       ${input.kind},
@@ -115,7 +121,8 @@ export async function createLibraryAsset(input: {
       ${input.sourceUrl},
       ${input.contentType},
       ${input.data?.length ?? null},
-      ${input.data}
+       ${input.data},
+       ${input.ownerInstanceId ?? null}
     )
     RETURNING id, kind, name, description, tags, metadata,
               source_url AS "sourceUrl", content_type AS "contentType",
@@ -124,14 +131,17 @@ export async function createLibraryAsset(input: {
   return rows[0];
 }
 
-export async function getLibraryAsset(id: string): Promise<(LibraryAsset & { data: Buffer | null }) | null> {
+export async function getLibraryAsset(id: string, ownerInstanceId?: string): Promise<(LibraryAsset & { data: Buffer | null }) | null> {
   const sql = await getDatabase();
+  const ownerFilter = ownerInstanceId
+    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${ownerInstanceId}::uuid)`
+    : sql`AND owner_instance_id IS NULL`;
   const rows = await sql<LibraryFileRow[]>`
     SELECT id, kind, name, description, tags, metadata,
-           source_url AS "sourceUrl", content_type AS "contentType",
+           source_url AS "sourceUrl", content_type AS "contentType", owner_instance_id,
            size_bytes AS "sizeBytes", created_at AS "createdAt", data
     FROM curio_library_assets
-    WHERE id = ${id}
+    WHERE id = ${id} ${ownerFilter}
   `;
   const asset = rows[0];
   return asset ? { ...summary(asset), tags: asset.tags, metadata: asset.metadata, sourceUrl: asset.sourceUrl, contentType: asset.contentType, sizeBytes: asset.sizeBytes, data: asset.data } : null;

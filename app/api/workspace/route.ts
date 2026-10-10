@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
-import { attachInstanceCookie, getInstanceContext } from "@/lib/instance";
+import { attachInstanceCookie, getAccountContext } from "@/lib/instance";
 import { loadWorkspace, saveWorkspace } from "@/lib/instance-store";
 import { sanitizeState } from "@/lib/design-state";
 
@@ -12,10 +12,17 @@ function noStore(response: NextResponse) {
 }
 
 export async function GET(request: Request) {
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   try {
-    const state = await loadWorkspace(instance.id);
-    const response = noStore(NextResponse.json({ instanceId: instance.id, state, persistent: true }));
+    const workspace = await loadWorkspace(instance.id);
+    const response = noStore(
+      NextResponse.json({
+        instanceId: instance.id,
+        state: workspace.state,
+        updatedAt: workspace.updatedAt,
+        persistent: true,
+      }),
+    );
     if (instance.isNew) attachInstanceCookie(response, request, instance.id);
     return response;
   } catch {
@@ -29,7 +36,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_STATE_BYTES) return NextResponse.json({ error: "too_large" }, { status: 413 });
 
@@ -44,8 +51,8 @@ export async function PUT(request: Request) {
   if (!state) return NextResponse.json({ error: "invalid_state" }, { status: 400 });
 
   try {
-    await saveWorkspace(instance.id, state);
-    const response = noStore(NextResponse.json({ ok: true }));
+    const updatedAt = await saveWorkspace(instance.id, state);
+    const response = noStore(NextResponse.json({ ok: true, updatedAt }));
     if (instance.isNew) attachInstanceCookie(response, request, instance.id);
     return response;
   } catch {

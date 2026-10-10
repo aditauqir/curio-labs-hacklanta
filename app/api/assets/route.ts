@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
+import { getAccountContext } from "@/lib/instance";
 import {
   createLibraryAsset,
   LIBRARY_KINDS,
@@ -25,8 +26,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "invalid_kind" }, { status: 400 });
   }
   try {
+    const instance = await getAccountContext();
     return NextResponse.json(
-      { assets: await listLibraryAssets(kind as LibraryKind | undefined) },
+      { assets: await listLibraryAssets(kind as LibraryKind | undefined, 60, instance.id) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {
@@ -35,7 +37,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** Library writes are held behind a server-only token until the auth service exists. */
+/** Shared library writes remain token-gated; account-owned assets are scoped below. */
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const declared = Number(request.headers.get("content-length") ?? 0);
@@ -72,6 +74,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const instance = await getAccountContext();
     const stored = await createLibraryAsset({
       kind: kind as LibraryKind,
       name,
@@ -85,6 +88,7 @@ export async function POST(request: Request) {
       sourceUrl: safeText(form.get("sourceUrl"), 2_000) || null,
       contentType: file instanceof File ? file.type || "application/octet-stream" : null,
       data: file instanceof File ? Buffer.from(await file.arrayBuffer()) : null,
+      ownerInstanceId: instance.id,
     });
     return NextResponse.json({ asset: stored }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch {
