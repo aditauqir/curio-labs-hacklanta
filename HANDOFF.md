@@ -24,7 +24,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | Area | Status |
 | --- | --- |
 | Start, director, and full editor screen states | Working locally. The start screen gathers an idea, the director screen owns the conversation, and the full editor combines chat, canvas, and references/inspector. |
-| Entry route | Working locally. The root route redirects to `/home`; the supplied wireframe-led start-to-director-to-editor flow lives there. |
+| Entry route | Working locally. `/` redirects to `/home`; the start, director, and full editor states are addressable at `/home`, `/director`, and `/editor`. |
 | Onboarding/editor visual workflow | Working locally. The wireframe-led start screen uses `voice_key1.svg` as the mascot, a centered bundled Redaction 20 Curio Labs wordmark, and real start/director/editor transitions; the full editor uses a references/fonts rail above an always-speaking director rail beside the live canvas. |
 | Three-panel workspace (director, canvas, inspiration) | Working |
 | Three poster directions (Vintage Jazz, Modern Minimal, Experimental Editorial) | Working |
@@ -59,7 +59,10 @@ Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (
 ```
 app/
   layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; bundled Neue Montreal, Apfel Grotezk, and Redaction 20 assets load from globals.css
-  page.tsx              Server component that renders <StudioLoader />
+  page.tsx              Server component that redirects to /home
+  home/page.tsx          Addressable start screen at /home
+  director/page.tsx      Addressable director screen at /director
+  editor/page.tsx        Addressable full editor at /editor
   globals.css           Tailwind import and the neutral UI palette tokens
 components/studio/
   studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from browser/database persistence
@@ -260,5 +263,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
-| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, and exact ElevenLabs voice default added; typecheck, lint, build, and 15 Playwright tests pass; not deployed |
+| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, and addressable `/home`, `/director`, and `/editor` routes added; typecheck, lint, build, and the route regression pass; not deployed |
 <!-- BRANCH-LOG-INSERT -->

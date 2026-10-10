@@ -9,6 +9,21 @@ test("redirects the entry route to the /home workspace", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "What are you thinking of?" })).toBeVisible();
 });
 
+test("uses dedicated director and editor routes", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/editor");
+  await expect(page).toHaveURL(/\/editor$/);
+  await expect(page.getByTestId("editor-screen")).toBeVisible();
+
+  await page.getByRole("button", { name: "Open director" }).click();
+  await expect(page).toHaveURL(/\/director$/);
+  await expect(page.getByTestId("chat-screen")).toBeVisible();
+
+  await page.getByRole("button", { name: "Open full editor" }).click();
+  await expect(page).toHaveURL(/\/editor$/);
+  await expect(page.getByTestId("editor-screen")).toBeVisible();
+});
+
 test.describe("studio workspace", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

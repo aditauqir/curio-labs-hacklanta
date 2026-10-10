@@ -11,7 +11,13 @@ import { InspirationBoard } from "./inspiration-board";
 import { OnboardingStudio, type StartDestination } from "./onboarding-studio";
 
 type Tab = "chat" | "canvas" | "inspiration";
-type StudioView = "start" | "chat" | "editor";
+export type StudioView = "start" | "chat" | "editor";
+
+const VIEW_ROUTES: Record<StudioView, string> = {
+  start: "/home",
+  chat: "/director",
+  editor: "/editor",
+};
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "chat", label: "Director" },
@@ -21,21 +27,14 @@ const TABS: { id: Tab; label: string }[] = [
 
 const ONBOARDING_KEY = "curio-onboarding-complete-v1";
 
-export default function StudioWorkspace() {
+export default function StudioWorkspace({ initialView }: { initialView: StudioView }) {
   const [state, dispatch] = useReducer(
     studioReducer,
     undefined,
     createDefaultState,
   );
   const [tab, setTab] = useState<Tab>("canvas");
-  const [view, setView] = useState<StudioView>(
-    () =>
-      typeof window === "undefined"
-        ? "start"
-        : window.localStorage.getItem(ONBOARDING_KEY) === "true"
-          ? "editor"
-          : "start",
-  );
+  const [view, setView] = useState<StudioView>(initialView);
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
   const [persistence, setPersistence] = useState<{
     ready: boolean;
@@ -114,6 +113,22 @@ export default function StudioWorkspace() {
     };
   }, [persistence, state]);
 
+  useEffect(() => {
+    function handlePopState() {
+      const nextView =
+        window.location.pathname === VIEW_ROUTES.chat
+          ? "chat"
+          : window.location.pathname === VIEW_ROUTES.editor
+            ? "editor"
+            : "start";
+      setInitialPrompt(null);
+      setView(nextView);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const { design, messages, selectedPaletteId } = state;
 
   function resetProject() {
@@ -122,26 +137,34 @@ export default function StudioWorkspace() {
     }
   }
 
+  function navigateTo(nextView: StudioView) {
+    const nextPath = VIEW_ROUTES[nextView];
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setView(nextView);
+  }
+
   function startStudio(prompt?: string, destination: StartDestination = prompt ? "chat" : "editor") {
     window.localStorage.setItem(ONBOARDING_KEY, "true");
     setInitialPrompt(prompt?.trim() || null);
-    setView(destination);
+    navigateTo(destination);
   }
 
   function openChat() {
     setInitialPrompt(null);
-    setView("chat");
+    navigateTo("chat");
   }
 
   function openEditor() {
     setInitialPrompt(null);
-    setView("editor");
+    navigateTo("editor");
   }
 
   function openStart() {
     window.localStorage.removeItem(ONBOARDING_KEY);
     setInitialPrompt(null);
-    setView("start");
+    navigateTo("start");
   }
 
   if (view === "start") return <OnboardingStudio onStart={startStudio} projectName={design.projectName} />;
@@ -180,7 +203,7 @@ export default function StudioWorkspace() {
             <button type="button" aria-label="Open director" onClick={openChat}>
               Director
             </button>
-            <button type="button" aria-current="page" className="is-active">
+            <button type="button" aria-current="page" className="is-active" onClick={openEditor}>
               Editor
             </button>
           </div>
