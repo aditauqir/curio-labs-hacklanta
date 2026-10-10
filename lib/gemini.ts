@@ -111,6 +111,31 @@ function describeDesign(design: DesignState, paletteId: string | null) {
   );
 }
 
+function assetSuggestionsFromModel(record: Record<string, unknown>, library: Awaited<ReturnType<typeof libraryContext>>) {
+  const requested = Array.isArray(record.assetIds)
+    ? record.assetIds.filter((id): id is string => typeof id === "string")
+    : [];
+  const mentionedText = ["reply", "headline", "subtitle", "mood"]
+    .map((key) => record[key])
+    .filter((value): value is string => typeof value === "string")
+    .join("\n")
+    .toLocaleLowerCase();
+  const mentioned = library
+    .filter(
+      (asset) =>
+        mentionedText.includes(asset.id.toLocaleLowerCase()) ||
+        mentionedText.includes(asset.name.toLocaleLowerCase()),
+    )
+    .map((asset) => asset.id);
+  const ids = [...new Set([...requested, ...mentioned])];
+
+  return ids
+    .map((id) => library.find((asset) => asset.id === id))
+    .filter((asset): asset is (typeof library)[number] => Boolean(asset))
+    .slice(0, 3)
+    .map(({ id, kind, name, description }) => ({ id, kind, name, description }));
+}
+
 async function callModel(model: string, apiKey: string, body: string) {
   return fetch(`${API_BASE}/${model}:generateContent`, {
     method: "POST",
@@ -204,14 +229,7 @@ export async function askGemini(input: {
         : "";
 
     const { patch, skipped } = validatePatch(record);
-    const assetSuggestions = Array.isArray(record.assetIds)
-      ? record.assetIds
-          .filter((id): id is string => typeof id === "string")
-          .map((id) => library.find((asset) => asset.id === id))
-          .filter((asset): asset is (typeof library)[number] => Boolean(asset))
-          .slice(0, 3)
-          .map(({ id, kind, name, description }) => ({ id, kind, name, description }))
-      : [];
+    const assetSuggestions = assetSuggestionsFromModel(record, library);
     return {
       reply: reply || "Done.",
       patch: reconcilePatch(patch, input.design, input.message),
