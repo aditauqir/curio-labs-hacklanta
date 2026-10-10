@@ -78,7 +78,7 @@ function VoiceActivityOrb({ active, level, processing }: { active: boolean; leve
       <span className="voice-activity-bars">
         {barFactors.map((factor, index) => (
           <span
-            key={factor}
+            key={`${factor}-${index}`}
             className="voice-activity-bar"
             style={{
               "--bar-height": `${0.2 + level * factor}rem`,
