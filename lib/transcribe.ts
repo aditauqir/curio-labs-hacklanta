@@ -1,42 +1,41 @@
 // Server-only. Picks a speech-to-text provider and falls back if the first one fails.
 import { isElevenLabsConfigured, transcribeWithElevenLabs } from "./elevenlabs";
-import { isOpenAiConfigured, transcribeWithOpenAi } from "./openai";
+import { isWhisperUp, transcribeWithWhisper } from "./whisper";
 import { VoiceError } from "./voice-error";
 
-export type Transcriber = "openai" | "elevenlabs";
+export type Transcriber = "whisper" | "elevenlabs";
 
-/** OpenAI first (the preferred model), ElevenLabs as the backup. */
-export function availableTranscribers(): Transcriber[] {
+/**
+ * Offline Whisper first: it is free, private, and needs no key. ElevenLabs is the
+ * backup when the Whisper server is not running or fails.
+ */
+export async function availableTranscribers(): Promise<Transcriber[]> {
   const providers: Transcriber[] = [];
-  if (isOpenAiConfigured()) providers.push("openai");
+  if (await isWhisperUp()) providers.push("whisper");
   if (isElevenLabsConfigured()) providers.push("elevenlabs");
   return providers;
-}
-
-export function isTranscriptionConfigured() {
-  return availableTranscribers().length > 0;
 }
 
 export async function transcribe(
   audio: File,
 ): Promise<{ text: string; provider: Transcriber }> {
-  const providers = availableTranscribers();
+  const providers = await availableTranscribers();
   if (providers.length === 0) {
-    throw new VoiceError("not_configured", "No speech-to-text provider is configured");
+    throw new VoiceError("not_configured", "No speech-to-text provider is available");
   }
 
   let lastError: unknown;
   for (const provider of providers) {
     try {
       const text =
-        provider === "openai"
-          ? await transcribeWithOpenAi(audio)
+        provider === "whisper"
+          ? await transcribeWithWhisper(audio)
           : await transcribeWithElevenLabs(audio);
       // An empty transcript just means silence. It is not a failure, so do not retry.
       return { text, provider };
     } catch (error) {
       lastError = error;
-      // Log the category only, never the key, audio, or upstream body.
+      // Log the category only, never the audio or an upstream body.
       console.error(
         `[transcribe] ${provider} failed: ${error instanceof Error ? error.message : "unknown"}`,
       );

@@ -26,7 +26,7 @@ const SOURCE_LABEL: Record<NonNullable<ChatMessage["source"]>, string> = {
 };
 
 const PROVIDER_LABEL: Record<string, string> = {
-  openai: "OpenAI",
+  whisper: "Whisper (offline)",
   elevenlabs: "ElevenLabs",
 };
 
@@ -189,7 +189,7 @@ export function CreativeDirector({
   let voiceStatus: string;
   switch (voice.block) {
     case "not-configured":
-      voiceStatus = "Voice is off: no speech-to-text key is configured on this server. Text mode only.";
+      voiceStatus = "Voice is off: no speech-to-text service is running on this server. Text mode only.";
       break;
     case "insecure":
       voiceStatus =

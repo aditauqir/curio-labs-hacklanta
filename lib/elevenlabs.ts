@@ -25,7 +25,7 @@ function safeId(value: string | undefined, fallback: string, pattern: RegExp) {
   return candidate && pattern.test(candidate) ? candidate : fallback;
 }
 
-/** Speech to text with ElevenLabs. Used when OpenAI is not configured or has failed. */
+/** Speech to text with ElevenLabs. Used when local Whisper is unavailable or fails. */
 export async function transcribeWithElevenLabs(audio: File): Promise<string> {
   const key = apiKey();
   const form = new FormData();

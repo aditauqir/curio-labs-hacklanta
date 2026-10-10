@@ -1,6 +1,6 @@
 import { MAX_AUDIO_BYTES } from "@/lib/elevenlabs";
 import { rateLimited } from "@/lib/rate-limit";
-import { isTranscriptionConfigured, transcribe } from "@/lib/transcribe";
+import { availableTranscribers, transcribe } from "@/lib/transcribe";
 import { VoiceError } from "@/lib/voice-error";
 
 function fail(status: number, error: string) {
@@ -8,7 +8,7 @@ function fail(status: number, error: string) {
 }
 
 export async function POST(request: Request) {
-  if (!isTranscriptionConfigured()) return fail(503, "not_configured");
+  if ((await availableTranscribers()).length === 0) return fail(503, "not_configured");
 
   const limited = rateLimited(request, "transcribe", { perClientPerMinute: 12, globalPerHour: 200 });
   if (limited) return limited;
