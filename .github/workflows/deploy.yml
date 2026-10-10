@@ -56,8 +56,16 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          newline=$'\n'
+          normalized_key="${SSH_KEY//\\n/$newline}"
+          normalized_key="${normalized_key//$'\r'/}"
+          printf '%s\n' "$normalized_key" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+
+          if ! ssh-keygen -y -P "" -f ~/.ssh/id_ed25519 > /dev/null 2>&1; then
+            echo "VULTR_SSH_KEY is not a readable, unencrypted private SSH key"
+            exit 1
+          fi
 
           # The server host key changes when a Vultr instance is rebuilt. Refresh
           # the entry so a stale VULTR_KNOWN_HOSTS secret cannot block deploys.
