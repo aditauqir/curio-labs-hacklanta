@@ -204,9 +204,10 @@ Never commit real environment values. The secret scanner is part of CI.
 npm run check
 npm run build
 npm run check:secrets
+npm run test:e2e
 ```
 
-`npm run check` runs secret scanning, ESLint with zero warnings, and Next.js typechecking. `npm run build` verifies the production build.
+`npm run check` runs secret scanning, ESLint with zero warnings, and Next.js typechecking. `npm run build` verifies the production build. `npm run test:e2e` starts an isolated local server and runs the Playwright browser and API suite.
 
 ## Live Demo
 
