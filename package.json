@@ -12,6 +12,7 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "check": "npm run check:secrets && npm run lint && npm run typecheck",
     "test:e2e": "playwright test",
+    "test:unit": "node --test \"scripts/**/*.test.mjs\"",
     "branch": "node scripts/new-branch.mjs"
   },
   "dependencies": {
