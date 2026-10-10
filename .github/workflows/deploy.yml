@@ -44,15 +44,29 @@ jobs:
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.VULTR_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.VULTR_KNOWN_HOSTS }}
+          VULTR_HOST: ${{ secrets.VULTR_HOST }}
         run: |
+          set -euo pipefail
+
+          if [[ -z "$SSH_KEY" || -z "$VULTR_HOST" ]]; then
+            echo "VULTR_SSH_KEY and VULTR_HOST must be configured"
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The server host key changes when a Vultr instance is rebuilt. Refresh
+          # the entry so a stale VULTR_KNOWN_HOSTS secret cannot block deploys.
+          ssh-keyscan -T 10 -H "$VULTR_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          if [[ ! -s ~/.ssh/known_hosts ]]; then
+            echo "Could not retrieve an SSH host key for $VULTR_HOST"
+            exit 1
+          fi
+
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy application
