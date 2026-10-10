@@ -1,0 +1,6 @@
+* text=auto
+
+# Shell scripts run on the Linux server and are sometimes copied there straight
+# from a checkout. CRLF would make bash fail with "$'\r': command not found",
+# so keep them LF even in a Windows working copy.
+*.sh text eol=lf
