@@ -17,9 +17,9 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 ## 2. Current state
 
-Live at **http://155.138.194.120/** (plain HTTP, no domain or HTTPS yet). Deployed from `main` on every merge.
+Live at **https://155-138-194-120.sslip.io/**. HTTP redirects to HTTPS. Deployed from `main` on every merge.
 
-Live verification on 2026-10-10 (public HTTP API): Gemini is configured, the live status reports Whisper as the active transcriber, the public transcription endpoint returned the expected speech, and both PM2 processes are online. The browser mic still needs HTTPS.
+Live verification on 2026-10-10: Gemini and ElevenLabs returned successful responses, Whisper is online on the server, HTTPS is active, and the browser reports a secure context with the microphone control enabled.
 
 | Area | Status |
 | --- | --- |
@@ -29,18 +29,18 @@ Live verification on 2026-10-10 (public HTTP API): Gemini is configured, the liv
 | Creative brief reflecting and editing the live design | Working |
 | LocalStorage persistence with validation of stored data | Working |
 | PostgreSQL persistence | Working. Anonymous instances have separate profiles, hashed passwords, workspace state, chat history, and files; the shared library seeds fonts, palettes, and references for Gemini context. |
-| Account sessions and ownership | Built on `user-persistence-refresh`; local checks and a real TigerData smoke test pass. Registration/login/logout, account-scoped workspace/files/assets, session cookies, and LocalStorage refresh reconciliation still need production verification before merge. |
+| Account sessions and ownership | Built on `user-persistence-refresh`; local checks, a real TigerData smoke test, and production API verification pass. |
 | PNG export (renders the same layout model as the screen) and brief JSON export | Working |
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
 | Gemini integration | Built. `POST /api/creative-director`. Output is validated against whitelists and reconciled with the user's intent (see section 4). |
-| Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Needs HTTPS or localhost (see section 5). |
+| Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Production microphone access is enabled over HTTPS. |
 | Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
 | Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
-| HTTPS / custom domain | Not set up. |
+| HTTPS / custom domain | Working at `https://155-138-194-120.sslip.io/` with an automatically renewing Let's Encrypt certificate. |
 
 ## 3. Stack
 
@@ -113,7 +113,7 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | Process manager | PM2, process name `curiolabs`, serves Next on `127.0.0.1:3000` |
 | Offline transcription | PM2, process name `whisper`, `whisper.cpp` server on `127.0.0.1:8178`, `base.en` model in `/home/linuxuser/.curio-whisper` |
 | Database | TigerData/Timescale PostgreSQL; connection string is in `/var/www/curiolabs/.env.local` only |
-| Reverse proxy | nginx on :80 -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
+| Reverse proxy | nginx on :80 (redirect) and :443 (TLS) -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
 | Firewall | ufw: 22, 80, 443 open |
 
 ### Pipelines (`.github/workflows/`)
@@ -121,9 +121,9 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 - **`ci.yml`**: runs on pull requests to `main`. Lint (zero warnings), typecheck, build, non-blocking `npm audit`.
 - **`deploy.yml`**: runs on push to `main` (every merge) and manually. Job 1 lints, typechecks, and builds. Job 2 SSHes in, fast-forwards the server to `origin/main`, runs `npm ci` and `npm run build`, restarts PM2, and health-checks `127.0.0.1:3000`. If any step fails it restores the previous commit, rebuilds, and restarts. Job 3 checks the public URL. The separately installed `whisper` PM2 process is not rebuilt by application deploys.
 
-### Microphone needs HTTPS (important)
+### Production microphone access
 
-Browsers only expose `getUserMedia` on **HTTPS or localhost**. The server is currently plain HTTP at `http://155.138.194.120/`, so on the live site the mic button is disabled and says why (that is the intended, honest behavior). Chat with Gemini and spoken replies still work over HTTP. To make the mic work in production you need a TLS certificate, which needs a hostname (a free `155-138-194-120.sslip.io` name works with Let's Encrypt, or use a real domain). Until then, test voice locally with `npm run dev` at `http://localhost:3000`.
+The live site uses `https://155-138-194-120.sslip.io/`, with a Let's Encrypt certificate managed by Certbot. Browsers can now expose `getUserMedia`; users still need to grant microphone permission in the browser. The direct IP remains available over HTTP and redirects when accessed through the sslip.io hostname.
 
 ### nginx upload size
 
@@ -213,12 +213,10 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 In priority order, matching the build phases:
 
-1. **HTTPS and a hostname** so the mic works in production (section 5).
-2. **Open and merge account sessions** after reviewing the real-database smoke result; then expand authenticated profile/password controls and library-write permissions.
-3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
-4. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
-5. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
-6. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
+1. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
+2. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
+3. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
+4. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
 
 ## Branch log
 
@@ -238,5 +236,6 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-asset-library-merged` | 2026-10-10 | Record handoff verification branch merge | merged | PR #8; README and submission documentation deployed |
 | `handoff-readme-merged` | 2026-10-10 | Record README architecture and submission documentation merge | merged | PR #9 |
 | `committed-browser-api-tests` | 2026-10-10 | Add committed Playwright browser and API coverage | in progress | |
-| `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | PR open | PR #11; local and TigerData smoke checks pass |
+| `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
+| `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 <!-- BRANCH-LOG-INSERT -->
