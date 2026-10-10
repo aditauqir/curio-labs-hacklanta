@@ -24,7 +24,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | Area | Status |
 | --- | --- |
 | Start, director, and full editor screen states | Working locally. The start screen gathers an idea, the director screen owns the conversation, and the full editor combines chat, canvas, and references/inspector. |
-| Entry route | Working locally. `/` redirects to `/home`; the start, director, and full editor states are addressable at `/home`, `/director`, and `/editor`. |
+| Entry route | Working locally. The apex `/` redirects to `/home`; the app-subdomain root renders the editor, and `/director` plus `/editor` remain direct aliases. Live `app.` DNS/nginx/TLS is still pending. |
 | Onboarding/editor visual workflow | Working locally. The wireframe-led start screen uses `voice_key1.svg` as the mascot, a centered bundled Redaction 20 Curio Labs wordmark, and real start/director/editor transitions; the full editor uses a references/fonts rail above an always-speaking director rail beside the live canvas. |
 | Three-panel workspace (director, canvas, inspiration) | Working |
 | Three poster directions (Vintage Jazz, Modern Minimal, Experimental Editorial) | Working |
@@ -45,7 +45,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
-| HTTPS / custom domain | Working. One automatically renewing Let's Encrypt certificate covers `idkjustmakeitlookgood.gay`, `www.idkjustmakeitlookgood.gay` and `155-138-194-120.sslip.io`. See the nginx caveat in section 9. |
+| HTTPS / custom domain | Working for the apex and `www`; the app subdomain still needs its DNS A record and certificate expansion before it is live. See the nginx caveat in section 9. |
 
 ## 3. Stack
 
@@ -59,7 +59,8 @@ Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (
 ```
 app/
   layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; bundled Neue Montreal, Apfel Grotezk, and Redaction 20 assets load from globals.css
-  page.tsx              Server component that redirects to /home
+  page.tsx              Apex redirects to /home; proxy.ts rewrites the app-subdomain root to the editor
+  proxy.ts              Keeps the app-subdomain root at / while rendering the full editor internally
   home/page.tsx          Addressable start screen at /home
   director/page.tsx      Addressable director screen at /director
   editor/page.tsx        Addressable full editor at /editor
@@ -75,6 +76,7 @@ components/studio/
   creative-brief.tsx    Editable brief rows
   typography-selector.tsx, color-palette-selector.tsx, export-controls.tsx, ui.tsx, icons.tsx
 lib/
+  host-routing.ts       App-subdomain detection and base/app host navigation helpers
   design-types.ts       DesignState, ChatMessage, PersistedStudioState
   design-presets.ts     Font pairs, palettes, direction configs, applyDirection(), initial design
   poster-layout.ts      buildPoster(design) -> shapes and texts. Shared by the SVG poster and the PNG exporter
@@ -129,7 +131,7 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | Offline transcription | PM2, process name `whisper`, `whisper.cpp` server on `127.0.0.1:8178`, `base.en` model in `/home/linuxuser/.curio-whisper` |
 | Database | TigerData/Timescale PostgreSQL; connection string is in `/var/www/curiolabs/.env.local` only |
 | Reverse proxy | nginx on :80 (redirect) and :443 (TLS) -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
-| Domain | `idkjustmakeitlookgood.gay`; apex and `www` are A records pointing at the server. No AAAA record, so Let's Encrypt validates over IPv4 |
+| Domain | `idkjustmakeitlookgood.gay`; apex and `www` are A records pointing at the server. Planned app host: `app.idkjustmakeitlookgood.gay`. No AAAA record, so Let's Encrypt validates over IPv4 |
 | Firewall | ufw: 22, 80, 443 open |
 
 ### Pipelines (`.github/workflows/`)
@@ -143,7 +145,7 @@ The live site uses `https://idkjustmakeitlookgood.gay/` (and still `https://155-
 
 ### Adding another domain
 
-`scripts/add-domain-ssl.sh` runs on the server, adds the names to nginx and expands the existing certificate rather than issuing a second one. It is a dry run unless given `--apply`; **read the diff before applying**. Point the name at the server with an A record first, or the Let's Encrypt HTTP challenge fails.
+`scripts/add-domain-ssl.sh` runs on the server, adds the names to nginx and expands the existing certificate rather than issuing a second one. It is a dry run unless given `--apply`; **read the diff before applying**. Point the name at the server with an A record first, or the Let's Encrypt HTTP challenge fails. For the studio host, use `DOMAINS='app.idkjustmakeitlookgood.gay' bash scripts/add-domain-ssl.sh --apply` after DNS propagates.
 
 `scripts/fix-nginx-server-names.sh` repairs the case where a name ends up declared in more than one block for the same port. The rewrite it uses lives in `scripts/nginx-server-names.mjs` and is covered by `npm run test:unit`.
 
@@ -263,5 +265,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
-| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, and addressable `/home`, `/director`, and `/editor` routes added; typecheck, lint, build, and the route regression pass; not deployed |
+| `tldraw-voice-onboarding` | 2026-10-10 | Add tldraw onboarding canvas, start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | in progress | Wireframe start screen, 31 source-linked Pinterest studies, embedded tldraw board, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, and app-subdomain routing added; typecheck, lint, and the route regression pass; production DNS/nginx/TLS still pending |
 <!-- BRANCH-LOG-INSERT -->

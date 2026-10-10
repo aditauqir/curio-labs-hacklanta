@@ -9,6 +9,7 @@ import { DesignCanvas } from "./design-canvas";
 import { ExportControls } from "./export-controls";
 import { InspirationBoard } from "./inspiration-board";
 import { OnboardingStudio, type StartDestination } from "./onboarding-studio";
+import { getWorkspaceHostUrl } from "@/lib/host-routing";
 
 type Tab = "chat" | "canvas" | "inspiration";
 export type StudioView = "start" | "chat" | "editor";
@@ -139,6 +140,12 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   function navigateTo(nextView: StudioView) {
     const nextPath = VIEW_ROUTES[nextView];
+    const hostUrl = getWorkspaceHostUrl(nextPath);
+    if (hostUrl) {
+      window.location.assign(hostUrl);
+      return;
+    }
+
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, "", nextPath);
     }
