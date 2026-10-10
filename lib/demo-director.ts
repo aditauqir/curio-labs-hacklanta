@@ -1,6 +1,7 @@
 import type { DesignDirection, DesignState } from "./design-types";
 import { directionConfigs, directionOrder } from "./design-presets";
 import type { StudioAction } from "./design-state";
+import { wantsLayoutKept } from "./ai-patch";
 
 export type DirectorResult = {
   reply: string;
@@ -38,7 +39,7 @@ function breakHeadline(value: string) {
  */
 export function interpretRequest(input: string, design: DesignState): DirectorResult {
   const text = input.toLowerCase();
-  const keepLayout = /keep (the |my )?layout|same layout|don'?t change the layout/.test(text);
+  const keepLayout = wantsLayoutKept(input);
   const actions: StudioAction[] = [];
   const changes: string[] = [];
 

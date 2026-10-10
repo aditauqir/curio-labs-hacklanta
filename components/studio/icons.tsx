@@ -12,6 +12,23 @@ const base = {
   "aria-hidden": true,
 };
 
+export function MicIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
+  );
+}
+
+export function StopIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function MicOffIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

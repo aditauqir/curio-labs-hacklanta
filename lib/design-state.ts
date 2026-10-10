@@ -273,7 +273,16 @@ function sanitizeMessages(raw: unknown): ChatMessage[] {
       role: item.role,
       content: item.content.slice(0, 1000),
       source:
-        item.source === "example" || item.source === "demo" ? item.source : undefined,
+        item.source === "example" || item.source === "demo" || item.source === "gemini"
+          ? item.source
+          : undefined,
+      notice: typeof item.notice === "string" ? item.notice.slice(0, 160) : undefined,
+      skipped: Array.isArray(item.skipped)
+        ? item.skipped
+            .filter((entry): entry is string => typeof entry === "string")
+            .map((entry) => entry.slice(0, 24))
+            .slice(0, 10)
+        : undefined,
       suggestions: Array.isArray(item.suggestions)
         ? item.suggestions.filter((entry): entry is DesignDirection =>
             directionOrder.includes(entry as DesignDirection),
