@@ -17,7 +17,7 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 ## 2. Current state
 
-Live at **https://155-138-194-120.sslip.io/**. HTTP redirects to HTTPS. Deployed from `main` on every merge.
+Live at **https://idkjustmakeitlookgood.gay/** and **https://155-138-194-120.sslip.io/**. Deployed from `main` on every merge.
 
 Live verification on 2026-10-10: Gemini and ElevenLabs returned successful responses, Whisper is online on the server, HTTPS is active, and the browser reports a secure context with the microphone control enabled.
 
@@ -40,7 +40,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
-| HTTPS / custom domain | Working at `https://155-138-194-120.sslip.io/` with an automatically renewing Let's Encrypt certificate. |
+| HTTPS / custom domain | Working. One automatically renewing Let's Encrypt certificate covers `idkjustmakeitlookgood.gay`, `www.idkjustmakeitlookgood.gay` and `155-138-194-120.sslip.io`. See the nginx caveat in section 9. |
 
 ## 3. Stack
 
@@ -88,6 +88,9 @@ lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.t
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
 scripts/new-branch.mjs  Creates a branch and logs it here (see Working agreement)
 scripts/check-secrets.mjs  Fails if a credential-shaped string is in a committable file
+scripts/add-domain-ssl.sh  Server-side: add a domain to nginx and expand the Let's Encrypt certificate
+scripts/fix-nginx-server-names.sh  Server-side: repair duplicate server_name declarations
+scripts/nginx-server-names.mjs     The pure rewrite behind it, with tests alongside
 ```
 
 ### The key design decision
@@ -114,6 +117,7 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | Offline transcription | PM2, process name `whisper`, `whisper.cpp` server on `127.0.0.1:8178`, `base.en` model in `/home/linuxuser/.curio-whisper` |
 | Database | TigerData/Timescale PostgreSQL; connection string is in `/var/www/curiolabs/.env.local` only |
 | Reverse proxy | nginx on :80 (redirect) and :443 (TLS) -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
+| Domain | `idkjustmakeitlookgood.gay`; apex and `www` are A records pointing at the server. No AAAA record, so Let's Encrypt validates over IPv4 |
 | Firewall | ufw: 22, 80, 443 open |
 
 ### Pipelines (`.github/workflows/`)
@@ -123,7 +127,13 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 
 ### Production microphone access
 
-The live site uses `https://155-138-194-120.sslip.io/`, with a Let's Encrypt certificate managed by Certbot. Browsers can now expose `getUserMedia`; users still need to grant microphone permission in the browser. The direct IP remains available over HTTP and redirects when accessed through the sslip.io hostname.
+The live site uses `https://idkjustmakeitlookgood.gay/` (and still `https://155-138-194-120.sslip.io/`), with a Let's Encrypt certificate managed by Certbot. Browsers can now expose `getUserMedia`; users still need to grant microphone permission in the browser. The direct IP remains available over plain HTTP and is deliberately not redirected, because it has no certificate of its own.
+
+### Adding another domain
+
+`scripts/add-domain-ssl.sh` runs on the server, adds the names to nginx and expands the existing certificate rather than issuing a second one. It is a dry run unless given `--apply`; **read the diff before applying**. Point the name at the server with an A record first, or the Let's Encrypt HTTP challenge fails.
+
+`scripts/fix-nginx-server-names.sh` repairs the case where a name ends up declared in more than one block for the same port. The rewrite it uses lives in `scripts/nginx-server-names.mjs` and is covered by `npm run test:unit`.
 
 ### nginx upload size
 
@@ -181,6 +191,7 @@ npm run typecheck   # next typegen && tsc --noEmit
 npm run build       # production build
 npm run check       # secret scan + lint + typecheck
 npm run check:secrets  # just the secret scan
+npm run test:unit   # node:test unit tests for scripts/
 npm run test:e2e    # Playwright browser and API suite
 ```
 
@@ -198,6 +209,7 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 ## 9. Known issues and limitations
 
+- **Open on the server:** `idkjustmakeitlookgood.gay` and `www.idkjustmakeitlookgood.gay` are each declared in two `:80` blocks and the apex is also in a `:443` catch-all, so `nginx -t` logs `conflicting server name ... ignored`. nginx keeps the first declaration, which puts the apex in certbot's redirect block where it falls through to `return 404`. Effect: **`http://idkjustmakeitlookgood.gay/` returns 404 instead of redirecting.** HTTPS is unaffected and correct on all three names. Fix with `bash scripts/fix-nginx-server-names.sh --apply` on the server; it is not applied by deploys, which never touch nginx config.
 - Rate limits are in-memory per process (`lib/rate-limit.ts`): 20 director calls, 12 transcriptions, 20 speaks per client per minute, plus hourly global caps, to protect the paid keys on a public URL. They reset on restart and are not a substitute for auth. The client key comes from nginx's `X-Real-IP`.
 - Voice recordings are capped at 30 seconds. Safari (mp4/m4a) and Firefox recording paths are implemented but were only tested in Chromium.
 - Microphone permission errors were tested by throwing the same `DOMException` names browsers throw (`NotAllowedError`, `NotFoundError`, `NotReadableError`, `NotSupportedError`), because headless Chromium cannot show a real permission prompt.
