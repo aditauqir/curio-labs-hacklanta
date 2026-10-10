@@ -19,6 +19,8 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 Live at **http://155.138.194.120/** (plain HTTP, no domain or HTTPS yet). Deployed from `main` on every merge.
 
+Live verification on 2026-10-09 (real browser against the public URL): Gemini edit with the keep-layout rule enforced, spoken replies over HTTP, and the microphone correctly disabled with an HTTPS explanation. The full mic loop was verified locally, not on the server, because the server has no HTTPS yet.
+
 | Area | Status |
 | --- | --- |
 | Three-panel workspace (director, canvas, inspiration) | Working |
@@ -212,6 +214,6 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | --- | --- | --- | --- | --- |
 | `main` | 2026-10-09 | Production. Auto-deploys to the Vultr server | live | Protected by convention: PRs only |
 | `app-setup-1` | 2026-10-09 | Curio Labs workspace UI, CI checks, rollback-safe deploy, opencode LSP config | merged | PR #1, squash-merged |
-| `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | in progress | |
-| `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | in progress | Stacked on `handoff-and-env-setup` (not yet merged), so its PR also carries HANDOFF.md, the branch script, and the secret scan |
+| `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | merged | Carried into main by PR #2 (it was the base of `gemini-voice-integration`) |
+| `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | merged | PR #2, squash-merged as `3fbdc3c`. Also carried `handoff-and-env-setup`. Deployed and verified live |
 <!-- BRANCH-LOG-INSERT -->
