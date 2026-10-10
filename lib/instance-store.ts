@@ -8,6 +8,7 @@ import { sanitizeState, type StudioState } from "./design-state";
 type WorkspaceRow = {
   design: unknown;
   selected_palette_id: string | null;
+  updated_at: Date | string;
 };
 
 type MessageRow = {
@@ -50,16 +51,17 @@ function toMessage(row: MessageRow) {
   };
 }
 
-export async function loadWorkspace(instanceId: string): Promise<StudioState | null> {
+export async function loadWorkspace(instanceId: string): Promise<{ state: StudioState | null; updatedAt: string | null }> {
   const sql = await getDatabase();
   await ensureInstance(sql, instanceId);
 
   const workspace = await sql<WorkspaceRow[]>`
     SELECT design, selected_palette_id
+           , updated_at
     FROM curio_workspaces
     WHERE instance_id = ${instanceId}::uuid
   `;
-  if (workspace.length === 0) return null;
+  if (workspace.length === 0) return { state: null, updatedAt: null };
 
   const messages = await sql<MessageRow[]>`
     SELECT message_id, role, content, source, suggestions, changes, skipped, notice, asset_suggestions
@@ -69,24 +71,29 @@ export async function loadWorkspace(instanceId: string): Promise<StudioState | n
     LIMIT 60
   `;
 
-  return sanitizeState({
-    design: workspace[0].design,
-    messages: messages.map(toMessage),
-    selectedPaletteId: workspace[0].selected_palette_id,
-  });
+  const state = sanitizeState({
+      design: workspace[0].design,
+      messages: messages.map(toMessage),
+      selectedPaletteId: workspace[0].selected_palette_id,
+    });
+  return {
+    state,
+    updatedAt: new Date(workspace[0].updated_at).toISOString(),
+  };
 }
 
 export async function saveWorkspace(instanceId: string, state: StudioState) {
   const sql = await getDatabase();
-  await sql.begin(async (tx) => {
+  const updatedAt = await sql.begin(async (tx) => {
     await ensureInstance(tx, instanceId);
-    await tx`
+    const rows = await tx<{ updated_at: Date | string }[]>`
       INSERT INTO curio_workspaces (instance_id, design, selected_palette_id, updated_at)
       VALUES (${instanceId}::uuid, ${tx.json(state.design)}, ${state.selectedPaletteId}, NOW())
       ON CONFLICT (instance_id) DO UPDATE SET
         design = EXCLUDED.design,
         selected_palette_id = EXCLUDED.selected_palette_id,
         updated_at = NOW()
+      RETURNING updated_at
     `;
 
     await tx`DELETE FROM curio_chat_messages WHERE instance_id = ${instanceId}::uuid`;
@@ -108,7 +115,9 @@ export async function saveWorkspace(instanceId: string, state: StudioState) {
         )
       `;
     }
+    return rows[0]?.updated_at ?? new Date();
   });
+  return new Date(updatedAt).toISOString();
 }
 
 export async function getProfile(instanceId: string): Promise<InstanceProfile> {

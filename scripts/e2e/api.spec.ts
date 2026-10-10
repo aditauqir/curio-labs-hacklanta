@@ -61,4 +61,12 @@ test.describe("public API contracts", () => {
     expect(transcribe.status()).toBe(503);
     expect(await transcribe.json()).toEqual({ error: "not_configured" });
   });
+
+  test("validates account credentials before database access", async ({ request }) => {
+    const invalid = await request.post("/api/auth", {
+      data: { mode: "login", username: "a", password: "short" },
+    });
+    expect(invalid.status()).toBe(400);
+    expect(await invalid.json()).toEqual({ error: "invalid_credentials" });
+  });
 });

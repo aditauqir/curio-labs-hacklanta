@@ -44,3 +44,51 @@ test.describe("studio workspace", () => {
     expect(download.suggestedFilename()).toMatch(/-brief\.json$/);
   });
 });
+
+test("keeps a newer local edit when the remote workspace is older", async ({ page }) => {
+  const instanceId = "11111111-1111-4111-8111-111111111111";
+  let remoteHeadline = "Remote old";
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(({ instanceId }) => {
+    const key = `studio-workspace-v1:${instanceId}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        savedAt: Date.parse("2026-10-10T01:00:00.000Z"),
+        state: {
+          design: { headline: "Local newer" },
+          messages: [],
+          selectedPaletteId: null,
+        },
+      }),
+    );
+  }, { instanceId });
+  await page.route("**/api/workspace", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          instanceId,
+          state: { design: { headline: remoteHeadline }, messages: [], selectedPaletteId: null },
+          updatedAt: "2026-10-10T00:00:00.000Z",
+          persistent: true,
+        }),
+      });
+      return;
+    }
+
+    const body = route.request().postDataJSON() as { state?: { design?: { headline?: string } } };
+    remoteHeadline = body.state?.design?.headline ?? remoteHeadline;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, updatedAt: "2026-10-10T02:00:00.000Z" }),
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByLabel("Headline")).toHaveValue("Local newer");
+});

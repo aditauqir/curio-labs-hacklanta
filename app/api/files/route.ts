@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
-import { attachInstanceCookie, getInstanceContext } from "@/lib/instance";
+import { attachInstanceCookie, getAccountContext } from "@/lib/instance";
 import { createFile, listFiles } from "@/lib/instance-store";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -11,7 +11,7 @@ function safeFilename(value: string) {
 }
 
 export async function GET(request: Request) {
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   try {
     const response = NextResponse.json(
       { files: await listFiles(instance.id) },
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const instance = await getInstanceContext();
+  const instance = await getAccountContext();
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_FILE_BYTES + 8 * 1024) {
     return NextResponse.json({ error: "too_large" }, { status: 413 });

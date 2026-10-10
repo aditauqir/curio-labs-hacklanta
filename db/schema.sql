@@ -6,6 +6,23 @@ CREATE TABLE IF NOT EXISTS curio_instances (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS curio_instances_username_unique_idx
+  ON curio_instances (LOWER(username))
+  WHERE username IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS curio_sessions (
+  token_hash TEXT PRIMARY KEY,
+  instance_id UUID NOT NULL REFERENCES curio_instances(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS curio_sessions_instance_idx
+  ON curio_sessions (instance_id);
+
+CREATE INDEX IF NOT EXISTS curio_sessions_expiry_idx
+  ON curio_sessions (expires_at);
+
 CREATE TABLE IF NOT EXISTS curio_workspaces (
   instance_id UUID PRIMARY KEY REFERENCES curio_instances(id) ON DELETE CASCADE,
   design JSONB NOT NULL,
@@ -58,6 +75,12 @@ CREATE TABLE IF NOT EXISTS curio_library_assets (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE curio_library_assets
+  ADD COLUMN IF NOT EXISTS owner_instance_id UUID REFERENCES curio_instances(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS curio_library_assets_owner_idx
+  ON curio_library_assets (owner_instance_id);
 
 CREATE INDEX IF NOT EXISTS curio_library_assets_kind_idx
   ON curio_library_assets (kind);

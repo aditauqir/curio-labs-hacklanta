@@ -151,6 +151,7 @@ export async function askGemini(input: {
   design: DesignState;
   paletteId: string | null;
   history: HistoryItem[];
+  instanceId?: string;
 }): Promise<GeminiResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new GeminiError("not_configured", "GEMINI_API_KEY is not set");
@@ -159,7 +160,7 @@ export async function askGemini(input: {
     ? `Recent conversation (oldest first):\n${input.history.map((item) => `${item.role}: ${item.content}`).join("\n")}\n\n`
     : "";
 
-  const library = await libraryContext();
+  const library = await libraryContext(input.instanceId);
   const libraryText = library.length
     ? library
         .map(

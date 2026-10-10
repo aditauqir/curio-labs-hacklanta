@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
+import { getAccountContext } from "@/lib/instance";
 import { getLibraryAsset } from "@/lib/library";
 
 type RouteProps = { params: Promise<{ id: string }> };
@@ -9,7 +10,8 @@ export async function GET(_request: Request, { params }: RouteProps) {
   if (!/^[-a-zA-Z0-9:_]+$/.test(id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   try {
-    const asset = await getLibraryAsset(id);
+    const instance = await getAccountContext();
+    const asset = await getLibraryAsset(id, instance.id);
     if (!asset) return NextResponse.json({ error: "not_found" }, { status: 404 });
     if (!asset.data) return NextResponse.json({ asset }, { headers: { "Cache-Control": "no-store" } });
 
