@@ -251,4 +251,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
+| `creative-pipeline-backend` | 2026-10-10 | Build the AI creative director backend: brief interpretation, concepts, references, asset and composition planning, rendering, critique, revisions, versions and export | in progress | |
 <!-- BRANCH-LOG-INSERT -->
