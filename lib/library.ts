@@ -1,0 +1,138 @@
+// Server-only access to the shared Curio asset library. Instance files live in
+// curio_files; this table is the reusable library that Gemini can reference.
+import { randomUUID } from "node:crypto";
+import { getDatabase } from "./db";
+import type { AssetSuggestion } from "./design-types";
+
+export type JsonValue =
+  | null
+  | string
+  | number
+  | boolean
+  | JsonValue[]
+  | { [key: string]: JsonValue | undefined };
+export type JsonObject = { [key: string]: JsonValue | undefined };
+
+export const LIBRARY_KINDS = [
+  "font",
+  "palette",
+  "reference",
+  "image",
+  "video",
+  "audio",
+  "document",
+  "other",
+] as const;
+
+export type LibraryKind = (typeof LIBRARY_KINDS)[number];
+
+export type LibraryAsset = AssetSuggestion & {
+  tags: string[];
+  metadata: JsonObject;
+  sourceUrl: string | null;
+  contentType: string | null;
+  sizeBytes: number | null;
+};
+
+type LibraryRow = {
+  id: string;
+  kind: LibraryKind;
+  name: string;
+  description: string | null;
+  tags: string[];
+  metadata: JsonObject;
+  sourceUrl: string | null;
+  contentType: string | null;
+  sizeBytes: number | null;
+  createdAt: Date | string;
+};
+
+type LibraryFileRow = LibraryRow & { data: Buffer | null };
+
+function summary(asset: LibraryRow): AssetSuggestion {
+  return {
+    id: asset.id,
+    kind: asset.kind,
+    name: asset.name,
+    description: asset.description,
+  };
+}
+
+export async function listLibraryAssets(kind?: LibraryKind, limit = 60): Promise<LibraryAsset[]> {
+  const sql = await getDatabase();
+  const rows = kind
+    ? await sql<LibraryRow[]>`
+        SELECT id, kind, name, description, tags, metadata,
+               source_url AS "sourceUrl", content_type AS "contentType",
+               size_bytes AS "sizeBytes", created_at AS "createdAt"
+        FROM curio_library_assets
+        WHERE kind = ${kind}
+        ORDER BY name ASC
+        LIMIT ${limit}
+      `
+    : await sql<LibraryRow[]>`
+        SELECT id, kind, name, description, tags, metadata,
+               source_url AS "sourceUrl", content_type AS "contentType",
+               size_bytes AS "sizeBytes", created_at AS "createdAt"
+        FROM curio_library_assets
+        ORDER BY kind ASC, name ASC
+        LIMIT ${limit}
+      `;
+  return rows.map((asset) => ({ ...summary(asset), tags: asset.tags, metadata: asset.metadata, sourceUrl: asset.sourceUrl, contentType: asset.contentType, sizeBytes: asset.sizeBytes }));
+}
+
+/** Context sent to Gemini. Failure is intentionally non-fatal: the poster still works. */
+export async function libraryContext() {
+  try {
+    return await listLibraryAssets(undefined, 60);
+  } catch {
+    return [];
+  }
+}
+
+export async function createLibraryAsset(input: {
+  kind: LibraryKind;
+  name: string;
+  description: string | null;
+  tags: string[];
+  metadata: JsonObject;
+  sourceUrl: string | null;
+  contentType: string | null;
+  data: Buffer | null;
+}) {
+  const sql = await getDatabase();
+  const id = `asset:${randomUUID()}`;
+  const rows = await sql<LibraryRow[]>`
+    INSERT INTO curio_library_assets
+      (id, kind, name, description, tags, metadata, source_url, content_type, size_bytes, data)
+    VALUES (
+      ${id},
+      ${input.kind},
+      ${input.name},
+      ${input.description},
+      ${sql.array(input.tags)},
+      ${sql.json(input.metadata)},
+      ${input.sourceUrl},
+      ${input.contentType},
+      ${input.data?.length ?? null},
+      ${input.data}
+    )
+    RETURNING id, kind, name, description, tags, metadata,
+              source_url AS "sourceUrl", content_type AS "contentType",
+              size_bytes AS "sizeBytes", created_at AS "createdAt"
+  `;
+  return rows[0];
+}
+
+export async function getLibraryAsset(id: string): Promise<(LibraryAsset & { data: Buffer | null }) | null> {
+  const sql = await getDatabase();
+  const rows = await sql<LibraryFileRow[]>`
+    SELECT id, kind, name, description, tags, metadata,
+           source_url AS "sourceUrl", content_type AS "contentType",
+           size_bytes AS "sizeBytes", created_at AS "createdAt", data
+    FROM curio_library_assets
+    WHERE id = ${id}
+  `;
+  const asset = rows[0];
+  return asset ? { ...summary(asset), tags: asset.tags, metadata: asset.metadata, sourceUrl: asset.sourceUrl, contentType: asset.contentType, sizeBytes: asset.sizeBytes, data: asset.data } : null;
+}

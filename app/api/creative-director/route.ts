@@ -60,7 +60,13 @@ export async function POST(request: Request) {
     });
 
     return Response.json(
-      { reply: result.reply, patch: result.patch, skipped: result.skipped, model: result.model },
+      {
+        reply: result.reply,
+        patch: result.patch,
+        skipped: result.skipped,
+        assets: result.assetSuggestions,
+        model: result.model,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

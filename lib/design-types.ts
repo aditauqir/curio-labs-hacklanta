@@ -47,6 +47,14 @@ export type ChatMessage = {
   skipped?: string[];
   /** Plain-language note, e.g. that Gemini was unavailable and local rules were used. */
   notice?: string;
+  assetSuggestions?: AssetSuggestion[];
+};
+
+export type AssetSuggestion = {
+  id: string;
+  kind: string;
+  name: string;
+  description: string | null;
 };
 
 export type PersistedStudioState = {

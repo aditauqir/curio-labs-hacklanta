@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useState } from "react";
-import { createDefaultState, studioReducer } from "@/lib/design-state";
+import { createDefaultState, sanitizeState, studioReducer } from "@/lib/design-state";
 import { loadStudioState, saveStudioState } from "@/lib/storage";
 import { CreativeDirector } from "./creative-director";
 import { DesignCanvas } from "./design-canvas";
@@ -20,13 +20,61 @@ export default function StudioWorkspace() {
   const [state, dispatch] = useReducer(
     studioReducer,
     undefined,
-    () => loadStudioState() ?? createDefaultState(),
+    createDefaultState,
   );
   const [tab, setTab] = useState<Tab>("canvas");
+  const [persistence, setPersistence] = useState<{
+    ready: boolean;
+    instanceId: string | null;
+    persistent: boolean;
+  }>({ ready: false, instanceId: null, persistent: false });
 
   useEffect(() => {
-    saveStudioState(state);
-  }, [state]);
+    const controller = new AbortController();
+    let active = true;
+
+    fetch("/api/workspace", { signal: controller.signal, cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("workspace"))))
+      .then((json: { instanceId?: unknown; state?: unknown; persistent?: unknown }) => {
+        if (!active) return;
+        const instanceId = typeof json.instanceId === "string" ? json.instanceId : null;
+        const remote = sanitizeState(json.state);
+        const local = instanceId ? loadStudioState(instanceId) : loadStudioState();
+        const restored = remote ?? local;
+        if (restored) dispatch({ type: "restoreState", state: restored });
+        setPersistence({
+          ready: true,
+          instanceId,
+          persistent: json.persistent === true,
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        const local = loadStudioState();
+        if (local) dispatch({ type: "restoreState", state: local });
+        setPersistence({ ready: true, instanceId: null, persistent: false });
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!persistence.ready) return;
+    saveStudioState(state, persistence.instanceId ?? undefined);
+    if (!persistence.persistent || !persistence.instanceId) return;
+
+    const timer = window.setTimeout(() => {
+      void fetch("/api/workspace", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state }),
+      });
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [persistence, state]);
 
   const { design, messages, selectedPaletteId } = state;
   const show = (target: Tab) => (tab === target ? "flex" : "hidden");

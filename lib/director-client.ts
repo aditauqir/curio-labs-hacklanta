@@ -1,4 +1,4 @@
-import type { ChatMessage, DesignState } from "./design-types";
+import type { AssetSuggestion, ChatMessage, DesignState } from "./design-types";
 import { validatePatch, type AiPatch } from "./ai-patch";
 
 export type DirectorReply = {
@@ -6,6 +6,7 @@ export type DirectorReply = {
   patch: AiPatch;
   skipped: string[];
   model: string;
+  assets: AssetSuggestion[];
 };
 
 export class DirectorError extends Error {
@@ -64,6 +65,17 @@ export async function askDirector(input: {
         ? json.skipped.filter((entry): entry is string => typeof entry === "string")
         : [],
       model: typeof json?.model === "string" ? json.model : "gemini",
+      assets: Array.isArray(json?.assets)
+        ? json.assets.filter(
+            (asset): asset is AssetSuggestion =>
+              typeof asset === "object" &&
+              asset !== null &&
+              typeof asset.id === "string" &&
+              typeof asset.kind === "string" &&
+              typeof asset.name === "string" &&
+              (asset.description === null || typeof asset.description === "string"),
+          )
+        : [],
     };
   } finally {
     window.clearTimeout(timer);

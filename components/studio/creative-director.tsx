@@ -7,7 +7,7 @@ import {
   type Dispatch,
   type FormEvent,
 } from "react";
-import type { ChatMessage, DesignState } from "@/lib/design-types";
+import type { AssetSuggestion, ChatMessage, DesignState } from "@/lib/design-types";
 import { describePatch, patchToActions } from "@/lib/ai-patch";
 import { directionConfigs } from "@/lib/design-presets";
 import { interpretRequest } from "@/lib/demo-director";
@@ -60,6 +60,7 @@ type Outcome = {
   suggestions?: ChatMessage["suggestions"];
   skipped?: string[];
   notice?: string;
+  assets?: AssetSuggestion[];
 };
 
 export function CreativeDirector({
@@ -119,6 +120,7 @@ export function CreativeDirector({
         changes: describePatch(ai.patch),
         source: "gemini",
         skipped: ai.skipped,
+        assets: ai.assets,
       };
     } catch (failure) {
       const limited = failure instanceof DirectorError && failure.status === 429;
@@ -158,6 +160,7 @@ export function CreativeDirector({
             suggestions: outcome.suggestions,
             skipped: outcome.skipped?.length ? outcome.skipped : undefined,
             notice: outcome.notice,
+            assetSuggestions: outcome.assets,
           },
         ],
       });
@@ -264,6 +267,11 @@ export function CreativeDirector({
               {message.skipped && message.skipped.length > 0 ? (
                 <p className="mt-1.5 text-[11px] text-muted">
                   Skipped invalid suggestions: {message.skipped.join(", ")}
+                </p>
+              ) : null}
+              {message.assetSuggestions && message.assetSuggestions.length > 0 ? (
+                <p className="mt-2 text-[11px] text-muted">
+                  Library references: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
                 </p>
               ) : null}
               {message.id === lastId && message.suggestions?.length ? (
