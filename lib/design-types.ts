@@ -36,10 +36,17 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  /** "example" is the seeded demo conversation, "demo" is the local rule engine. */
-  source?: "example" | "demo";
+  /**
+   * "example" is the seeded sample conversation, "demo" is the local rule engine,
+   * "gemini" is a validated response from the Gemini API.
+   */
+  source?: "example" | "demo" | "gemini";
   suggestions?: DesignDirection[];
   changes?: string[];
+  /** Properties the model proposed but that failed validation and were not applied. */
+  skipped?: string[];
+  /** Plain-language note, e.g. that Gemini was unavailable and local rules were used. */
+  notice?: string;
 };
 
 export type PersistedStudioState = {

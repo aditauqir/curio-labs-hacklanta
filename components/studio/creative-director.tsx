@@ -8,15 +8,32 @@ import {
   type FormEvent,
 } from "react";
 import type { ChatMessage, DesignState } from "@/lib/design-types";
+import { describePatch, patchToActions } from "@/lib/ai-patch";
 import { directionConfigs } from "@/lib/design-presets";
 import { interpretRequest } from "@/lib/demo-director";
+import { askDirector, DirectorError } from "@/lib/director-client";
 import { makeId, type StudioAction } from "@/lib/design-state";
-import { MicOffIcon, SendIcon } from "./icons";
+import { MicIcon, MicOffIcon, SendIcon, StopIcon } from "./icons";
+import { useCapabilities } from "./use-capabilities";
+import { useVoice } from "./use-voice";
+
+const MAX_MESSAGE = 500;
+
+const SOURCE_LABEL: Record<NonNullable<ChatMessage["source"]>, string> = {
+  example: "Example conversation",
+  demo: "Demo rules",
+  gemini: "Gemini",
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  openai: "OpenAI",
+  elevenlabs: "ElevenLabs",
+};
 
 const PROMPTS: Record<DesignState["direction"], string[]> = {
   vintage: [
     "Make it more minimal but keep the layout",
-    "Use a burnt orange accent",
+    "Use a deep teal accent",
     "Center everything",
   ],
   minimal: [
@@ -31,63 +48,159 @@ const PROMPTS: Record<DesignState["direction"], string[]> = {
   ],
 };
 
+function formatTime(total: number) {
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+type Outcome = {
+  reply: string;
+  actions: StudioAction[];
+  changes: string[];
+  source: "gemini" | "demo";
+  suggestions?: ChatMessage["suggestions"];
+  skipped?: string[];
+  notice?: string;
+};
+
 export function CreativeDirector({
   messages,
   design,
+  selectedPaletteId,
   dispatch,
 }: {
   messages: ChatMessage[];
   design: DesignState;
+  selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
 }) {
+  const capabilities = useCapabilities();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
+  const [heard, setHeard] = useState<{ text: string; provider: string | null } | null>(null);
+  const [speakReplies, setSpeakReplies] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef(false);
+  const sendRef = useRef<(text: string, spoken?: boolean) => void>(() => undefined);
 
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const voice = useVoice({
+    canListen: capabilities.listen,
+    canSpeak: capabilities.speak,
+    onTranscript: (text, provider) => {
+      setHeard({ text, provider });
+      sendRef.current(text, true);
+    },
+  });
+  const { speak } = voice;
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, pending]);
 
-  function send(raw: string) {
-    const content = raw.trim();
-    if (!content || pending) return;
+  async function interpret(content: string): Promise<Outcome> {
+    const local = () => {
+      const result = interpretRequest(content, design);
+      return {
+        reply: result.reply,
+        actions: result.actions,
+        changes: result.changes,
+        source: "demo" as const,
+        suggestions: result.suggestions,
+      };
+    };
 
+    if (!capabilities.gemini) return local();
+
+    try {
+      const ai = await askDirector({ message: content, design, paletteId: selectedPaletteId, history: messages });
+      return {
+        reply: ai.reply,
+        actions: patchToActions(ai.patch),
+        // Chips list what was actually applied, not what the model claims it did.
+        changes: describePatch(ai.patch),
+        source: "gemini",
+        skipped: ai.skipped,
+      };
+    } catch (failure) {
+      const limited = failure instanceof DirectorError && failure.status === 429;
+      return {
+        ...local(),
+        notice: limited
+          ? "Too many requests to Gemini, so this used local demo rules."
+          : "Gemini was unavailable, so this used local demo rules.",
+      };
+    }
+  }
+
+  async function send(raw: string, spoken = false) {
+    const content = raw.trim().slice(0, MAX_MESSAGE);
+    if (!content || pendingRef.current) return;
+
+    pendingRef.current = true;
+    setPending(true);
+    setDraft("");
     dispatch({
       type: "addMessages",
       messages: [{ id: makeId(), role: "user", content }],
     });
-    setDraft("");
-    setPending(true);
 
-    const snapshot = design;
-    timer.current = window.setTimeout(() => {
-      const result = interpretRequest(content, snapshot);
-      for (const action of result.actions) dispatch(action);
+    try {
+      const outcome = await interpret(content);
+      for (const action of outcome.actions) dispatch(action);
       dispatch({
         type: "addMessages",
         messages: [
           {
             id: makeId(),
             role: "assistant",
-            source: "demo",
-            content: result.reply,
-            changes: result.changes,
-            suggestions: result.suggestions,
+            source: outcome.source,
+            content: outcome.reply,
+            changes: outcome.changes,
+            suggestions: outcome.suggestions,
+            skipped: outcome.skipped?.length ? outcome.skipped : undefined,
+            notice: outcome.notice,
           },
         ],
       });
+      if (spoken || speakReplies) void speak(outcome.reply);
+    } finally {
+      pendingRef.current = false;
       setPending(false);
-    }, 450);
+    }
   }
+
+  useEffect(() => {
+    sendRef.current = (text, spoken) => void send(text, spoken);
+  });
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
-    send(draft);
+    void send(draft);
   }
 
   const lastId = messages[messages.length - 1]?.id;
+  const listening = voice.phase === "listening";
+  const micDisabled =
+    voice.block !== null || pending || voice.phase === "transcribing";
+
+  let micLabel = "Start voice input";
+  if (listening) micLabel = "Stop recording and send";
+  else if (voice.block) micLabel = "Voice input unavailable";
+
+  let voiceStatus: string;
+  switch (voice.block) {
+    case "not-configured":
+      voiceStatus = "Voice is off: no speech-to-text key is configured on this server. Text mode only.";
+      break;
+    case "insecure":
+      voiceStatus =
+        "The browser blocks the microphone on plain HTTP. Open this over HTTPS or on localhost to use voice.";
+      break;
+    case "unsupported":
+      voiceStatus = "This browser does not support microphone recording. Text mode only.";
+      break;
+    default:
+      voiceStatus = "Press the mic, speak, then press it again to send.";
+  }
 
   return (
     <section
@@ -99,7 +212,11 @@ export function CreativeDirector({
           Creative director
         </h2>
         <p className="mt-1 text-xs text-muted">
-          Demo mode: replies come from local rules, not an AI model.
+          {!capabilities.loaded
+            ? "Checking which services are available..."
+            : capabilities.gemini
+              ? "Powered by Gemini. Every change is validated before it touches your poster."
+              : "Demo mode: no Gemini key is configured, so replies come from local rules, not an AI model."}
         </p>
       </div>
 
@@ -115,7 +232,7 @@ export function CreativeDirector({
                   Curio Labs
                   {message.source ? (
                     <span className="rounded border border-line px-1.5 py-0.5 normal-case tracking-normal">
-                      {message.source === "example" ? "Example conversation" : "Demo rules"}
+                      {SOURCE_LABEL[message.source]}
                     </span>
                   ) : null}
                 </p>
@@ -129,8 +246,11 @@ export function CreativeDirector({
               >
                 {message.content}
               </p>
+              {message.notice ? (
+                <p className="mt-1.5 text-[11px] text-muted">{message.notice}</p>
+              ) : null}
               {message.changes && message.changes.length > 0 ? (
-                <ul className="mt-2 flex flex-wrap gap-1.5">
+                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Changes applied">
                   {message.changes.map((change) => (
                     <li
                       key={change}
@@ -141,6 +261,11 @@ export function CreativeDirector({
                   ))}
                 </ul>
               ) : null}
+              {message.skipped && message.skipped.length > 0 ? (
+                <p className="mt-1.5 text-[11px] text-muted">
+                  Skipped invalid suggestions: {message.skipped.join(", ")}
+                </p>
+              ) : null}
               {message.id === lastId && message.suggestions?.length ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {message.suggestions.map((direction) => (
@@ -148,7 +273,7 @@ export function CreativeDirector({
                       key={direction}
                       type="button"
                       disabled={pending}
-                      onClick={() => send(directionConfigs[direction].label)}
+                      onClick={() => void send(directionConfigs[direction].label)}
                       className="rounded-full border border-ink px-3 py-1.5 text-xs font-medium transition-colors hover:bg-ink hover:text-paper disabled:opacity-40"
                     >
                       {directionConfigs[direction].label}
@@ -180,7 +305,7 @@ export function CreativeDirector({
               key={prompt}
               type="button"
               disabled={pending}
-              onClick={() => send(prompt)}
+              onClick={() => void send(prompt)}
               className="rounded-md border border-line px-2.5 py-1.5 text-left text-[11px] leading-snug text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-40"
             >
               {prompt}
@@ -188,19 +313,38 @@ export function CreativeDirector({
           ))}
         </div>
 
+        {heard ? (
+          <p className="mb-2 text-[11px] text-muted" data-testid="transcript">
+            <span className="font-medium uppercase tracking-[0.12em]">Heard</span>{" "}
+            &ldquo;{heard.text}&rdquo;
+            {heard.provider ? (
+              <span className="ml-1.5 rounded border border-line px-1 py-0.5">
+                {PROVIDER_LABEL[heard.provider] ?? heard.provider}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+
         <form onSubmit={onSubmit} className="flex items-center gap-2">
           <button
             type="button"
-            disabled
-            aria-label="Voice input unavailable"
-            title="Voice needs an ElevenLabs integration, which is not configured yet"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line text-muted opacity-60"
+            disabled={micDisabled}
+            aria-label={micLabel}
+            aria-pressed={listening}
+            title={voice.block ? voiceStatus : micLabel}
+            onClick={() => (listening ? voice.stop() : void voice.start())}
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-md border transition-colors disabled:opacity-50 ${
+              listening
+                ? "border-ink bg-ink text-paper"
+                : "border-line text-ink hover:border-ink"
+            }`}
           >
-            <MicOffIcon />
+            {voice.block ? <MicOffIcon /> : listening ? <StopIcon /> : <MicIcon />}
           </button>
           <input
             type="text"
             value={draft}
+            maxLength={MAX_MESSAGE}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Describe a change or a direction"
             aria-label="Message the creative director"
@@ -215,7 +359,52 @@ export function CreativeDirector({
             <SendIcon />
           </button>
         </form>
-        <p className="mt-2 text-[11px] text-muted">Voice is off. Text mode only.</p>
+
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <p className="min-w-0 text-[11px] text-muted" role="status" data-testid="voice-status">
+            {listening ? (
+              <span className="inline-flex items-center gap-1.5 text-ink">
+                <span className="rec-dot" aria-hidden="true" />
+                Listening {formatTime(voice.seconds)}. Press the mic to send.
+              </span>
+            ) : voice.phase === "transcribing" ? (
+              "Transcribing..."
+            ) : voice.phase === "speaking" ? (
+              <span className="inline-flex items-center gap-2 text-ink">
+                Speaking...
+                <button
+                  type="button"
+                  onClick={voice.stopSpeaking}
+                  className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:text-ink"
+                >
+                  Stop
+                </button>
+              </span>
+            ) : (
+              voiceStatus
+            )}
+          </p>
+
+          <label
+            className={`flex shrink-0 items-center gap-1.5 text-[11px] ${
+              voice.canSpeak ? "text-muted" : "text-muted opacity-50"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={speakReplies}
+              disabled={!voice.canSpeak}
+              onChange={(event) => setSpeakReplies(event.target.checked)}
+            />
+            Speak replies
+          </label>
+        </div>
+
+        {voice.error ? (
+          <p role="alert" className="mt-2 text-[11px] text-red-700">
+            {voice.error}
+          </p>
+        ) : null}
       </div>
     </section>
   );

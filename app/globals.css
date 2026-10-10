@@ -52,6 +52,24 @@ summary::-webkit-details-marker {
   animation-delay: 0.3s;
 }
 
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #b42318;
+  animation: rec-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 @keyframes dot-pulse {
   0%,
   80%,
@@ -67,5 +85,8 @@ summary::-webkit-details-marker {
   .dot {
     animation: none;
     opacity: 0.6;
+  }
+  .rec-dot {
+    animation: none;
   }
 }

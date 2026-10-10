@@ -100,7 +100,12 @@ export default function StudioWorkspace() {
 
       <main className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)_380px]">
         <div className={`${show("chat")} min-h-0 flex-col border-line lg:flex lg:border-r`}>
-          <CreativeDirector messages={messages} design={design} dispatch={dispatch} />
+          <CreativeDirector
+            messages={messages}
+            design={design}
+            selectedPaletteId={selectedPaletteId}
+            dispatch={dispatch}
+          />
         </div>
         <div className={`${show("canvas")} min-h-0 min-w-0 flex-col lg:flex`}>
           <DesignCanvas design={design} dispatch={dispatch} />

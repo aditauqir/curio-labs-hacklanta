@@ -28,11 +28,11 @@ Live at **http://155.138.194.120/** (plain HTTP, no domain or HTTPS yet). Deploy
 | LocalStorage persistence with validation of stored data | Working |
 | PNG export (renders the same layout model as the screen) and brief JSON export | Working |
 | Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
-| Chat replies | **Demo only.** Local keyword rules in `lib/demo-director.ts`, labelled "Demo rules" in the UI. Not an AI. |
+| Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
+| Gemini integration | Built. `POST /api/creative-director`. Output is validated against whitelists and reconciled with the user's intent (see section 4). |
+| Microphone (speech to text) | Built. Records in the browser, `POST /api/voice/transcribe`. Uses **OpenAI** (`gpt-transcribe`) when `OPENAI_API_KEY` is set, otherwise or on failure **ElevenLabs**. Needs HTTPS or localhost (see section 5). |
+| Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
 | Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
-| Voice (microphone) | **Disabled on purpose.** Button is inert until ElevenLabs is wired up. Do not fake it. |
-| Gemini integration | **Not built.** Key is provisioned, nothing reads it yet. |
-| ElevenLabs integration | **Not built.** Key is provisioned, nothing reads it yet. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
@@ -69,13 +69,29 @@ lib/
   demo-director.ts      interpretRequest(): local rule engine that returns StudioAction[]
   storage.ts            LocalStorage load/save (key: studio-workspace-v1)
   export.ts             PNG (canvas) and brief JSON export
+app/api/
+  status/route.ts             Which integrations are configured (booleans only). Uses connection() so it is not prerendered
+  creative-director/route.ts  Gemini design edits. Validates input, rate limits, never returns upstream error text
+  voice/transcribe/route.ts   Audio upload -> text (OpenAI, ElevenLabs fallback)
+  voice/speak/route.ts        Text -> MP3 (ElevenLabs), streamed
+lib/ (server only: gemini.ts, openai.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
+  ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
+  director-client.ts    Browser fetch for the director with a timeout
+components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
 scripts/new-branch.mjs  Creates a branch and logs it here (see Working agreement)
+scripts/check-secrets.mjs  Fails if a credential-shaped string is in a committable file
 ```
 
 ### The key design decision
 
 All edits go through one reducer. Each `StudioAction` changes only its own slice of `DesignState`, which is what makes "change the font and the colors stay put" true.
 `StudioAction` is also the contract for AI: a Gemini response should be validated and mapped onto these same actions, never applied as raw state.
+
+**AI output is untrusted.** The Gemini route never applies model output directly:
+1. `validatePatch()` keeps only whitelisted ids, real `#RRGGBB` colors, and bounded plain text. Anything else is dropped and reported in `skipped`, which the UI shows.
+2. `reconcilePatch()` enforces the user's intent in code, because the models ignore it otherwise. Probing showed they set `spacing` and claim direction changes even when told "keep the layout". If the user says to keep the layout, direction/alignment/spacing are removed and a requested direction becomes its palette and fonts. Values equal to the current design are dropped so the change chips only list real changes.
+3. `patchToActions()` maps the result onto the same `StudioAction`s the manual controls use (order matters: direction, palette, fonts, colors, layout, copy).
+4. The "changes" chips come from what was actually applied, not from the model's reply text.
 
 `buildPoster()` is the single source of layout. The SVG on screen and the exported PNG both render its output, so they cannot drift apart.
 
@@ -95,6 +111,14 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 - **`ci.yml`**: runs on pull requests to `main`. Lint (zero warnings), typecheck, build, non-blocking `npm audit`.
 - **`deploy.yml`**: runs on push to `main` (every merge) and manually. Job 1 lints, typechecks, and builds. Job 2 SSHes in, fast-forwards the server to `origin/main`, runs `npm ci` and `npm run build`, restarts PM2, and health-checks `127.0.0.1:3000`. If any step fails it restores the previous commit, rebuilds, and restarts. Job 3 checks the public URL.
 
+### Microphone needs HTTPS (important)
+
+Browsers only expose `getUserMedia` on **HTTPS or localhost**. The server is currently plain HTTP at `http://155.138.194.120/`, so on the live site the mic button is disabled and says why (that is the intended, honest behavior). Chat with Gemini and spoken replies still work over HTTP. To make the mic work in production you need a TLS certificate, which needs a hostname (a free `155-138-194-120.sslip.io` name works with Let's Encrypt, or use a real domain). Until then, test voice locally with `npm run dev` at `http://localhost:3000`.
+
+### nginx upload size
+
+nginx's default `client_max_body_size` is 1 MB. Voice clips are capped at 30 seconds (roughly 100 to 700 KB depending on browser codec), which fits, but raise the limit to `10m` in `/etc/nginx/sites-available/curiolabs` if you lengthen the cap. The API itself rejects audio over 8 MB.
+
 ### Things to know about deploy
 
 - **Never push straight to `main`.** A push deploys to production immediately. Use a branch and a pull request.
@@ -109,15 +133,18 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | Variable | Used for | Where it lives |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Gemini calls (server only, never `NEXT_PUBLIC_`) | `.env.local` locally; `/var/www/curiolabs/.env.local` on the server (mode 600) |
-| `ELEVENLABS_API_KEY` | ElevenLabs voice (server only) | same as above |
+| `ELEVENLABS_API_KEY` | Spoken replies, and backup speech-to-text | same as above |
+| `OPENAI_API_KEY` | Preferred speech-to-text (`gpt-transcribe`). **Not set yet.** Until it is, ElevenLabs transcribes | same as above |
+| `GEMINI_MODEL`, `OPENAI_STT_MODEL`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_STT_MODEL` | Optional overrides. Comma-separated lists are tried in order | same as above |
 | GitHub Actions secrets | `VULTR_HOST`, `VULTR_USER`, `VULTR_SSH_KEY`, `VULTR_KNOWN_HOSTS` | GitHub repo settings. App keys are intentionally **not** here |
 
-Both app keys were checked against their APIs on 2026-10-09 (HTTP 200). Nothing in the code reads them yet.
+Gemini and ElevenLabs keys were checked against their APIs on 2026-10-09 and are now used by the app. `GET /api/status` reports which are configured (booleans only).
 
 Keys are read only from `process.env` at runtime, never written in code. `npm run check:secrets` (part of `npm run check`, and a step in both CI workflows) fails the build if a credential-shaped string appears in any file git would commit. Gitignored files such as `.env.local` are skipped on purpose.
 
 - Google Cloud project for Gemini: **Hacklanta 2**, project number `145508307041`.
-- Gemini text models that were available to the key: `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.5-flash`, `gemini-3.6-flash`, `gemini-3.7-flash`, `gemini-3.8-flash`, plus `*-latest` aliases. Re-list before relying on a name; they change.
+- **Gemini model choice (measured, not assumed).** `gemini-2.5-flash` is listed by the API but is **retired for new keys** (404). `gemini-3.8-flash` took about 36 s for a trivial prompt and hung with `thinkingBudget:0`. The flash-lite models answer in about 1 s. Default chain is `gemini-3.5-flash-lite` then `gemini-flash-lite-latest` (an alias, so a retirement cannot break the app). Expect occasional latency spikes (one 7 s call was observed). Re-list models before relying on a name; they change.
+- OpenAI docs (checked 2026-10-09) recommend `gpt-transcribe` for file transcription, at `POST /v1/audio/transcriptions`. The code falls back to `gpt-4o-mini-transcribe` then `whisper-1`. **This path has not been tested against a real OpenAI key yet.** Only its failure/fallback behavior has been verified, using a deliberately invalid key.
 - A new server needs the same `.env.local` created by hand. `git pull` will not bring it, by design.
 
 **Security TODOs (the keys and the server password were shared in chat, so treat them as exposed):**
@@ -157,20 +184,22 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 ## 9. Known issues and limitations
 
-- Chat is rule-based, so unmatched requests get a clarifying prompt rather than an intelligent answer.
+- Rate limits are in-memory per process (`lib/rate-limit.ts`): 20 director calls, 12 transcriptions, 20 speaks per client per minute, plus hourly global caps, to protect the paid keys on a public URL. They reset on restart and are not a substitute for auth. The client key comes from nginx's `X-Real-IP`.
+- Voice recordings are capped at 30 seconds. Safari (mp4/m4a) and Firefox recording paths are implemented but were only tested in Chromium.
+- Microphone permission errors were tested by throwing the same `DOMException` names browsers throw (`NotAllowedError`, `NotFoundError`, `NotReadableError`, `NotSupportedError`), because headless Chromium cannot show a real permission prompt.
+- Without Gemini or voice keys, the app runs in demo mode and says so. Demo mode is keyword rules only, so unmatched requests get a clarifying prompt.
 - Fonts use `next/font/google`. Builds need outbound network access to fetch them.
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
-- The browser test suite (Playwright) that verified this work was ad hoc and is **not in the repo**. See next steps.
+- The browser test suites (Playwright) that verified this work were ad hoc and are **not in the repo**. See next steps.
 
 ## 10. Where to work next
 
 In priority order, matching the build phases:
 
-1. **Gemini (Phase 2).** Add `app/api/creative-director/route.ts`. Accept `{ message, design }`, call Gemini server-side with a JSON response schema, validate the result, and map it to the existing `StudioAction` types (reuse `HEX_COLOR`, `fontPairs` ids, palette ids). Reject anything outside that whitelist. Fall back to `interpretRequest()` when no key is set, and label replies "Gemini" vs "Demo rules" truthfully in the UI. Cap input length. The success test is the demo in section 1: ask for one change, see only that property change, see the brief update.
-2. **ElevenLabs (Phase 3).** Server route that issues a short-lived session credential so the key never reaches the browser, then a real microphone flow with genuine permission, listening, speaking, and transcript states. Keep text-only mode working when voice is unavailable.
-3. **HTTPS and a domain.** Point a domain at the server and add TLS (certbot with the existing nginx).
-4. **Put the browser tests in the repo** (`scripts/e2e/`, Playwright) and run them in CI.
+1. **HTTPS and a hostname** so the mic works in production (section 5). Then add `OPENAI_API_KEY` on the server and test the OpenAI transcription path with a real key.
+2. **Put the browser and API tests in the repo** (`scripts/e2e/`, Playwright) and run them in CI. The Gemini and voice suites covered: keep-layout enforcement, hostile model output, fallback on outage and 429, full voice loop with a fake microphone, permission errors, silence, rate limiting, and key-leak scans.
+3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
 5. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
 6. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
 7. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
@@ -184,5 +213,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `main` | 2026-10-09 | Production. Auto-deploys to the Vultr server | live | Protected by convention: PRs only |
 | `app-setup-1` | 2026-10-09 | Curio Labs workspace UI, CI checks, rollback-safe deploy, opencode LSP config | merged | PR #1, squash-merged |
 | `handoff-and-env-setup` | 2026-10-09 | Add HANDOFF.md, branch-logging rule and script, and provision Gemini and ElevenLabs env vars | in progress | |
-| `gemini-voice-integration` | 2026-10-09 | Wire Gemini (structured design edits) and ElevenLabs (speech-to-text, text-to-speech) into the app | in progress | Stacked on `handoff-and-env-setup` (not yet merged). Merge that first |
+| `gemini-voice-integration` | 2026-10-09 | Wire Gemini (validated design edits), OpenAI/ElevenLabs speech-to-text, and ElevenLabs spoken replies into the app | in progress | Stacked on `handoff-and-env-setup` (not yet merged), so its PR also carries HANDOFF.md, the branch script, and the secret scan |
 <!-- BRANCH-LOG-INSERT -->
