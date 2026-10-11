@@ -274,13 +274,16 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 ## 9. Known issues and limitations
 
+- **Deploys are blocked (found 2026-10-11).** The deploy run for PR #19 (`06824ca`) failed in "Run browser and API tests", so the deploy job was skipped and **production is still on `a13d42f`**. Seven tests in `scripts/e2e/studio.spec.ts` (line 35) wait for a heading named `CURIO LABS`, which the new `/app` editor no longer renders. Every PR runs the same suite, so nothing can deploy until the tests are updated to match the new UI.
+- **Gemini's library context is all fonts.** `libraryContext()` takes the first 60 shared rows ordered by kind, and the font import put 628 font rows in `curio_library_assets` (also 2 documents, 4 palettes, 31 references). The context is therefore 2 documents and 58 fonts, and palettes and references never reach Gemini. Fix with a per-kind cap in `libraryContext()` (`lib/library.ts`).
+- **Engine textures are waiting on a filter.** `curio/assets` (on `curio-raster-engine`) publishes 42 image rows tagged `engine-texture` into `curio_library_assets` via `python -m curio publish-library`. Branch `library-engine-texture-filter` keeps those rows out of the Gemini context and coach search; merge and deploy it **before** publishing. Nothing has been published yet.
 - **Open on the server:** `idkjustmakeitlookgood.gay` and `www.idkjustmakeitlookgood.gay` are each declared in two `:80` blocks and the apex is also in a `:443` catch-all, so `nginx -t` logs `conflicting server name ... ignored`. nginx keeps the first declaration, which puts the apex in certbot's redirect block where it falls through to `return 404`. Effect: **`http://idkjustmakeitlookgood.gay/` returns 404 instead of redirecting.** HTTPS is unaffected and correct on all three names. Fix with `bash scripts/fix-nginx-server-names.sh --apply` on the server; it is not applied by deploys, which never touch nginx config.
 - Rate limits are in-memory per process (`lib/rate-limit.ts`): 20 director calls, 12 transcriptions, 20 speaks per client per minute, plus hourly global caps, to protect the paid keys on a public URL. They reset on restart and are not a substitute for auth. The client key comes from nginx's `X-Real-IP`.
 - Voice recordings are capped at 30 seconds. Safari (mp4/m4a) and Firefox recording paths are implemented but were only tested in Chromium.
 - Microphone permission errors were tested by throwing the same `DOMException` names browsers throw (`NotAllowedError`, `NotFoundError`, `NotReadableError`, `NotSupportedError`), because headless Chromium cannot show a real permission prompt.
 - Without Gemini or voice keys, the app runs in demo mode and says so. Demo mode is keyword rules only, so unmatched requests get a clarifying prompt.
 - The Tiger MCP connection currently reports stale `tsdbadmin` credentials, but the app's existing server-side `DATABASE_URL` successfully applied and verified the design-principles import. No database credential was rotated.
-- `npm run check` passes. A production build is still environment-blocked here: Turbopack hits a worker/process permission panic, while the webpack fallback reaches the existing Google `next/font` Cormorant loader and fails while fetching/parsing the font stylesheet; neither failure points at the knowledge or Gemini changes.
+- `npm run check` passes. A production build is still environment-blocked here: Turbopack hits a worker/process permission panic, while the webpack fallback reaches the existing Google `next/font` Cormorant loader and fails while fetching/parsing the font stylesheet; neither failure points at the knowledge or Gemini changes. On Windows, a checkout under a folder whose name contains `!` (for example `!Programming_Projects`) also fails `npm run build` with `Can't resolve 'tw-animate-css'` even though the package is installed; CI's build passes. Clone to a path without `!` for local builds.
 - Fonts use `next/font/google`. Builds need outbound network access to fetch them.
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
@@ -292,11 +295,12 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 In priority order, matching the build phases:
 
-1. **Merge and deploy `tldraw-voice-onboarding`.** The branch contains the verified manual editor pass, improved warm Vintage Jazz canvas, transparent mascot container, and randomized five-frame speaking loop. Review the `/home` start flow into the `/app` editor, director, Gemini/TigerData coach, and PNG/JPG/PSD export flows before promoting it to `main`; do not push directly to `main`.
-2. **Canonical editor is `/app`.** Keep `/home` as the start screen and do not add another editor route unless the user asks.
-3. **Gemini editing quality.** Follow the [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) to add versioned, permissioned design examples or a supported tuning path, evaluate real requests, and preserve the `layerEdits` semantics.
-4. **Reference depth.** Replace or supplement the 31 source-linked Pinterest searches with legally usable, verified assets when licensing/attribution requirements are settled.
-5. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
+1. **Unblock deploys.** Update `scripts/e2e/studio.spec.ts` to the new editor (section 9), so the already-merged PR #19 actually deploys. Then merge `library-engine-texture-filter`, and only after it is live run `python -m curio publish-library` from `curio-raster-engine`. Consider the per-kind cap for the Gemini library context at the same time.
+2. **(Merged as PR #19, not yet deployed) `tldraw-voice-onboarding`.** The branch contains the verified manual editor pass, improved warm Vintage Jazz canvas, transparent mascot container, and randomized five-frame speaking loop. Review the `/home` start flow into the `/app` editor, director, Gemini/TigerData coach, and PNG/JPG/PSD export flows before promoting it to `main`; do not push directly to `main`.
+3. **Canonical editor is `/app`.** Keep `/home` as the start screen and do not add another editor route unless the user asks.
+4. **Gemini editing quality.** Follow the [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) to add versioned, permissioned design examples or a supported tuning path, evaluate real requests, and preserve the `layerEdits` semantics.
+5. **Reference depth.** Replace or supplement the 31 source-linked Pinterest searches with legally usable, verified assets when licensing/attribution requirements are settled.
+6. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
 
 ## Branch log
 
