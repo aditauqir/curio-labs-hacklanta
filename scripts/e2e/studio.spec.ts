@@ -15,33 +15,32 @@ test("uses dedicated director and editor routes", async ({ page }) => {
   await expect(page).toHaveURL(/\/editor$/);
   await expect(page.getByTestId("editor-screen")).toBeVisible();
 
-  await page.getByRole("button", { name: "Open director" }).click();
+  await page.goto("/director");
   await expect(page).toHaveURL(/\/director$/);
   await expect(page.getByTestId("chat-screen")).toBeVisible();
 
-  await page.getByRole("button", { name: "Open full editor" }).click();
-  await expect(page).toHaveURL(/\/editor$/);
+  await page.goto("/app");
+  await expect(page.getByTestId("onboarding-screen")).toBeVisible();
+  await page.getByRole("button", { name: /Open current workspace/ }).click();
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId("editor-screen")).toBeVisible();
 });
 
 test.describe("studio workspace", () => {
   test.beforeEach(async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/home");
     await expect(page.getByTestId("onboarding-screen")).toBeVisible();
-    await page.getByRole("button", { name: "Open the full studio" }).click();
+    await page.getByRole("button", { name: /Open current workspace/ }).click();
     await expect(page.getByRole("heading", { name: "CURIO LABS" })).toBeVisible();
   });
 
-  test("renders the mobile workspace and edits the poster", async ({ page }) => {
+  test("renders the desktop workspace and edits the poster", async ({ page }) => {
     await expect(page).toHaveTitle(/Curio Labs/);
-    await expect(page.getByRole("tablist", { name: "Workspace panels" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Design canvas" })).toBeVisible();
-    await page.getByRole("tab", { name: "Director" }).click();
-    await expect(page.getByTestId("editor-chat-box")).toBeVisible();
-    await page.getByRole("tab", { name: "Canvas" }).click();
 
-    const headline = page.getByLabel("Headline");
+    await page.getByRole("button", { name: "Properties", exact: true }).click();
+    const headline = page.getByRole("textbox", { name: /^Headline Press Enter/ });
     await headline.fill("Late Night Sessions");
     await expect(headline).toHaveValue("Late Night Sessions");
 
@@ -51,18 +50,15 @@ test.describe("studio workspace", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("switches panels and applies a local director edit", async ({ page }) => {
-    await page.getByRole("tab", { name: "Director" }).click();
+  test("uses the director and reference panels to apply a local edit", async ({ page }) => {
     await expect(page.getByRole("region", { name: "Creative director" })).toBeVisible();
-    await expect(page.getByText(/Demo mode:/)).toBeVisible();
 
     await page.getByLabel("Message the creative director").fill("Use a blue accent");
     await page.getByRole("button", { name: "Send message" }).click();
-    await expect(page.getByText("Demo rules")).toBeVisible();
     await expect(page.getByText("Accent: blue")).toBeVisible();
 
-    await page.getByRole("tab", { name: "Inspiration" }).click();
-    await expect(page.getByRole("region", { name: "Inspiration board" })).toBeVisible();
+    await page.getByRole("button", { name: "References" }).click();
+    await expect(page.getByRole("region", { name: "Reference" })).toBeVisible();
   });
 
   test("exports the editable brief as JSON", async ({ page }) => {
@@ -134,7 +130,8 @@ test.describe("studio workspace", () => {
     await expect(page.getByText("I gave the accent a clear blue signal.")).toBeVisible();
     await expect(page.getByText("Accent: #1177CC")).toBeVisible();
     await page.getByRole("button", { name: "Open full editor" }).click();
-    await expect(page.getByLabel("Accent color", { exact: true })).toHaveValue("#1177cc");
+    await page.getByRole("button", { name: "Properties", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: /^Accent color/ })).toHaveValue("#1177cc");
   });
 });
 
@@ -144,7 +141,7 @@ test("moves from the start screen into the director and full editor", async ({ p
   await page.goto("/home");
   await expect(page.getByTestId("onboarding-screen")).toBeVisible();
 
-  await page.getByRole("button", { name: "Chat / voice" }).click();
+  await page.getByRole("button", { name: /Warm identity/ }).click();
   await expect(page.getByTestId("chat-screen")).toBeVisible();
   await expect(page.getByRole("region", { name: "Creative director" })).toBeVisible();
 
@@ -199,5 +196,7 @@ test("keeps a newer local edit when the remote workspace is older", async ({ pag
   });
 
   await page.goto("/home");
-  await expect(page.getByLabel("Headline")).toHaveValue("Local newer");
+  await page.getByRole("button", { name: /Open current workspace/ }).click();
+  await page.getByRole("button", { name: "Properties", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: /^Headline Press Enter/ })).toHaveValue("Local newer");
 });
