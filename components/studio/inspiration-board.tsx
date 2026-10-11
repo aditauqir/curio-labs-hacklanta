@@ -35,6 +35,19 @@ type LoadedLibraryAsset = {
   sourceUrl: string | null;
 };
 
+type LoadedPipelineAsset = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  conceptId: string | null;
+  type: string;
+  role: string;
+  description: string;
+  source: string;
+  status: string;
+  note: string;
+};
+
 type DisplayReference = {
   id: string;
   title: string;
@@ -57,6 +70,23 @@ function isLoadedLibraryAsset(value: unknown): value is LoadedLibraryAsset {
     asset.metadata !== null &&
     !Array.isArray(asset.metadata) &&
     (asset.sourceUrl === null || typeof asset.sourceUrl === "string")
+  );
+}
+
+function isLoadedPipelineAsset(value: unknown): value is LoadedPipelineAsset {
+  if (typeof value !== "object" || value === null) return false;
+  const asset = value as Record<string, unknown>;
+  return (
+    typeof asset.id === "string" &&
+    typeof asset.projectId === "string" &&
+    typeof asset.projectName === "string" &&
+    (asset.conceptId === null || typeof asset.conceptId === "string") &&
+    typeof asset.type === "string" &&
+    typeof asset.role === "string" &&
+    typeof asset.description === "string" &&
+    typeof asset.source === "string" &&
+    typeof asset.status === "string" &&
+    typeof asset.note === "string"
   );
 }
 
@@ -162,15 +192,20 @@ export function InspirationBoard({
 }) {
   const fontPair = getFontPair(design.typography.id);
   const [libraryAssets, setLibraryAssets] = useState<LoadedLibraryAsset[]>([]);
+  const [pipelineAssets, setPipelineAssets] = useState<LoadedPipelineAsset[]>([]);
   const [libraryStatus, setLibraryStatus] = useState<"loading" | "ready" | "fallback">("loading");
 
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/assets", { signal: controller.signal, cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("library"))))
-      .then((json: { assets?: unknown }) => {
+      .then((json: { assets?: unknown; pipelineAssets?: unknown }) => {
         const assets = Array.isArray(json.assets) ? json.assets.filter(isLoadedLibraryAsset) : [];
+        const loadedPipelineAssets = Array.isArray(json.pipelineAssets)
+          ? json.pipelineAssets.filter(isLoadedPipelineAsset)
+          : [];
         setLibraryAssets(assets);
+        setPipelineAssets(loadedPipelineAssets);
         setLibraryStatus(assets.length > 0 ? "ready" : "fallback");
       })
       .catch(() => setLibraryStatus("fallback"));
@@ -183,12 +218,15 @@ export function InspirationBoard({
   const loadedFonts = libraryAssets.filter((asset) => asset.kind === "font");
   const loadedPalettes = libraryAssets.filter((asset) => asset.kind === "palette");
   const loadedReferences = libraryAssets.filter((asset) => asset.kind === "reference");
+  const loadedAssetCount = libraryAssets.length + pipelineAssets.length;
   const libraryLabel =
     libraryStatus === "ready"
-      ? `${libraryAssets.length} loaded`
+      ? `${loadedAssetCount} loaded`
       : libraryStatus === "loading"
         ? "Loading"
-        : "Local fallback";
+        : pipelineAssets.length > 0
+          ? `${pipelineAssets.length} pipeline loaded`
+          : "Local fallback";
 
   if (compact) {
     return (
@@ -227,10 +265,19 @@ export function InspirationBoard({
             <span id="compact-library-heading">Loaded assets</span>
             <span>{libraryLabel}</span>
           </div>
-          <ul className="flex flex-wrap gap-1.5" aria-label="Loaded Curio library assets">
+          <ul className="flex flex-wrap gap-1.5" aria-label="Loaded Curio assets">
             {[...loadedFonts.slice(0, 2), ...loadedPalettes.slice(0, 2), ...loadedReferences.slice(0, 2)].map((asset) => (
               <li key={asset.id} className="rounded-full border border-line px-2 py-1 text-[10px] text-muted">
                 {asset.name}
+              </li>
+            ))}
+            {pipelineAssets.slice(0, 4).map((asset) => (
+              <li
+                key={`${asset.projectId}:${asset.id}`}
+                className="rounded-full border border-line px-2 py-1 text-[10px] text-muted"
+                title={`${asset.description} · ${asset.source} · ${asset.status}`}
+              >
+                {asset.projectName} · {asset.role}
               </li>
             ))}
             {libraryStatus === "fallback" ? (

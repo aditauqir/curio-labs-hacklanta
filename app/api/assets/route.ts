@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
 import { getAccountContext } from "@/lib/instance";
+import { listInstancePipelineAssets, type PipelineAssetSummary } from "@/lib/pipeline/store";
 import {
   createLibraryAsset,
   LIBRARY_KINDS,
@@ -27,8 +28,19 @@ export async function GET(request: Request) {
   }
   try {
     const instance = await getAccountContext();
+    const assets = await listLibraryAssets(kind as LibraryKind | undefined, 60, instance.id);
+    let pipelineAssets: PipelineAssetSummary[] = [];
+    if (!kind) {
+      try {
+        pipelineAssets = await listInstancePipelineAssets(instance.id);
+      } catch {
+        // Keep the legacy library usable while a deployment is migrating the
+        // pipeline tables.
+        logDatabaseFailure("list pipeline assets");
+      }
+    }
     return NextResponse.json(
-      { assets: await listLibraryAssets(kind as LibraryKind | undefined, 60, instance.id) },
+      { assets, pipelineAssets },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {

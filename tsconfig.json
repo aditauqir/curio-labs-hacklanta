@@ -11,6 +11,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Lets pipeline modules import siblings as "./x.ts". Node's built-in type
+    // stripping needs the explicit extension to run them under `node --test`
+    // without a build step. Safe here because noEmit is on.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

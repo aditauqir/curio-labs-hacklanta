@@ -32,6 +32,8 @@ Latest Gemini workflow integration: the interactive director now uses the shared
 
 Latest demo workflow: the home screen now opens a clearly labeled preloaded `Signal After Dark` pipeline workspace, and the editor Reference inspector reads seeded font, palette, and reference assets from `GET /api/assets` with the curated local presets as a fallback.
 
+Latest pipeline-data wiring: the reviewed creative-pipeline backend is now present on `codex/tool-options-palette`; `GET /api/assets` preserves the legacy library response and adds instance-scoped `curio_project_assets` plans joined through `curio_projects`. The compact Reference inspector surfaces the project name, asset role, source, and status while retaining the old Gemini/library data path and local fallback.
+
 Latest image import behavior: imported references now remain visible on the poster canvas even when Gemini image analysis is unavailable; the Reference inspector clearly labels that analysis fallback while the local preview remains usable.
 
 Latest Layers behavior: the compact Layers inspector now has a dedicated Delete control for every non-background layer; deletion remains reversible through the row's Show control, and the layer rows use a tighter viewport-relative vertical rhythm.

@@ -232,6 +232,20 @@ test("opens the preloaded pipeline demo and surfaces library assets", async ({ p
             sourceUrl: null,
           },
         ],
+        pipelineAssets: [
+          {
+            id: "asset-1-hero-image",
+            projectId: "project-signal",
+            projectName: "Signal After Dark",
+            conceptId: "signal-system",
+            type: "hero-image",
+            role: "hero artwork",
+            description: "A dark signal field with a sharp orange focal mark",
+            source: "generated",
+            status: "planned",
+            note: "Interpretive artwork, suitable for an image model.",
+          },
+        ],
       }),
     });
   });
@@ -244,6 +258,7 @@ test("opens the preloaded pipeline demo and surfaces library assets", async ({ p
   await expect(page.getByText("Loaded assets")).toBeVisible();
   await expect(page.getByText("Space Grotesk + Inter", { exact: true })).toBeVisible();
   await expect(page.getByText("Night Signal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Signal After Dark · hero artwork", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open Signal / noise" })).toBeVisible();
 });
 
