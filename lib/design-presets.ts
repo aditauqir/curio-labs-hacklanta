@@ -202,12 +202,13 @@ export function applyDirection(
  * Copy, layout and direction stay as they are. "none" keeps colours and fonts and drops the finish.
  */
 export function applyLook(design: DesignState, lookId: string): DesignState {
-  if (lookId === NO_LOOK) return { ...design, lookId: NO_LOOK };
+  if (lookId === NO_LOOK) return { ...design, lookId: NO_LOOK, hiddenTextures: [] };
   const look = getReferenceLook(lookId);
   if (!look) return design;
   return {
     ...design,
     lookId: look.id,
+    hiddenTextures: [],
     typography: typographyFromPair(getFontPair(look.fontPairId)),
     colors: { ...look.palette },
   };

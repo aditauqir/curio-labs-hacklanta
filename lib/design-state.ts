@@ -42,6 +42,7 @@ export type ColorKey = "background" | "foreground" | "accent";
 export type StudioAction =
   | { type: "setDirection"; direction: DesignDirection }
   | { type: "setLook"; id: string }
+  | { type: "toggleTexture"; asset: string }
   | { type: "setPosterSize"; value: PosterSize }
   | { type: "setFontPair"; id: string }
   | { type: "setPalette"; id: string }
@@ -118,6 +119,20 @@ export function studioReducer(
         ...state,
         design: applyLook(state.design, action.id),
         selectedPaletteId: look ? lookPaletteId(look) : state.selectedPaletteId,
+      };
+    }
+    case "toggleTexture": {
+      const look = getReferenceLook(state.design.lookId);
+      if (!look?.textures.some((texture) => texture.asset === action.asset)) return state;
+      const hidden = state.design.hiddenTextures ?? [];
+      return {
+        ...state,
+        design: {
+          ...state.design,
+          hiddenTextures: hidden.includes(action.asset)
+            ? hidden.filter((asset) => asset !== action.asset)
+            : [...hidden, action.asset],
+        },
       };
     }
     case "setPosterSize":
@@ -311,6 +326,9 @@ function sanitizeDesign(raw: unknown): DesignState {
   const colors = isRecord(raw.colors) ? raw.colors : {};
   const layout = isRecord(raw.layout) ? raw.layout : {};
   const pair = getFontPair(text(typography.id, initialDesign.typography.id, 60));
+  // Stored designs from before looks existed keep their flat colours.
+  const lookId = oneOf(raw.lookId, [...referenceLookIds, NO_LOOK], NO_LOOK);
+  const look = getReferenceLook(lookId);
 
   return {
     projectName: text(raw.projectName, initialDesign.projectName),
@@ -321,8 +339,13 @@ function sanitizeDesign(raw: unknown): DesignState {
     time: text(raw.time, initialDesign.time),
     footer: text(raw.footer, initialDesign.footer),
     direction,
-    // Stored designs from before looks existed keep their flat colours.
-    lookId: oneOf(raw.lookId, [...referenceLookIds, NO_LOOK], NO_LOOK),
+    lookId,
+    hiddenTextures: Array.isArray(raw.hiddenTextures)
+      ? raw.hiddenTextures.filter(
+          (asset): asset is string =>
+            typeof asset === "string" && Boolean(look?.textures.some((texture) => texture.asset === asset)),
+        )
+      : [],
     posterSize: oneOf(raw.posterSize, posterSizes.map((size) => size.id), initialDesign.posterSize),
     styleLabel: text(raw.styleLabel, directionConfigs[direction].label, 60),
     mood: text(raw.mood, directionConfigs[direction].mood, 80),

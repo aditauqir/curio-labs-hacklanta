@@ -3161,6 +3161,53 @@ select {
   text-transform: uppercase;
 }
 
+.studio-texture-list {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.8rem;
+}
+
+.studio-texture-toggle {
+  display: grid;
+  grid-template-columns: auto 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.72rem;
+}
+
+.studio-texture-toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.studio-texture-toggle input {
+  accent-color: var(--ink);
+}
+
+.studio-texture-swatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.25rem;
+  background-color: #d8d8d4;
+  background-size: cover;
+}
+
+.studio-texture-toggle:has(input:not(:checked)) .studio-texture-swatch,
+.studio-texture-toggle:has(input:not(:checked)) .studio-texture-label {
+  opacity: 0.4;
+}
+
+.studio-texture-label::first-letter {
+  text-transform: uppercase;
+}
+
+.studio-texture-meta {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
 .studio-copy-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -11,7 +11,7 @@ import {
   type PosterText,
 } from "@/lib/poster-layout";
 import { createPosterLayerEdit, type PosterEdits, type PosterTool } from "@/lib/poster-editor";
-import { getReferenceLook, lookAssetUrl } from "@/lib/reference-looks";
+import { getReferenceLook, lookAssetUrl, visibleLookTextures } from "@/lib/reference-looks";
 import { useLookPlate } from "./use-look-plate";
 
 type Bounds = { x: number; y: number; width: number; height: number };
@@ -537,7 +537,7 @@ export function Poster({
 
       {look ? (
         <g className="poster-look-finish" pointerEvents="none" aria-hidden="true">
-          {look.textures.map((texture) => (
+          {visibleLookTextures(look, design.hiddenTextures).map((texture) => (
             <image
               key={texture.asset}
               href={lookAssetUrl(texture.asset)}
