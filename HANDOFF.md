@@ -1,6 +1,6 @@
 # Curio Labs: Handoff
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 Read this first. It is the single source of truth for where the project stands and where to work next.
 If you create a branch, you must also log it in the [Branch log](#branch-log). See [Working agreement](#working-agreement).
@@ -290,4 +290,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
 | `tldraw-voice-onboarding` | 2026-10-10 | Add start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | PR open (#14) | Lighter full-bleed home scene with dense ASCII overlay, focal-point prompt placement, smaller shadowed type, mascot overlap fix, removed “Edit and ready” and chat/voice controls, transparent onboarding surface, Gemini-generated starter chips with fallback, audio-reactive home mic orb, 31 source-linked Pinterest studies, refined single desktop three-pane Photoshop-like editor with rounded Chatbox area, compact Reference 2×2 study tiles, visible Layers dock, no workspace tab strip or freeform board, functional text selection/font/copy/cut controls, functional canvas Inspire/Restyle/Shuffle/Layers/Export actions, stronger warm Vintage Jazz poster composition, transparent mascot background, randomized five-frame speaking loop, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, `/home` start flow into canonical `/app` editor, app-subdomain root rewrite, TigerData design-principles source-of-truth corpus, and a Curio-specific Gemini identity/taste contract with validated canvas layer edits; `npm run check`, 9 unit tests, and browser verification pass; current borderless editor/floating-button changes are committed on this branch; PR #14 is open and production server deployment is pending merge |
+| `e2e-current-flow` | 2026-10-11 | Align production E2E tests with the current home-to-app desktop flow | in progress | |
 <!-- BRANCH-LOG-INSERT -->
