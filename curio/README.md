@@ -106,6 +106,13 @@ match.method                        # exact_name | fuzzy | category_default | an
 label = render_text("MIDNIGHT", match.face, 150, tracking=-0.02, case="upper")   # RGBA image
 ```
 
+## Style analysis export
+
+`docs/MODEL_EXPORT_SPEC.md` is the contract for the model that analyses reference
+posters and clusters them into families: file layout, units, the recipe and cluster
+schemas, measurement guidance, and the engine's op catalog (generated from the
+registry, so regenerate it when ops change).
+
 ## Tests
 
 - **Contract tests** run against every registered op, so a new op is held to the same rules.
