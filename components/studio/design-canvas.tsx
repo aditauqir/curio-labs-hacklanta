@@ -13,7 +13,7 @@ import {
   type PosterLayerEdit,
   type PosterTool,
 } from "@/lib/poster-editor";
-import { Poster } from "./poster";
+import { Poster, type BrushStroke } from "./poster";
 import {
   CopyIcon,
   CropIcon,
@@ -157,6 +157,7 @@ export function DesignCanvas({
   const [canvasScale, setCanvasScale] = useState(1);
   const [brushSize, setBrushSize] = useState(24);
   const [brushOpacity, setBrushOpacity] = useState(1);
+  const [brushStrokes, setBrushStrokes] = useState<BrushStroke[]>([]);
   const touchPointers = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
 
@@ -279,10 +280,12 @@ export function DesignCanvas({
       if (actionDialog === "reset-design") {
         dispatch({ type: "resetDesign" });
         setCanvasScale(1);
+        setBrushStrokes([]);
         setCanvasStatus("Design reset");
       } else if (actionDialog === "reset-project") {
         onResetProject();
         setCanvasScale(1);
+        setBrushStrokes([]);
         setCanvasStatus("Project reset");
       } else if (actionDialog === "delete-layer" && pendingLayerId) {
         onDeleteLayer(pendingLayerId);
@@ -856,6 +859,11 @@ export function DesignCanvas({
                 layerOrder={layerOrder}
                 selectedLayerId={selectedLayerId}
                 activeTool={activeTool}
+                brushStrokes={brushStrokes}
+                brushColor={design.colors.accent}
+                brushSize={brushSize}
+                brushOpacity={brushOpacity}
+                onChangeBrushStrokes={setBrushStrokes}
                 onSelectLayer={selectLayer}
                 onChangeLayer={onChangeLayer}
                 onEditText={editTextLayer}

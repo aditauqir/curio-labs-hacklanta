@@ -83,6 +83,29 @@ test.describe("studio workspace", () => {
     await expect(format).toHaveText("PSD");
   });
 
+  test("draws with the brush and keeps the export menu inside the editor", async ({ page }) => {
+    await page.getByRole("button", { name: "Brush options" }).click();
+    const poster = page.getByRole("img", { name: /poster/ });
+    const posterBox = await poster.boundingBox();
+    expect(posterBox).not.toBeNull();
+
+    const startX = posterBox!.x + posterBox!.width * 0.35;
+    const startY = posterBox!.y + posterBox!.height * 0.35;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 80, startY + 40);
+    await page.mouse.move(startX + 140, startY + 20);
+    await page.mouse.up();
+    await expect(page.locator('[data-brush-stroke="true"]')).toHaveCount(1);
+
+    const format = page.getByRole("combobox", { name: "Export format" });
+    await format.click();
+    const menu = page.getByRole("listbox", { name: "Export format" });
+    const menuBox = await menu.boundingBox();
+    expect(menuBox).not.toBeNull();
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(1440);
+  });
+
   test("explains canvas actions with tooltips", async ({ page }) => {
     await page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Export" }).hover();
     await expect(page.getByRole("tooltip")).toHaveText("Export");

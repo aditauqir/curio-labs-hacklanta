@@ -15,6 +15,15 @@ import { createPosterLayerEdit, type PosterEdits, type PosterTool } from "@/lib/
 type Bounds = { x: number; y: number; width: number; height: number };
 type DragMode = "move" | "scale";
 type SelectionMode = "rectangle-select";
+type BrushPoint = { x: number; y: number };
+
+export type BrushStroke = {
+  id: string;
+  points: BrushPoint[];
+  color: string;
+  size: number;
+  opacity: number;
+};
 
 type LayerInteraction = {
   kind: "layer";
@@ -43,7 +52,14 @@ type SelectionInteraction = {
   points: { x: number; y: number }[];
 };
 
-type Interaction = LayerInteraction | PanInteraction | SelectionInteraction;
+type BrushInteraction = {
+  kind: "brush";
+  pointerId: number;
+  strokeId: string;
+  points: BrushPoint[];
+};
+
+type Interaction = LayerInteraction | PanInteraction | SelectionInteraction | BrushInteraction;
 
 type SelectionPreview = {
   mode: SelectionMode;
@@ -64,6 +80,13 @@ type PosterProps = {
   onDeleteLayer?: (id: string) => void;
   onPickColor?: (value: string) => void;
   onFill?: () => void;
+  brushStrokes?: BrushStroke[];
+  brushColor?: string;
+  brushSize?: number;
+  brushOpacity?: number;
+  onChangeBrushStrokes?: (
+    update: BrushStroke[] | ((current: BrushStroke[]) => BrushStroke[]),
+  ) => void;
 };
 
 function editFor(edits: PosterEdits | undefined, id: string) {
@@ -109,6 +132,12 @@ function localPoint(svg: SVGSVGElement, event: ReactPointerEvent<SVGElement>) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function brushPath(points: BrushPoint[]) {
+  if (points.length === 0) return "";
+  const [first, ...rest] = points;
+  return `M ${first.x} ${first.y}${rest.map((point) => ` L ${point.x} ${point.y}`).join("")}`;
 }
 
 function renderShape(shape: PosterShape) {
@@ -168,9 +197,15 @@ export function Poster({
   onDeleteLayer,
   onPickColor,
   onFill,
+  brushStrokes = [],
+  brushColor = "#ffffff",
+  brushSize = 24,
+  brushOpacity = 1,
+  onChangeBrushStrokes,
 }: PosterProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const interaction = useRef<Interaction | null>(null);
+  const brushStrokeIndex = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const [selection, setSelection] = useState<SelectionPreview | null>(null);
   const { shapes, texts } = useMemo(() => buildPoster(design), [design]);
@@ -212,6 +247,30 @@ export function Poster({
       start: { x: event.clientX, y: event.clientY },
       scroll: { left: stage.scrollLeft, top: stage.scrollTop },
       stage,
+    };
+    svg.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+  }
+
+  function beginBrush(event: ReactPointerEvent<SVGElement>) {
+    const svg = svgRef.current;
+    if (!svg || !onChangeBrushStrokes) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = localPoint(svg, event);
+    const stroke: BrushStroke = {
+      id: `brush-${++brushStrokeIndex.current}`,
+      points: [point],
+      color: brushColor,
+      size: brushSize,
+      opacity: brushOpacity,
+    };
+    onChangeBrushStrokes((current) => [...current, stroke]);
+    interaction.current = {
+      kind: "brush",
+      pointerId: event.pointerId,
+      strokeId: stroke.id,
+      points: [point],
     };
     svg.setPointerCapture(event.pointerId);
     setIsDragging(true);
@@ -290,6 +349,10 @@ export function Poster({
       beginSelection(event, activeTool);
       return;
     }
+    if (activeTool === "brush") {
+      beginBrush(event);
+      return;
+    }
     event.stopPropagation();
     onSelectLayer?.(id);
     if (activeTool === "eraser") {
@@ -349,6 +412,15 @@ export function Poster({
         current: point,
         points: current.points,
       });
+      return;
+    }
+    if (current.kind === "brush") {
+      current.points = [...current.points, point];
+      onChangeBrushStrokes?.((strokes) =>
+        strokes.map((stroke) =>
+          stroke.id === current.strokeId ? { ...stroke, points: current.points } : stroke,
+        ),
+      );
       return;
     }
     if (!onChangeLayer) return;
@@ -513,8 +585,10 @@ export function Poster({
       onPointerDown={(event) => {
         if (activeTool === "hand") {
           beginPan(event);
-      } else if (activeTool === "rectangle-select") {
-        beginSelection(event, activeTool);
+        } else if (activeTool === "rectangle-select") {
+          beginSelection(event, activeTool);
+        } else if (activeTool === "brush") {
+          beginBrush(event);
         } else if (event.target === event.currentTarget) {
           onSelectLayer?.(null);
         }
@@ -525,6 +599,21 @@ export function Poster({
       onKeyDown={handleKeyDown}
     >
       {[...orderedLayerIds].reverse().map(renderLayer)}
+
+      {brushStrokes.map((stroke) => (
+        <path
+          key={stroke.id}
+          data-brush-stroke="true"
+          d={brushPath(stroke.points)}
+          fill="none"
+          stroke={stroke.color}
+          strokeWidth={stroke.size}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={stroke.opacity}
+          pointerEvents="none"
+        />
+      ))}
 
       {selection ? (
         <rect

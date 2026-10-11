@@ -26,6 +26,8 @@ Latest CI verification: the desktop E2E suite now follows the canonical `/app` e
 
 Current toolbar follow-up: brush and fill use compact dark tool-options popovers beside the left rail, the current foreground/background colors stay in that rail, lasso selection is removed, and canvas zoom uses explicit minus/percentage/plus controls.
 
+Latest brush/export behavior: Brush now creates non-destructive SVG stroke paths in the poster coordinate system using the selected brush color, size, and opacity; reset clears those strokes. The compact export format menu aligns to the inspector edge so PNG/JPG/PSD labels and tags remain inside the editor instead of clipping off the right side.
+
 Latest Gemini workflow integration: the interactive director now uses the shared server-only structured JSON provider boundary introduced by the pipeline work, while retaining Curio's `whoami.md`/`taste.json` prompt, TigerData principles and library context, patch validation/reconciliation, and reducer application path.
 
 Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) contains the data-grounding/tuning scope, evaluation requirements, safety boundaries, and PR sign-off checklist for the next Gemini-quality pass.

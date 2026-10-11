@@ -83,6 +83,7 @@ export function ExportControls({
           size="sm"
           radius={9}
           menuWidth={150}
+          align={compact ? "right" : "left"}
           disabled={busy}
         />
         {!compact ? (
