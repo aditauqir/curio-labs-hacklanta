@@ -291,4 +291,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
 | `tldraw-voice-onboarding` | 2026-10-10 | Add start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | merged | PR #14 merged to `main`; the first production workflow run exposed stale E2E expectations for the current desktop flow; follow-up fix is on `e2e-current-flow` |
 | `e2e-current-flow` | 2026-10-11 | Align production E2E tests with the current home-to-app desktop flow | PR open (#15) | Updated route, desktop workspace, editor-property, and reference-panel assertions; all 17 local E2E tests pass; PR #15 is open and production deploy is pending merge |
+| `server-local-fonts` | 2026-10-11 | Remove remote Google font build dependency from the production bundle | in progress | |
 <!-- BRANCH-LOG-INSERT -->
