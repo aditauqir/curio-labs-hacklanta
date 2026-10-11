@@ -10,6 +10,7 @@ import {
   type LookBlend,
   type LookColor,
   type ReferenceLook,
+  visibleLookTextures,
 } from "./reference-looks";
 
 /** The parts of a design the plate depends on. A full DesignState satisfies it. */
@@ -168,11 +169,13 @@ export type LookFinishLayer = {
   label: string;
 };
 
-export async function loadLookFinish(design: Pick<DesignState, "lookId">): Promise<LookFinishLayer[]> {
+export async function loadLookFinish(
+  design: Pick<DesignState, "lookId" | "hiddenTextures">,
+): Promise<LookFinishLayer[]> {
   const look = getReferenceLook(design.lookId);
   if (!look) return [];
   return Promise.all(
-    look.textures.map(async (texture) => ({
+    visibleLookTextures(look, design.hiddenTextures).map(async (texture) => ({
       image: await loadLookImage(texture.asset),
       blend: texture.blend,
       opacity: texture.opacity,

@@ -3005,11 +3005,42 @@ select {
 }
 
 .studio-properties-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  background: #f7f7f4;
   padding: 0.7rem 0.85rem;
+}
+
+.studio-properties-close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 0.35rem;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.studio-properties-close svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.studio-properties-close:hover,
+.studio-properties-close:focus-visible {
+  border-color: rgba(0, 0, 0, 0.4);
+  background: #ececea;
 }
 
 .studio-properties-heading > div > p:last-child {
@@ -3128,6 +3159,53 @@ select {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.studio-texture-list {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.8rem;
+}
+
+.studio-texture-toggle {
+  display: grid;
+  grid-template-columns: auto 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.72rem;
+}
+
+.studio-texture-toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.studio-texture-toggle input {
+  accent-color: var(--ink);
+}
+
+.studio-texture-swatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.25rem;
+  background-color: #d8d8d4;
+  background-size: cover;
+}
+
+.studio-texture-toggle:has(input:not(:checked)) .studio-texture-swatch,
+.studio-texture-toggle:has(input:not(:checked)) .studio-texture-label {
+  opacity: 0.4;
+}
+
+.studio-texture-label::first-letter {
+  text-transform: uppercase;
+}
+
+.studio-texture-meta {
+  color: var(--muted);
+  font-size: 0.62rem;
 }
 
 .studio-copy-grid {

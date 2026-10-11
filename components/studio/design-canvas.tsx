@@ -7,6 +7,7 @@ import type { CopyKey, StudioAction } from "@/lib/design-state";
 import { colorPalettes, directionConfigs, directionOrder, fontPairs } from "@/lib/design-presets";
 import { exportPoster } from "@/lib/export";
 import { getPosterDimensions } from "@/lib/poster-layout";
+import { getReferenceLook } from "@/lib/reference-looks";
 import {
   createPosterLayerEdit,
   type PosterEdits,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/poster-editor";
 import { Poster } from "./poster";
 import {
+  CloseIcon,
   CopyIcon,
   CropIcon,
   DropIcon,
@@ -149,6 +151,11 @@ export function DesignCanvas({
   const [exporting, setExporting] = useState(false);
   const [canvasStatus, setCanvasStatus] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const look = getReferenceLook(design.lookId);
+  const closeProperties = useCallback(() => {
+    setPropertiesOpen(false);
+    onToolChange("select");
+  }, [onToolChange]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [actionDialog, setActionDialog] = useState<CanvasActionDialog | null>(null);
   const [pendingLayerId, setPendingLayerId] = useState<string | null>(null);
@@ -202,6 +209,10 @@ export function DesignCanvas({
       const editingField = target?.matches("input, textarea, select, [contenteditable='true']");
 
       if (event.key === "Escape") {
+        if (propertiesOpen) {
+          closeProperties();
+          return;
+        }
         onSelectLayer(null);
         setEditStatus("Nothing selected");
         return;
@@ -221,7 +232,7 @@ export function DesignCanvas({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [copySelectedText, cutSelectedText, onSelectLayer, selectedTextLayer]);
+  }, [closeProperties, copySelectedText, cutSelectedText, onSelectLayer, propertiesOpen, selectedTextLayer]);
 
   async function checkLayout() {
     setChecking(true);
@@ -956,13 +967,13 @@ export function DesignCanvas({
             </div>
             <button
               type="button"
-              className="studio-footer-button"
-              onClick={() => {
-                setPropertiesOpen(false);
-                onToolChange("select");
-              }}
+              className="studio-properties-close"
+              aria-label="Close poster properties"
+              title="Close (Esc)"
+              onClick={closeProperties}
             >
-              Done
+              <CloseIcon />
+              <span>Close</span>
             </button>
           </div>
 
@@ -1112,8 +1123,8 @@ export function DesignCanvas({
             </div>
           </div>
 
-          <details className="studio-copy-details">
-            <summary>Edit poster copy</summary>
+          <details className="studio-copy-details" open>
+            <summary>Poster text</summary>
             <div className="studio-copy-grid">
               {COPY_FIELDS.map((field) => (
                 <Field key={field.key} label={field.label}>
@@ -1129,6 +1140,37 @@ export function DesignCanvas({
               ))}
             </div>
           </details>
+
+          {look && look.textures.length > 0 ? (
+            <details className="studio-copy-details" open>
+              <summary>Textures · {look.name}</summary>
+              <ul className="studio-texture-list">
+                {look.textures.map((texture) => {
+                  const visible = !(design.hiddenTextures ?? []).includes(texture.asset);
+                  return (
+                    <li key={texture.asset}>
+                      <label className="studio-texture-toggle">
+                        <input
+                          type="checkbox"
+                          checked={visible}
+                          onChange={() => dispatch({ type: "toggleTexture", asset: texture.asset })}
+                        />
+                        <span
+                          className="studio-texture-swatch"
+                          style={{ backgroundImage: `url(/looks/thumbs/${texture.asset}.webp)` }}
+                          aria-hidden="true"
+                        />
+                        <span className="studio-texture-label">{texture.label}</span>
+                        <span className="studio-texture-meta">
+                          {texture.blend} · {Math.round(texture.opacity * 100)}%
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          ) : null}
         </section>
       ) : null}
     </section>

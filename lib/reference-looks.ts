@@ -228,6 +228,11 @@ export function lookPaletteId(look: ReferenceLook) {
   return `look-${look.id}`;
 }
 
+/** The look's textures minus the ones the user switched off. */
+export function visibleLookTextures(look: ReferenceLook, hiddenTextures: readonly string[] = []) {
+  return look.textures.filter((texture) => !hiddenTextures.includes(texture.asset));
+}
+
 /** Public URL of a baked look asset. Halftone maps are lossless PNG, textures are WebP. */
 export function lookAssetUrl(assetId: string) {
   return `/looks/${assetId}${assetId.startsWith("ht_") ? ".png" : ".webp"}`;
