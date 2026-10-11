@@ -312,7 +312,7 @@ present in a poster (no halftone, no grain), omit it. Do not write zero.
 | `colors` | yes | colour rules (8.3) |
 | `layout_clusters` | yes | at least one (8.4) |
 | `type_roles` | yes | per role: category, case, tracking range, `size_rel` range, outline, `font_matches` |
-| `texture_rules` | yes | `[{type, blend, opacity: Range, probability}]` |
+| `texture_rules` | yes | `[{type, blend, opacity: Range, probability, asset?}]`. `asset` is optional: an id from `curio/assets/assets_manifest.json` (grain, paper, overlay, pattern or vector, not a halftone map). Without it the engine uses its procedural texture for `type`, if it has one |
 | `selection` | yes | when to use it (8.5) |
 | `unsupported_by_engine` | yes | union across members |
 | `vocab_proposals` | no | new vocabulary terms with a one-line justification |
@@ -520,6 +520,8 @@ pixels at the engine reference size (1080 px on the short edge).
   - `kind` one of gaussian, motion (default gaussian); `radius` float 0..100 (default 2); `angle_deg` float -180..180 (default 0)
 - **`edge_detect`**: Edge map as white lines on black, or dark lines laid over the image.
   - `method` one of sobel, laplacian, canny (default sobel); `strength` float 0..4 (default 1); `low` float 0..1 (default 0.1); `high` float 0..1 (default 0.3); `output` one of edges, overlay (default edges); `invert` true/false (default false)
+- **`halftone_map`**: Screens the image through a supplied threshold map from the asset library (`curio/assets`): round, line, square, elliptical, FM or Bayer screens with their pitch and angle baked in.
+  - `map` asset id `asset:<id>` of kind `halftone_threshold` (default `asset:ht_am_round_p7p8_a51`); `softness` float 0.1..64 (default 1.5); `scale` float 0.1..16 (default 1, the map's native size); `ink` hex colour (default #000000); `paper` hex colour (default #FFFFFF)
 - **`halftone_screen`**: AM halftone: a regular screen whose dot size follows tone. Multi-angle in CMYK mode.
   - `shape` one of round, square, ellipse, line (default round); `pitch_px` float 2..200 (default 8); `angle_deg` float -90..90 (default 45); `dot_gain` float 0..0.5 (default 0.1); `mode` one of mono, cmyk (default mono); `ink` hex colour (default #000000); `paper` hex colour (default #FFFFFF); `antialias` true/false (default true)
 - **`ordered_dither`**: Bayer-matrix dithering.
@@ -615,7 +617,7 @@ with a different operation.
 | Subject isolation (cutting a person or object out of a photo) | not decided; a stub only |
 | Automatic layout from regions | not built yet (this export is its input) |
 | Colour-tolerance ranges (`max_delta_e`) | planned in the compiler |
-| Real ink or paper scans as textures | only procedural textures for now |
+| Real ink or paper scans as textures | not supported. A CC0 procedural library is available instead (`curio/assets`: halftone maps, grain, paper, overlays, patterns, vectors); name its ids in `texture_rules[].asset` or a `halftone_map` step |
 | Text that follows a freeform path | supported for arcs and polylines only |
 | Emboss, foil, spot-UV and other physical finishes | not supported |
 | Vector illustration generation | not supported; only primitives (rect, circle, line) |

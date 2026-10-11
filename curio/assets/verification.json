@@ -1,0 +1,331 @@
+{
+  "ht_am_round_p7p8_a51": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 7.801,
+    "measured_angle_deg": 51.34,
+    "baked_pitch_px": 7.801,
+    "recipe_pitch_px": 7.81,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_line_p13p8_h": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 13.838,
+    "measured_angle_deg": 0.0,
+    "baked_pitch_px": 13.838,
+    "recipe_pitch_px": 13.86,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_dotgrain_p9p8_a0": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 9.799,
+    "measured_angle_deg": 0.0,
+    "baked_pitch_px": 9.799,
+    "recipe_pitch_px": 9.8,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_fine_p4p5_a0": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 4.501,
+    "measured_angle_deg": 0.0,
+    "baked_pitch_px": 4.501,
+    "recipe_pitch_px": 4.5,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_square_p15p3_a0": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 15.284,
+    "measured_angle_deg": 0.0,
+    "baked_pitch_px": 15.284,
+    "recipe_pitch_px": 15.33,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_ellipse_p14p4_a29": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 14.482,
+    "measured_angle_deg": 28.74,
+    "baked_pitch_px": 14.482,
+    "recipe_pitch_px": 14.37,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_line_p4_h": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 4.0,
+    "measured_angle_deg": 0.0,
+    "baked_pitch_px": 4.0,
+    "recipe_pitch_px": 4.0,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_cmyk_c_p8_a15": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 8.018,
+    "measured_angle_deg": 14.74,
+    "baked_pitch_px": 8.018,
+    "recipe_pitch_px": 8.0,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_cmyk_m_p8_a75": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 8.018,
+    "measured_angle_deg": 75.26,
+    "baked_pitch_px": 8.018,
+    "recipe_pitch_px": 8.0,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_cmyk_y_p8_a0": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 8.0,
+    "measured_angle_deg": 0.0,
+    "baked_pitch_px": 8.0,
+    "recipe_pitch_px": 8.0,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_cmyk_k_p8_a45": {
+    "kind": "halftone_threshold",
+    "measured_pitch_px": 8.001,
+    "measured_angle_deg": 45.0,
+    "baked_pitch_px": 8.001,
+    "recipe_pitch_px": 8.0,
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_bayer4": {
+    "kind": "halftone_threshold",
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_bayer8": {
+    "kind": "halftone_threshold",
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "ht_stochastic_blue": {
+    "kind": "halftone_threshold",
+    "ink_coverage_at_50pct": 0.5,
+    "ok": true
+  },
+  "pattern_checker_p15": {
+    "kind": "pattern",
+    "mean": 127.5,
+    "seam_vs_max_step": 1.0,
+    "ok": true
+  },
+  "pattern_scanlines_crt_p4": {
+    "kind": "pattern",
+    "mean": 184.5,
+    "seam_vs_max_step": 0.0,
+    "ok": true
+  },
+  "pattern_interference_rings_p5": {
+    "kind": "pattern",
+    "mean": 128.0,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "grain_film_mono_std8": {
+    "kind": "grain",
+    "measured_std": [
+      8.01
+    ],
+    "target_std": 8.0,
+    "mean": 128.0,
+    "seam_ratio": 1.07,
+    "ok": true
+  },
+  "grain_film_mono_std10": {
+    "kind": "grain",
+    "measured_std": [
+      10.0
+    ],
+    "target_std": 10.0,
+    "mean": 128.0,
+    "seam_ratio": 0.95,
+    "ok": true
+  },
+  "grain_film_mono_std12": {
+    "kind": "grain",
+    "measured_std": [
+      12.0
+    ],
+    "target_std": 12.0,
+    "mean": 128.0,
+    "seam_ratio": 0.97,
+    "ok": true
+  },
+  "grain_silver_gelatin_std12": {
+    "kind": "grain",
+    "measured_std": [
+      12.0
+    ],
+    "target_std": 12.0,
+    "mean": 128.0,
+    "seam_ratio": 0.95,
+    "ok": true
+  },
+  "grain_silver_gelatin_std14": {
+    "kind": "grain",
+    "measured_std": [
+      14.0
+    ],
+    "target_std": 14.0,
+    "mean": 128.0,
+    "seam_ratio": 1.07,
+    "ok": true
+  },
+  "grain_toner_grit_std8": {
+    "kind": "grain",
+    "measured_std": [
+      8.0
+    ],
+    "target_std": 8.0,
+    "mean": 128.0,
+    "seam_ratio": 1.03,
+    "ok": true
+  },
+  "grain_chroma_std14p7": {
+    "kind": "grain",
+    "measured_std": [
+      14.7,
+      14.7,
+      14.7
+    ],
+    "target_std": 14.7,
+    "mean": 128.0,
+    "seam_ratio": 0.98,
+    "ok": true
+  },
+  "grain_airbrush_halation_std10": {
+    "kind": "grain",
+    "measured_std": [
+      10.0
+    ],
+    "target_std": 10.0,
+    "mean": 128.0,
+    "seam_ratio": 1.01,
+    "ok": true
+  },
+  "paper_uncoated_r4": {
+    "kind": "paper",
+    "mean": 236.0,
+    "std": 5.21,
+    "seam_ratio": 0.95,
+    "ok": true
+  },
+  "paper_newsprint_r5": {
+    "kind": "paper",
+    "mean": 234.0,
+    "std": 6.42,
+    "seam_ratio": 1.01,
+    "ok": true
+  },
+  "paper_aged_r5": {
+    "kind": "paper",
+    "mean": 228.0,
+    "std": 9.51,
+    "seam_ratio": 1.1,
+    "ok": true
+  },
+  "paper_ivory_r4": {
+    "kind": "paper",
+    "mean": 238.0,
+    "std": 4.27,
+    "seam_ratio": 1.0,
+    "ok": true
+  },
+  "overlay_toner_speckle": {
+    "kind": "overlay",
+    "mean": 253.9,
+    "std": 11.4,
+    "seam_ratio": 1.27,
+    "ok": true
+  },
+  "overlay_photocopy_creases_1": {
+    "kind": "overlay",
+    "mean": 1.7,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "overlay_photocopy_creases_2": {
+    "kind": "overlay",
+    "mean": 2.0,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "overlay_photocopy_creases_3": {
+    "kind": "overlay",
+    "mean": 2.1,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "overlay_photocopy_edge_blotch": {
+    "kind": "overlay",
+    "mean": 229.7,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "overlay_cloud_smoke_s41": {
+    "kind": "overlay",
+    "mean": 128.0,
+    "std": 41.95,
+    "seam_ratio": 1.02,
+    "ok": true
+  },
+  "overlay_cloud_smoke_s41_wispy": {
+    "kind": "overlay",
+    "mean": 128.0,
+    "std": 41.98,
+    "seam_ratio": 1.16,
+    "ok": true
+  },
+  "vec_wireframe_coordinate_grid": {
+    "kind": "vector",
+    "mean": 2.4,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "vec_sacred_flower_of_life": {
+    "kind": "vector",
+    "mean": 1.4,
+    "size": [
+      2048,
+      2560
+    ],
+    "ok": true
+  },
+  "vec_concentric_target": {
+    "kind": "vector",
+    "mean": 39.7,
+    "size": [
+      2048,
+      2048
+    ],
+    "ok": true
+  }
+}

@@ -122,6 +122,55 @@ def scratch_schema():
         conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
 
 
+def _small_library(tmp_path: Path, ids: list[str]):
+    from curio.core.assets import AssetLibrary, default_assets_dir
+
+    root = tmp_path / "assets"
+    manifest = json.loads((default_assets_dir() / "assets_manifest.json").read_text(encoding="utf-8"))
+    manifest["assets"] = [a for a in manifest["assets"] if a["id"] in ids]
+    for asset in manifest["assets"]:
+        for rel in [asset["file"], asset.get("achieved", {}).get("svg")]:
+            if rel:
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_bytes((default_assets_dir() / rel).read_bytes())
+    (root / "assets_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return AssetLibrary(root)
+
+
+def test_library_rows_are_tagged_hashed_and_include_svgs(tmp_path):
+    import hashlib
+
+    from curio.store.library_assets import ENGINE_TEXTURE_TAG, rows_for
+
+    rows = rows_for(_small_library(tmp_path, ["ht_bayer4", "vec_sacred_flower_of_life"]))
+    assert [r.id for r in rows] == ["engine:ht_bayer4", "engine:vec_sacred_flower_of_life", "engine:vec_sacred_flower_of_life.svg"]
+    assert all(ENGINE_TEXTURE_TAG in r.tags and r.metadata["license"] == "CC0-1.0" for r in rows)
+    assert rows[-1].content_type == "image/svg+xml" and "svg" in rows[-1].tags
+    assert all(r.metadata["sha256"] == hashlib.sha256(r.data).hexdigest() for r in rows)
+
+
+def test_the_library_publishes_into_the_website_table_idempotently(scratch_schema, tmp_path):
+    from curio.store.library_assets import publish_library, rows_for
+
+    with scratch_schema() as conn:
+        conn.execute(Path("db/schema.sql").read_text(encoding="utf-8"))
+    rows = rows_for(_small_library(tmp_path, ["ht_bayer4", "grain_film_mono_std8", "vec_concentric_target"]))
+    with scratch_schema() as conn:
+        first = publish_library(conn, rows)
+    assert (first.inserted, first.updated, first.unchanged) == (len(rows), 0, 0)
+    with scratch_schema() as conn:
+        again = publish_library(conn, rows)
+        stored = conn.execute("SELECT id, kind, owner_instance_id, size_bytes, data, tags FROM curio_library_assets ORDER BY id").fetchall()
+    assert (again.inserted, again.unchanged) == (0, len(rows))
+    assert [s[0] for s in stored] == [r.id for r in rows]
+    for (row_id, kind, owner, size, data, tags), row in zip(stored, rows):
+        assert kind == "image" and owner is None and size == len(row.data) and bytes(data) == row.data and "engine-texture" in tags
+    with scratch_schema() as conn:
+        pruned = publish_library(conn, rows[:1], prune=True)
+        left = [r[0] for r in conn.execute("SELECT id FROM curio_library_assets").fetchall()]
+    assert pruned.removed == len(rows) - 1 and left == [rows[0].id]
+
+
 def test_publish_then_load_round_trips_through_postgres(styles_dir, scratch_schema, tmp_path):
     from curio.store.database import list_releases, publish
 

@@ -353,6 +353,8 @@ def validate_cluster_export(raw: Any, file: str, ctx: ExportContext | None = Non
             tc.at("blend").error(f"unknown blend mode {tex['blend']!r}")
         if "opacity" in tex:
             check_range(tex["opacity"], tc.at("opacity"), support, 0, 1)
+        if "asset" in tex:
+            _check_texture_asset(tex["asset"], tc.at("asset"))
         prob = tex.get("probability")
         if not is_number(prob) or not 0 <= prob <= 1:
             tc.at("probability").error("must be a number from 0 to 1")
@@ -405,6 +407,22 @@ def _check_regions(regions: Any, c: IssueCollector, support: int) -> None:
             check_range(r["aspect_ratio"], rc.at("aspect_ratio"), support, lo=0.05)
         if r.get("z") is not None and (isinstance(r["z"], bool) or not isinstance(r["z"], int)):
             rc.at("z").error("must be a whole number")
+
+
+def _check_texture_asset(value: Any, c: IssueCollector) -> None:
+    """An optional texture asset: an id from the supplied library (curio/assets), not a halftone map."""
+    from curio.core.assets import ASSET_PREFIX, default_library
+
+    if not isinstance(value, str) or not value:
+        c.error("must be an asset id from curio/assets/assets_manifest.json")
+        return
+    try:
+        asset = default_library().get(value)
+    except KeyError:
+        c.error(f"no asset {value.removeprefix(ASSET_PREFIX)!r} in the asset library")
+        return
+    if asset.kind == "halftone_threshold":
+        c.error(f"{asset.id!r} is a halftone map; use it in a halftone_map pipeline step, not as a texture layer")
 
 
 def _check_selection(sel: Any, c: IssueCollector, ctx: ExportContext) -> None:

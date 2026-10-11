@@ -181,6 +181,7 @@ def build_preset(cluster: dict[str, Any], policy: CompilePolicy, c: IssueCollect
             "blend": t.get("blend", "normal"),
             "opacity": {"default": t["opacity"]["median"], "lo": t["opacity"]["min"], "hi": t["opacity"]["max"]},
             "probability": t["probability"],
+            **({"asset": t["asset"]} if t.get("asset") else {}),
         }
         for t in cluster["texture_rules"]
         if "opacity" in t

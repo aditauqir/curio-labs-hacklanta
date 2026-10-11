@@ -29,6 +29,7 @@ EXTRA_CASES: dict[str, tuple[str, dict, str]] = {
     "halftone_screen__line": ("halftone_screen", {"shape": "line", "pitch_px": 5, "angle_deg": 15}, "photo"),
     "halftone_screen__ellipse_inked": ("halftone_screen", {"shape": "ellipse", "pitch_px": 6, "ink": "#1B1340", "paper": "#FFB36B"}, "photo"),
     "halftone_screen__cmyk": ("halftone_screen", {"mode": "cmyk", "pitch_px": 6}, "photo"),
+    "halftone_map__line_inked": ("halftone_map", {"map": "asset:ht_line_p4_h", "ink": "#080806", "paper": "#E0DED6"}, "photo"),
     "duotone__riso": ("duotone", {"shadow": "#2B2B6B", "highlight": "#FF6B4A", "contrast": 0.3}, "photo"),
     "gradient_map__three_stops": ("gradient_map", {"stops": ["#101820", "#D8784C", "#F6E7CB"], "positions": [0.0, 0.45, 1.0]}, "photo"),
     "grain__chroma_overlay": ("grain", {"amount": 0.7, "size": 1.6, "mode": "chroma", "blend": "overlay"}, "photo"),

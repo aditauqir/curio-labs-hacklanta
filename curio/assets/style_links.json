@@ -1,0 +1,242 @@
+{
+  "looks": {
+    "r_25b9918b0585": {
+      "halftone": "ht_line_p13p8_h",
+      "style_tags": [
+        "newsprint-editorial",
+        "framed-inset-photo",
+        "condensed-grotesque",
+        "didone-modern-serif",
+        "monochrome-warm-grey",
+        "cinematic-broadsheet"
+      ],
+      "textures": [
+        {
+          "asset": "paper_uncoated_r4",
+          "blend": "multiply",
+          "opacity": 0.15,
+          "type": "uncoated_paper_texture"
+        },
+        {
+          "asset": "grain_silver_gelatin_std12",
+          "blend": "overlay",
+          "opacity": 0.22,
+          "type": "silver_gelatin_film_grain"
+        }
+      ]
+    },
+    "r_27652c722388": {
+      "halftone": "pattern_interference_rings_p5",
+      "style_tags": [
+        "psychedelic-techno",
+        "thermal-solarization",
+        "chromatic-noise",
+        "wireframe-sacred-geometry",
+        "iridescent-aura",
+        "ambient-club-visual"
+      ],
+      "textures": [
+        {
+          "asset": "grain_chroma_std14p7",
+          "blend": "overlay",
+          "opacity": 0.3,
+          "type": "chromatic_color_noise"
+        },
+        {
+          "asset": "vec_wireframe_coordinate_grid",
+          "blend": "screen",
+          "opacity": 0.4,
+          "type": "vector_coordinate_wireframe"
+        }
+      ]
+    },
+    "r_5185ccc24350": {
+      "halftone": null,
+      "style_tags": [
+        "early-90s-rave",
+        "cosmic-trance",
+        "ethereal-diffusion",
+        "cobalt-coral-duotone",
+        "ascension-surrealism",
+        "acid-house"
+      ],
+      "textures": [
+        {
+          "asset": "overlay_cloud_smoke_s41",
+          "blend": "soft_light",
+          "opacity": 0.45,
+          "type": "atmospheric_cloud_smoke"
+        },
+        {
+          "asset": "grain_airbrush_halation_std10",
+          "blend": "overlay",
+          "opacity": 0.22,
+          "type": "airbrush_halation_grain"
+        }
+      ]
+    },
+    "r_6f9ec42598cf": {
+      "halftone": "ht_fine_p4p5_a0",
+      "style_tags": [
+        "split-panel-broadsheet",
+        "framed-poster-mockup",
+        "condensed-wood-type",
+        "newsprint-monochrome",
+        "documentary-silver-gelatin",
+        "social-overlay"
+      ],
+      "textures": [
+        {
+          "asset": "paper_newsprint_r5",
+          "blend": "multiply",
+          "opacity": 0.16,
+          "type": "uncoated_newsprint_stock"
+        },
+        {
+          "asset": "grain_silver_gelatin_std12",
+          "blend": "overlay",
+          "opacity": 0.22,
+          "type": "silver_gelatin_film_grain"
+        }
+      ]
+    },
+    "r_6fc9707c711a": {
+      "halftone": "ht_dotgrain_p9p8_a0",
+      "style_tags": [
+        "event-broadsheet",
+        "framed-inset-photo",
+        "condensed-headline",
+        "didone-subhead",
+        "botanical-monochrome",
+        "uncoated-stock"
+      ],
+      "textures": [
+        {
+          "asset": "paper_aged_r5",
+          "blend": "multiply",
+          "opacity": 0.18,
+          "type": "aged_newsprint_stock"
+        },
+        {
+          "asset": "grain_silver_gelatin_std14",
+          "blend": "overlay",
+          "opacity": 0.24,
+          "type": "silver_gelatin_grain"
+        }
+      ]
+    },
+    "r_88044f1de9a1": {
+      "halftone": "ht_ellipse_p14p4_a29",
+      "style_tags": [
+        "berlin-techno",
+        "swiss-grid",
+        "tresor-minimalism",
+        "concentric-target-motif",
+        "staggered-columns",
+        "uncoated-ivory-stock",
+        "documentary-photo-inset"
+      ],
+      "textures": [
+        {
+          "asset": "paper_ivory_r4",
+          "blend": "multiply",
+          "opacity": 0.14,
+          "type": "uncoated_ivory_stock"
+        },
+        {
+          "asset": "grain_film_mono_std10",
+          "blend": "overlay",
+          "opacity": 0.2,
+          "type": "analog_film_grain"
+        }
+      ]
+    },
+    "r_93b6c869806c": {
+      "halftone": null,
+      "style_tags": [
+        "split-panel",
+        "monochrome-editorial",
+        "high-key-portrait",
+        "wireframe-display-type",
+        "extended-sans",
+        "swiss-contrast"
+      ],
+      "textures": [
+        {
+          "asset": "grain_film_mono_std10",
+          "blend": "overlay",
+          "opacity": 0.12,
+          "type": "monochrome_film_grain"
+        }
+      ]
+    },
+    "r_f0d754794097": {
+      "halftone": "ht_am_round_p7p8_a51",
+      "style_tags": [
+        "brat-green",
+        "duotone",
+        "acid-pop",
+        "halftone-screen",
+        "grotesque-microtype",
+        "minimalist-contrast"
+      ],
+      "textures": [
+        {
+          "asset": "grain_film_mono_std8",
+          "blend": "overlay",
+          "opacity": 0.18,
+          "type": "monochrome_film_grain"
+        }
+      ]
+    },
+    "r_f931bc33920a": {
+      "halftone": "ht_line_p4_h",
+      "style_tags": [
+        "berlin-techno",
+        "cyberpunk-hud",
+        "industrial-hazard",
+        "modular-infographic",
+        "amber-crimson-tritone",
+        "scanline-duotone",
+        "y2k-technical"
+      ],
+      "textures": [
+        {
+          "asset": "grain_film_mono_std8",
+          "blend": "overlay",
+          "opacity": 0.18,
+          "type": "industrial_matte_grain"
+        }
+      ]
+    },
+    "r_ffb5961db7fd": {
+      "halftone": "ht_square_p15p3_a0",
+      "style_tags": [
+        "underground-rave",
+        "club-flyer",
+        "duotone-crimson-black",
+        "modular-compartments",
+        "condensed-woodtype",
+        "checkerboard-divider",
+        "photocopy-distress"
+      ],
+      "textures": [
+        {
+          "asset": "overlay_photocopy_creases_2",
+          "blend": "screen",
+          "opacity": 0.35,
+          "type": "photocopier_crease_lines"
+        },
+        {
+          "asset": "grain_toner_grit_std8",
+          "blend": "overlay",
+          "opacity": 0.2,
+          "type": "toner_grit_grain"
+        }
+      ]
+    }
+  },
+  "note": "Which assets each analysed reference style uses. Ids are opaque; source names are not kept.",
+  "schema_version": "1.0",
+  "unmatched": []
+}

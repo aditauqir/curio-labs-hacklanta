@@ -7,7 +7,7 @@ import numpy as np
 
 from curio.core.color import luma
 from curio.core.seed import rng
-from curio.ops import Bool, Choice, Color, Float, Int, register_op
+from curio.ops import Bool, Choice, Color, Float, Int, Param, register_op
 from curio.ops._util import grey_rgb, hex_array, odd, smoothstep
 
 # ------------------------------------------------------------------ halftone
@@ -101,6 +101,43 @@ def halftone_screen(img, p, seed):
         plate = _screen_plate(np.clip(channels[name], 0.0, 1.0), p.shape, p.pitch_px, base_angle + offset, p.dot_gain, p.antialias)
         out *= 1.0 - plate[..., None] * (1.0 - np.array(ink_rgb, dtype=np.float32))
     return out
+
+
+@register_op(
+    "halftone_map",
+    category="screening",
+    params=[
+        Param("map", "image", "asset:ht_am_round_p7p8_a51", doc="a halftone_threshold asset (asset:<id>) or a grey array, 0..1, high at dot centres"),
+        Float("softness", 1.5, 0.1, 64.0, "edge softness in 8-bit levels; small is crisp"),
+        Float("scale", 1.0, 0.1, 16.0, "tile size relative to the map's native pixels"),
+        Color("ink", "#000000"),
+        Color("paper", "#FFFFFF"),
+    ],
+)
+def halftone_map(img, p, seed):
+    """Screens the image through a supplied threshold map (halftone, FM, Bayer or line screen)."""
+    h, w = img.shape[:2]
+    if isinstance(p.map, np.ndarray):
+        source = p.map if p.map.ndim == 2 else luma(p.map)
+        reps = (-(-h // source.shape[0]), -(-w // source.shape[1]))
+        threshold = np.tile(source.astype(np.float32), reps)[:h, :w]
+    else:
+        from curio.core.assets import default_library
+
+        library = default_library()
+        if library.get(p.map).kind != "halftone_threshold":
+            raise ValueError(f"{p.map!r} is not a halftone_threshold asset")
+        threshold = library.texture(p.map, (w, h), scale=p.scale)
+        threshold = threshold if threshold.ndim == 2 else luma(threshold)
+    # The manifest's convention: light where luminance exceeds the map, in 8-bit levels,
+    # with a soft edge. The map is squeezed into [s/2, 255 - s/2] so that pure black is
+    # solid ink and pure white is clean paper (with the map's full 0..255 range, a black
+    # pixel over a 0 threshold would come out half inked).
+    levels = luma(img) * 255.0
+    threshold = p.softness / 2.0 + threshold * (255.0 - p.softness)
+    light = np.clip((levels - threshold) / p.softness + 0.5, 0.0, 1.0)
+    ink, paper = hex_array([p.ink])[0], hex_array([p.paper])[0]
+    return ink + (paper - ink) * light[..., None]
 
 
 # ----------------------------------------------------------------- dithering

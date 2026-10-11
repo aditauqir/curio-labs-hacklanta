@@ -87,14 +87,23 @@ def procedural(texture_id: str, size: tuple[int, int], seed: int) -> Image:
     raise KeyError(f"unknown procedural texture {texture_id!r}; expected one of {PROCEDURAL}")
 
 
-def resolve_texture(reference: str | np.ndarray, size: tuple[int, int], seed: int = 0, zoom: float = 1.0) -> Image:
+def resolve_texture(reference: str | np.ndarray, size: tuple[int, int], seed: int = 0, zoom: float = 1.0, scale: float = 1.0) -> Image:
     """Returns a texture as float RGB covering ``size = (width, height)``.
 
-    A registered or array texture is scaled to *cover* the canvas and centre
-    cropped, then optionally zoomed in.
+    ``asset:<id>`` reads the supplied asset library: tileable assets repeat at
+    ``scale * zoom`` times their native pixel size (``scale`` is the output size
+    relative to the 1080 px reference), others are fitted to cover. A registered
+    or array texture is scaled to *cover* the canvas and centre cropped, then
+    optionally zoomed in.
     """
     if isinstance(reference, str) and reference.startswith("procedural:"):
         return procedural(reference, size, seed)
+
+    if isinstance(reference, str) and reference.startswith("asset:"):
+        from .assets import default_library
+
+        texture = default_library().texture(reference, size, scale=scale * max(zoom, 1.0))
+        return np.repeat(texture[..., None], 3, axis=2) if texture.ndim == 2 else texture
 
     if isinstance(reference, str):
         try:

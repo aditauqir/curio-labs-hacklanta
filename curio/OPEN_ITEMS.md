@@ -37,6 +37,7 @@ confined to one place in the code so it is a local edit to change.
 | A16 | With no `aspect` in the request, the runner uses the **first of the template's `aspects_seen`** (sorted), else 4:5. | `curio/render/poster.py` `render_poster()` |
 | A17 | A **`cutout` step is skipped with a warning** at render time (no matte, open item 1), rather than failing the whole poster. | `curio/render/poster.py` `treatment_calls()` |
 | A18 | **The newest release is the current one.** There is no separate "active release" pointer; rolling back means republishing an older release's content. A folder is published only if it loads with no errors. | `curio/store/database.py` `publish()`, `collect_documents()` |
+| A20 | **Library assets are at the 1080 px reference size**: tileable ones are tiled at native pixels and resampled by the output scale, non-tileable ones fitted to cover. `halftone_map` squeezes the threshold map into `[softness/2, 255 - softness/2]` so black is solid and white is clean, a small departure from the supplied formula, which half-inks black over a 0 threshold. | `curio/core/assets.py`, `ops/screening.py` `halftone_map` |
 | A19 | **Asset packs bake global textures into the background** and keep every region as its own element. Text is given both as settings and as the engine's raster. Elements carry no transform beyond position; a layer with scale or rotation in its transform is refused rather than approximated. | `curio/render/pack.py`, `curio/docs/ASSET_PACK_SPEC.md` |
 
 ## Known gaps in what exists

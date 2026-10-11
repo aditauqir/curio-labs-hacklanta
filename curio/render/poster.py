@@ -25,6 +25,7 @@ from typing import Any
 
 import numpy as np
 
+from curio.core.assets import Asset, default_library, is_asset_reference
 from curio.core.color import is_hex, parse_hex
 from curio.core.image import Image, split_alpha
 from curio.core.layers import Layer, LayerStack, Transform, render
@@ -108,6 +109,21 @@ def palette_color(preset: Preset, *roles: str, default: str) -> str:
             if isinstance(entry, dict) and entry.get("role") == role and is_hex(entry.get("color")):
                 return entry["color"].upper()
     return default
+
+
+def _texture_asset(reference: Any, warnings: list[str], what: str) -> Asset | None:
+    """The library asset a texture names, or None (with a warning if it named a bad one)."""
+    if not reference:
+        return None
+    try:
+        asset = default_library().get(str(reference))
+    except KeyError:
+        warnings.append(f"{what}: asset {reference!r} is not in the asset library; skipped")
+        return None
+    if asset.kind == "halftone_threshold":
+        warnings.append(f"{what}: {asset.id!r} is a halftone map, not a texture; skipped")
+        return None
+    return asset
 
 
 def _box(p: PlacedRegion) -> tuple[int, int, int, int]:
@@ -231,6 +247,7 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
     record_legibility: dict[str, Any] = {}
     record_type: dict[str, Any] = {}
     elements: dict[str, dict[str, Any]] = {}  # layer name -> what it is, for the asset pack
+    record_assets: list[Asset] = []  # library assets used, for assets_used
 
     # Global textures, directly above the ground.
     for i, rule in enumerate((preset.data.get("texture_rules") or {}).get("layers") or []):
@@ -240,18 +257,21 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
         if roll >= probability:
             record_textures.append({"type": kind, "applied": False, "reason": f"probability {probability:g}"})
             continue
-        source = PROCEDURAL_TEXTURES.get(kind)
+        asset = _texture_asset(rule.get("asset"), warnings, f"texture {kind!r}")
+        source = asset.reference if asset else PROCEDURAL_TEXTURES.get(kind)
         if source is None:
-            warnings.append(f"texture {kind!r} has no procedural source; skipped (scanned textures are not supported yet)")
-            record_textures.append({"type": kind, "applied": False, "reason": "no procedural source"})
+            warnings.append(f"texture {kind!r} has no procedural source or asset; skipped")
+            record_textures.append({"type": kind, "applied": False, "reason": "no procedural source or asset"})
             continue
         opacity = rule.get("opacity", 1.0)
         opacity = float(opacity.get("default", 1.0)) if isinstance(opacity, dict) else float(opacity)
-        blend = rule.get("blend", "normal")
-        image = resolve_texture(source, (width, height), derive_seed(request.seed, "texture", i, kind))
+        blend = rule.get("blend") or (asset.blend_hint if asset else "normal")
+        image = resolve_texture(source, (width, height), derive_seed(request.seed, "texture", i, kind), scale=scale)
         stack.add(Layer(f"texture:{i}:{kind}", image, blend=blend, opacity=opacity))
         elements[f"texture:{i}:{kind}"] = {"kind": "global_texture", "texture": kind}
         record_textures.append({"type": kind, "applied": True, "source": source, "blend": blend, "opacity": opacity})
+        if asset:
+            record_assets.append(asset)
 
     for placed in placement.regions:  # already in z order
         region = placed.region
@@ -271,12 +291,16 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
             elements[f"rule:{region.id}"] = {"kind": "rect", "role": "rule", "region": region.id, "box": [x, y, w, h], "fill": color}
 
         elif region.role == "texture":
-            source = PROCEDURAL_TEXTURES.get(region.content)
+            asset = _texture_asset(region.content, warnings, f"texture region {region.id!r}") if is_asset_reference(region.content) else None
+            source = asset.reference if asset else PROCEDURAL_TEXTURES.get(region.content)
             if source is None:
-                warnings.append(f"texture region {region.id!r}: {region.content!r} has no procedural source; skipped")
+                warnings.append(f"texture region {region.id!r}: {region.content!r} has no procedural source or asset; skipped")
                 continue
-            image = resolve_texture(source, (w, h), derive_seed(request.seed, "region", region.id))
-            stack.add(Layer(f"texture:{region.id}", image, blend="multiply", transform=Transform(x, y)))
+            image = resolve_texture(source, (w, h), derive_seed(request.seed, "region", region.id), scale=scale)
+            blend = asset.blend_hint if asset and asset.blend_hint != "threshold" else "multiply"
+            stack.add(Layer(f"texture:{region.id}", image, blend=blend, transform=Transform(x, y)))
+            if asset:
+                record_assets.append(asset)
             elements[f"texture:{region.id}"] = {"kind": "image", "role": "texture", "region": region.id, "texture": region.content}
 
         elif region.role in ("photo", "frame"):
@@ -419,6 +443,11 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
         if not request.photo.license:
             warnings.append("the photo has no licence recorded; it cannot be cleared for publication")
         assets.append({"kind": "photo", "source": request.photo.source, "license": request.photo.license})
+    for asset in sorted({a.id: a for a in record_assets}.values(), key=lambda a: a.id):
+        assets.append({"kind": "texture", "source": asset.reference, "license": asset.license})
+    for step in calls:
+        if step.op == "halftone_map" and is_asset_reference(step.params.get("map")):
+            assets.append({"kind": "halftone_map", "source": step.params["map"], "license": default_library().get(step.params["map"]).license})
     for region_id, font in sorted(record_fonts.items()):
         assets.append({"kind": "font", "region": region_id, "family": font["family"], "style": font["style"], "license": font["license"]})
 

@@ -24,10 +24,11 @@ Python 3.12 or newer. Dependencies: NumPy, SciPy, Pillow, OpenCV (headless), fon
 | Package | Contents |
 | --- | --- |
 | `core/` | Float images and I/O, colour (hex, HSV, CIELAB, CIEDE2000, WCAG contrast), 13 blend modes with Porter-Duff compositing, seeded noise, procedural textures, effect stacks, the layer stack and renderer (transforms, masks, adjustment layers, `bleed_off_edge`) |
-| `ops/` | The op registry and **44 ops**: tonal and colour, halftone and dithering, sharpen/blur/edges, grain/paper/distress/ink/halation/vignette/overlays, crop/resize/rotate/flip/perspective, mask/feather/stroke/drop shadow, and a `cutout` stub |
+| `ops/` | The op registry and **45 ops**: tonal and colour, halftone (procedural and from library maps) and dithering, sharpen/blur/edges, grain/paper/distress/ink/halation/vignette/overlays, crop/resize/rotate/flip/perspective, mask/feather/stroke/drop shadow, and a `cutout` stub |
 | `typography/` | Font library read from the font files themselves, name matching with the confidence-then-category fallback chain, text rendering (tracking, leading, case, outline, rotation, wrap, align), auto-fit, microtype columns, text on a path, the legibility guard |
 | `style_schema/` | Versioned validators for presets and recipes, the directory loader with hot reload, preset resolving and tuning, explicit logged merging, three `fallback_*` test presets |
 | `styles/` | Where style JSON files are dropped (empty; the data is produced elsewhere) |
+| `assets/` | The supplied CC0 library: 39 halftone maps, grain, paper, overlays, patterns and vectors, with a manifest. Referenced as `asset:<id>` (textures, style texture layers, `halftone_map`); loaded by `core/assets.py`. See `assets/README.md` |
 | `docs/` | The **offline** style ingestion pipeline: the export contract for the analysis model (`MODEL_EXPORT_SPEC.md`) and how compiled styles reach TigerData. Not run by the website; see `docs/README.md` |
 | `compiler/` | Validates a style-analysis export and compiles it into presets, layouts and templates (see below) |
 | `layout/` | The layout schema (regions as fractions with tunable bounds) and the engine that places them in pixels, clamping tuning and dropping empty optional slots |

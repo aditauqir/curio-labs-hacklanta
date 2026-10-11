@@ -59,11 +59,24 @@ function summary(asset: LibraryRow): AssetSuggestion {
   };
 }
 
-export async function listLibraryAssets(kind?: LibraryKind, limit = 60, ownerInstanceId?: string): Promise<LibraryAsset[]> {
+/**
+ * Rows published by the Python engine (`python -m curio assets publish-library`) carry this
+ * tag. They are halftone maps, grain and paper for the renderer, not design suggestions,
+ * so they are kept out of the Gemini context.
+ */
+export const ENGINE_TEXTURE_TAG = "engine-texture";
+
+export async function listLibraryAssets(
+  kind?: LibraryKind,
+  limit = 60,
+  ownerInstanceId?: string,
+  options: { excludeTag?: string } = {},
+): Promise<LibraryAsset[]> {
   const sql = await getDatabase();
+  const tagFilter = options.excludeTag ? sql`AND NOT (${options.excludeTag} = ANY(tags))` : sql``;
   const ownerFilter = ownerInstanceId
-    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${ownerInstanceId}::uuid)`
-    : sql`AND owner_instance_id IS NULL`;
+    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${ownerInstanceId}::uuid) ${tagFilter}`
+    : sql`AND owner_instance_id IS NULL ${tagFilter}`;
   const rows = kind
     ? await sql<LibraryRow[]>`
         SELECT id, kind, name, description, tags, metadata,
@@ -89,7 +102,7 @@ export async function listLibraryAssets(kind?: LibraryKind, limit = 60, ownerIns
 /** Context sent to Gemini. Failure is intentionally non-fatal: the poster still works. */
 export async function libraryContext(ownerInstanceId?: string) {
   try {
-    return await listLibraryAssets(undefined, 60, ownerInstanceId);
+    return await listLibraryAssets(undefined, 60, ownerInstanceId, { excludeTag: ENGINE_TEXTURE_TAG });
   } catch {
     return [];
   }

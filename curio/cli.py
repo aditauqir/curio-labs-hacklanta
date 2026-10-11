@@ -10,6 +10,8 @@ render   STYLES TEMPLATE OUT.png --photo P --text slot=value ...
 publish  COMPILED_DIR        upload a compiled folder to TigerData as a new release
 pull     OUT_DIR             download a release (default: newest) as a compiled folder
 releases                     list published releases, newest first
+assets                       check and list the asset library (curio/assets)
+publish-library              upsert the asset library into the website's shared library table
 ops                          list the engine's operations
 
 publish, pull, releases and db styles read the connection string from
@@ -190,6 +192,48 @@ def cmd_releases(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_assets(args: argparse.Namespace) -> int:
+    from curio.core.assets import AssetLibrary
+
+    library = AssetLibrary(args.dir) if args.dir else AssetLibrary()
+    for issue in library.issues:
+        print(issue, file=sys.stderr)
+    for asset in sorted(library.assets.values(), key=lambda a: (a.kind, a.id)):
+        print(f"{asset.kind:18} {asset.reference:38} {asset.width}x{asset.height}  {asset.blend_hint:10} {'tileable' if asset.tileable else 'fitted':8} {asset.license}")
+    print(f"\n{len(library.assets)} asset(s) in {library.directory}; {len(library.issues)} problem(s).")
+    return 0 if not library.issues else 1
+
+
+def cmd_publish_library(args: argparse.Namespace) -> int:
+    from curio.core.assets import AssetLibrary
+    from curio.store.library_assets import rows_for
+
+    library = AssetLibrary(args.dir) if args.dir else AssetLibrary()
+    if library.issues:
+        for issue in library.issues:
+            print(issue, file=sys.stderr)
+        print("\nnot published: fix the manifest first.", file=sys.stderr)
+        return 1
+    rows = rows_for(library)
+    size = sum(r.size_bytes for r in rows) / 1e6
+    if args.dry_run:
+        for row in rows:
+            print(f"{row.id:46} {row.content_type:14} {row.size_bytes:>9}  {', '.join(row.tags)}")
+        print(f"\nwould upsert {len(rows)} row(s), {size:.1f} MB, into curio_library_assets; nothing written (--dry-run).")
+        return 0
+    return _db_command(_publish_rows)(argparse.Namespace(rows=rows, prune=args.prune))
+
+
+def _publish_rows(args: argparse.Namespace) -> int:
+    from curio.store.database import connect
+    from curio.store.library_assets import publish_library
+
+    with connect() as conn:
+        s = publish_library(conn, args.rows, prune=args.prune)
+    print(f"library: {s.inserted} inserted, {s.updated} updated, {s.unchanged} unchanged, {s.removed} removed ({s.total_bytes / 1e6:.1f} MB)")
+    return 0
+
+
 def cmd_ops(args: argparse.Namespace) -> int:
     from curio.ops import list_ops
 
@@ -238,6 +282,14 @@ def main(argv: list[str] | None = None) -> int:
     rel = sub.add_parser("releases", help="list published releases, newest first")
     rel.add_argument("--limit", type=int, default=20)
     rel.set_defaults(fn=cmd_releases)
+    assets = sub.add_parser("assets", help="check and list the asset library (curio/assets)")
+    assets.add_argument("--dir", help="library folder (default: curio/assets or $CURIO_ASSETS_DIR)")
+    assets.set_defaults(fn=cmd_assets)
+    lib = sub.add_parser("publish-library", help="upsert the asset library into the website's curio_library_assets table")
+    lib.add_argument("--dir", help="library folder (default: curio/assets or $CURIO_ASSETS_DIR)")
+    lib.add_argument("--dry-run", action="store_true", help="list the rows without connecting")
+    lib.add_argument("--prune", action="store_true", help="also delete engine: rows the manifest no longer lists")
+    lib.set_defaults(fn=cmd_publish_library)
     ops = sub.add_parser("ops", help="list engine operations")
     ops.set_defaults(fn=cmd_ops)
     args = parser.parse_args(argv)

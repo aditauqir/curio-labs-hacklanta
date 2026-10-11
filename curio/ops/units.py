@@ -21,6 +21,7 @@ REFERENCE_SHORT_EDGE_PX = 1080
 
 LENGTH_PARAMS: dict[str, tuple[str, ...]] = {
     "halftone_screen": ("pitch_px",),
+    "halftone_map": ("scale",),  # a tile-size factor: 1 at the reference size, so it scales like a length
     "grain": ("size",),
     "blur": ("radius",),
     "unsharp_mask": ("radius",),
