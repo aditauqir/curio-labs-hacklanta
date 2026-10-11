@@ -145,12 +145,18 @@ def render_text(
     outline_color: str = "#000000",
     rotation_deg: float = 0.0,
     weight: int | None = None,
+    hollow: bool = False,
 ) -> TextRender:
     """Renders text to a tight RGBA image.
 
     ``tracking`` and ``leading`` are in em and as a multiple of the size, as in
     a layout tool. Negative tracking is allowed for tight display type.
+
+    ``hollow=True`` draws outline-only lettering: the interior is transparent and
+    only a ring of ``outline_px`` around each glyph is drawn, in ``color``.
     """
+    if hollow and outline_px <= 0:
+        raise ValueError("hollow text needs outline_px greater than 0")
     if align not in ALIGNS:
         raise ValueError(f"align must be one of {ALIGNS}, got {align!r}")
     size = max(int(round(size_px)), 1)
@@ -185,8 +191,11 @@ def render_text(
     alpha = fill_a
     if stroke_mask is not None:
         stroke_a = np.maximum(np.asarray(stroke_mask, dtype=np.float32) / 255.0, fill_a)
-        rgb = np.array(parse_hex(outline_color), np.float32) * (1.0 - fill_a[..., None]) + rgb * fill_a[..., None]
-        alpha = stroke_a
+        if hollow:
+            alpha = np.clip(stroke_a - fill_a, 0.0, 1.0)  # the ring only; rgb stays the text colour
+        else:
+            rgb = np.array(parse_hex(outline_color), np.float32) * (1.0 - fill_a[..., None]) + rgb * fill_a[..., None]
+            alpha = stroke_a
     image = np.concatenate([rgb, alpha[..., None]], axis=2).astype(np.float32)
 
     baseline: float | None = first_baseline

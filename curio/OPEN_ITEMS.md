@@ -30,15 +30,23 @@ confined to one place in the code so it is a local edit to change.
 | A9 | A merge keeps the **primary** preset's pipeline, rules and defining parameters, interpolates only free numeric defaults present in both, and adopts secondary steps only when named. | `preset.py` `merge_presets()` |
 | A10 | Pixels are **float32 sRGB in [0, 1]**, straight alpha. Blend modes and tonal ops work in the encoded space, as Photoshop does by default; exposure is the exception and works in linear light. | `curio/core/image.py`, `ops/tonal.py` |
 | A11 | Text is laid out with Pillow's **BASIC** engine, so output does not depend on whether Raqm is installed. The cost: kerning comes from the legacy `kern` table, not GPOS, so some fonts will kern slightly less than in a layout tool. | `curio/typography/library.py` `_load()` |
-| A12 | **Weights snap to the nearest hundred**, halves up (650 is 700). Variable fonts honour any weight inside their `wght` axis. | `library.py` `snap_weight()` |
+| A12 | **Weights snap to the nearest hundred**, halves up (650 is 700). Variable fonts honour any weight inside their `wght` axis. A bare family name ("Arial") prefers the normal width over Narrow or Condensed faces. | `library.py` `snap_weight()`, `matching.py` `resolve_font()` |
+| A13 | The runner puts **global texture layers directly above the ground**, below every region, matching the recipes' `layer_order`. A texture type with no procedural source is skipped and reported. | `curio/render/poster.py` |
+| A14 | **Colours by palette role:** text is `text`, else `ink`, else black; the ground is `ground`, else `background`, else `paper`, else white. | `curio/render/poster.py` `palette_color()` |
+| A15 | A role's **`size_rel` is the largest size**; type shrinks to fit its box (minimum 9 px at the 1080 reference). Tracklists and credits take the column count (1 to 4) that allows the largest size. Type sits at the top of its box. | `curio/render/poster.py` |
+| A16 | With no `aspect` in the request, the runner uses the **first of the template's `aspects_seen`** (sorted), else 4:5. | `curio/render/poster.py` `render_poster()` |
+| A17 | A **`cutout` step is skipped with a warning** at render time (no matte, open item 1), rather than failing the whole poster. | `curio/render/poster.py` `treatment_calls()` |
 
 ## Known gaps in what exists
 
-- **Not built yet** (build steps 5 to 9): asset registry, fetch layer, cache and rights
-  manifest; pipeline runner; creative director; critique loop and export (recipe and
-  credits files); scrapers. Presets can be resolved into runnable op calls
-  (`Preset.resolve().to_calls()`) and run with `run_stack`, but there is no layout,
-  no end-to-end runner, and no export yet.
+- **Not built yet**: asset registry, fetch layer, cache and rights manifest; creative
+  director; critique loop; scrapers. The runner (`curio/render/`) renders a compiled
+  template end to end and writes a record (values, tuning log, fonts, legibility fixes,
+  `assets_used`, warnings), but it is not yet a credits or rights file: licences are
+  copied from what the caller and the font files say, not verified.
+- **Runner limits**: type is always top-aligned in its box; text on a path is not used by
+  layouts; each legibility check re-composites the layers beneath it (cheap, because the
+  photo treatment runs once before compositing).
 - **Halftone**: the ellipse screen is stylistic (its tone curve is not corrected for the
   elongated shape), and the CMYK mode uses a naive RGB-to-CMYK split with fixed process
   inks. A press-accurate separation would need ICC profiles.

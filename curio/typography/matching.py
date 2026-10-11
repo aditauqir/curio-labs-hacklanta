@@ -91,7 +91,8 @@ def resolve_font(
         family_key, hints = split_style(name)
         w = wanted_weight if wanted_weight is not None else hints.get("weight")
         it = italic if italic is not None else hints.get("italic")
-        wd = width if width is not None else hints.get("width")
+        # A bare family name means its normal width: "Arial" is Arial, not Arial Narrow.
+        wd = width if width is not None else hints.get("width", 5)
 
         # 1. The whole name is a family ("Playfair Display"), or a family + style.
         for key, method in ((normalise(name), "exact_name"), (family_key, "exact_name")):

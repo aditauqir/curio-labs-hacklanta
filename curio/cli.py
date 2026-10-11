@@ -3,6 +3,8 @@
 validate EXPORT_DIR          check a model export; print each problem as file: field: message
 compile  EXPORT_DIR OUT_DIR  validate, then write presets, layouts and templates
 report   EXPORT_DIR OUT_DIR  write the markdown report for each cluster
+render   STYLES_DIR TEMPLATE OUT.png --photo P --text slot=value ...
+                             render a compiled template; writes OUT.png and OUT.json (the record)
 ops                          list the engine's operations
 
 Exit status: 0 when nothing was skipped and there were no errors, 1 otherwise.
@@ -54,6 +56,38 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0 if bundle.ok else 1
 
 
+def cmd_render(args: argparse.Namespace) -> int:
+    import json
+
+    from curio.core.image import load_image, save_image
+    from curio.render import Photo, RenderRequest, render_poster
+    from curio.store import DirectorySource
+    from curio.typography import FontLibrary
+
+    styles = DirectorySource(args.styles).load()
+    _print_issues(styles.issues, sys.stderr)
+    content: dict[str, object] = {}
+    for item in args.text:
+        slot, sep, value = item.partition("=")
+        if not sep:
+            print(f"--text expects slot=value, got {item!r}", file=sys.stderr)
+            return 1
+        # Tracklists and credits are lists; give them as one value separated by |.
+        content[slot] = value.split("|") if slot in ("tracklist", "credits") else value
+    fonts = FontLibrary.from_directories(args.fonts) if args.fonts else FontLibrary.from_system()
+    photo = Photo(load_image(args.photo), (args.focus_x, args.focus_y), source=args.photo, license=args.license) if args.photo else None
+    request = RenderRequest(args.template, content, photo, aspect=args.aspect, short_edge=args.short_edge, seed=args.seed)
+    result = render_poster(request, styles, fonts)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    save_image(result.image, out)
+    out.with_suffix(".json").write_text(json.dumps(result.record, indent=2, sort_keys=True), encoding="utf-8")
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"wrote {out} ({result.record['canvas'][0]}x{result.record['canvas'][1]}) and {out.with_suffix('.json')}")
+    return 0
+
+
 def cmd_ops(args: argparse.Namespace) -> int:
     from curio.ops import list_ops
 
@@ -75,6 +109,20 @@ def main(argv: list[str] | None = None) -> int:
         if needs_out:
             p.add_argument("out", help="output folder")
         p.set_defaults(fn=fn)
+    r = sub.add_parser("render", help="render a compiled template to a PNG and its record")
+    r.add_argument("styles", help="compiled styles folder (presets/, layouts/, templates/)")
+    r.add_argument("template", help="template id")
+    r.add_argument("out", help="output PNG path; the record is written next to it as .json")
+    r.add_argument("--photo", help="photo file")
+    r.add_argument("--license", help="the photo's licence, recorded in assets_used")
+    r.add_argument("--focus-x", type=float, default=0.5)
+    r.add_argument("--focus-y", type=float, default=0.5)
+    r.add_argument("--text", action="append", default=[], metavar="SLOT=VALUE", help="content for a slot; repeatable. Lists use |")
+    r.add_argument("--fonts", action="append", metavar="DIR", help="font folder (repeatable); default: system fonts")
+    r.add_argument("--aspect", help="for example 4:5; default: the template's first seen aspect")
+    r.add_argument("--short-edge", type=int, default=1080)
+    r.add_argument("--seed", type=int, default=0)
+    r.set_defaults(fn=cmd_render)
     ops = sub.add_parser("ops", help="list engine operations")
     ops.set_defaults(fn=cmd_ops)
     args = parser.parse_args(argv)

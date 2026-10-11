@@ -1,5 +1,6 @@
 """Layouts: regions as fractions of the canvas, and the engine that places content."""
 
+from .engine import PlacedRegion, Placement, PlacementError, canvas_size, has_content, place
 from .schema import (
     ALIGNMENTS,
     EDGES,
@@ -20,7 +21,13 @@ __all__ = [
     "EDGES",
     "Layout",
     "LayoutError",
+    "PlacedRegion",
+    "Placement",
+    "PlacementError",
     "REGION_ROLES",
+    "canvas_size",
+    "has_content",
+    "place",
     "REQUIRED_SLOTS",
     "Region",
     "SLOT_ROLES",

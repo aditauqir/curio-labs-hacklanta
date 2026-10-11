@@ -614,7 +614,6 @@ with a different operation.
 | --- | --- |
 | Subject isolation (cutting a person or object out of a photo) | not decided; a stub only |
 | Automatic layout from regions | not built yet (this export is its input) |
-| Hollow / outline-only text (`fill: none`) | planned; the engine currently always fills text |
 | Colour-tolerance ranges (`max_delta_e`) | planned in the compiler |
 | Real ink or paper scans as textures | only procedural textures for now |
 | Text that follows a freeform path | supported for arcs and polylines only |
