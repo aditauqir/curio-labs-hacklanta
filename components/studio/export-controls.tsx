@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DesignState } from "@/lib/design-types";
+import type { PosterEdits } from "@/lib/poster-editor";
 import { exportBriefAsJson, exportPoster, type PosterExportFormat } from "@/lib/export";
 import { DownloadIcon } from "./icons";
 import GlideSelect from "./glide-select";
@@ -18,9 +19,11 @@ const FORMAT_OPTIONS = [
 export function ExportControls({
   design,
   selectedPaletteId,
+  posterEdits = {},
 }: {
   design: DesignState;
   selectedPaletteId: string | null;
+  posterEdits?: PosterEdits;
 }) {
   const [status, setStatus] = useState<Status>({ tone: "idle", message: "" });
   const [format, setFormat] = useState<PosterExportFormat>("png");
@@ -28,7 +31,7 @@ export function ExportControls({
   async function exportSelectedFormat() {
     setStatus({ tone: "busy", message: `Rendering ${format.toUpperCase()}...` });
     try {
-      await exportPoster(design, format);
+      await exportPoster(design, format, posterEdits);
       setStatus({ tone: "ok", message: `${format.toUpperCase()} downloaded` });
     } catch (error) {
       setStatus({
@@ -40,7 +43,7 @@ export function ExportControls({
 
   function exportJson() {
     try {
-      exportBriefAsJson(design, selectedPaletteId);
+      exportBriefAsJson(design, selectedPaletteId, posterEdits);
       setStatus({ tone: "ok", message: "Brief downloaded" });
     } catch {
       setStatus({ tone: "error", message: "Brief export failed" });

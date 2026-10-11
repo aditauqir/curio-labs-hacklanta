@@ -81,15 +81,6 @@ export function PanelRightIcon({ className }: IconProps) {
   );
 }
 
-export function BoardIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <rect x="4" y="4" width="16" height="16" rx="2" />
-      <path d="M8 8h8M8 12h5M8 16h3" />
-    </svg>
-  );
-}
-
 export function SlidersIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
@@ -116,6 +107,24 @@ export function GridIcon({ className }: IconProps) {
       <rect x="14" y="4" width="6" height="6" rx="1" />
       <rect x="4" y="14" width="6" height="6" rx="1" />
       <rect x="14" y="14" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+
+export function LayersIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="m12 4 8 4-8 4-8-4 8-4Z" />
+      <path d="m4 12 8 4 8-4M4 16l8 4 8-4" />
+    </svg>
+  );
+}
+
+export function EyeIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3.5 12s3.2-5 8.5-5 8.5 5 8.5 5-3.2 5-8.5 5-8.5-5-8.5-5Z" />
+      <circle cx="12" cy="12" r="2" />
     </svg>
   );
 }

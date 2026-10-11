@@ -2,7 +2,7 @@
 
 import type { Dispatch, ReactNode } from "react";
 import type { DesignState } from "@/lib/design-types";
-import { referenceCards } from "@/lib/design-presets";
+import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
 import { ColorPaletteSelector } from "./color-palette-selector";
 import { CreativeBrief } from "./creative-brief";
@@ -92,19 +92,52 @@ export function InspirationBoard({
   design,
   selectedPaletteId,
   dispatch,
+  compact = false,
 }: {
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
+  compact?: boolean;
 }) {
+  const fontPair = getFontPair(design.typography.id);
+
+  if (compact) {
+    return (
+      <section aria-label="Reference" className="studio-compact-reference">
+        <div className="studio-compact-reference-heading">
+          <p>Reference</p>
+          <span>{design.projectName || "Untitled poster"}</span>
+        </div>
+        <div className="studio-compact-fonts" aria-label="Current fonts">
+          <span>{fontPair.heading}</span>
+          <span>{fontPair.body}</span>
+        </div>
+        <ul className="studio-compact-reference-grid" aria-label="Reference studies">
+          {referenceCards.slice(0, 4).map((card) => (
+            <li key={card.id}>
+              <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
+                <span className="studio-compact-reference-placeholder" aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Inspiration board"
       className="studio-inspector flex min-h-0 flex-1 flex-col overflow-y-auto bg-panel"
     >
       <div className="sticky top-0 z-10 border-b border-line bg-panel px-5 py-4">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">Inspector</p>
-        <p className="mt-1 text-sm font-medium text-ink">References and decisions</p>
+        <p className="studio-reference-kicker">Reference</p>
+        <p className="studio-reference-title mt-1 text-lg text-ink">
+          {design.projectName || "Untitled poster"}
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          {design.styleLabel} · {design.mood}
+        </p>
       </div>
       <Section
         id="brief-heading"

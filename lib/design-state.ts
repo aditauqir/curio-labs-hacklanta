@@ -18,6 +18,7 @@ import {
   initialPaletteId,
   typographyFromPair,
 } from "./design-presets";
+import { sanitizePosterEdits, type PosterLayerEdit } from "./poster-editor";
 
 export type StudioState = PersistedStudioState;
 
@@ -42,6 +43,8 @@ export type StudioAction =
   | { type: "setSpacing"; value: Spacing }
   | { type: "setMood"; value: string }
   | { type: "addMessages"; messages: ChatMessage[] }
+  | { type: "setPosterLayerEdit"; id: string; patch: Partial<PosterLayerEdit> }
+  | { type: "resetPosterEdits" }
   | { type: "restoreState"; state: StudioState }
   | { type: "resetDesign" }
   | { type: "resetProject" };
@@ -76,6 +79,7 @@ export function createDefaultState(): StudioState {
     design: initialDesign,
     messages: seedMessages,
     selectedPaletteId: initialPaletteId,
+    posterEdits: {},
   };
 }
 
@@ -151,6 +155,29 @@ export function studioReducer(
         ...state,
         messages: [...state.messages, ...action.messages].slice(-MAX_MESSAGES),
       };
+    case "setPosterLayerEdit": {
+      const current = state.posterEdits[action.id] ?? {
+        x: 0,
+        y: 0,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+      };
+      return {
+        ...state,
+        posterEdits: {
+          ...state.posterEdits,
+          [action.id]: {
+            ...current,
+            ...action.patch,
+          },
+        },
+      };
+    }
+    case "resetPosterEdits":
+      return { ...state, posterEdits: {} };
     case "restoreState":
       return action.state;
     case "resetDesign":
@@ -336,5 +363,6 @@ export function sanitizeState(raw: unknown): StudioState | null {
     design,
     messages: sanitizeMessages(raw.messages),
     selectedPaletteId: paletteId,
+    posterEdits: sanitizePosterEdits(raw.posterEdits),
   };
 }

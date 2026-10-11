@@ -90,7 +90,6 @@ export function OnboardingStudio({
   const capabilities = useCapabilities();
   const [draft, setDraft] = useState("");
   const [starterPrompts, setStarterPrompts] = useState(FALLBACK_STARTER_PROMPTS);
-  const [suggestionSource, setSuggestionSource] = useState<"fallback" | "gemini">("fallback");
   const voice = useVoice({
     canListen: capabilities.listen,
     canSpeak: false,
@@ -108,7 +107,6 @@ export function OnboardingStudio({
           : [];
         if (suggestions.length === 3) {
           setStarterPrompts(suggestions);
-          setSuggestionSource("gemini");
         }
       })
       .catch(() => {
@@ -134,10 +132,8 @@ export function OnboardingStudio({
     <main className="onboarding-shell onboarding-wireframe-shell" data-testid="onboarding-screen">
       <div className="onboarding-topbar">
         <div className="brand-lockup">
-          <span className="brand-dot" />
           <span>CURIO LABS</span>
         </div>
-        <span className="onboarding-kicker">START / 01</span>
       </div>
 
       <div className="onboarding-content onboarding-wireframe-content">
@@ -206,7 +202,7 @@ export function OnboardingStudio({
               {voice.error ? <p className="onboarding-error" role="alert">{voice.error}</p> : null}
             </form>
 
-            <div className="starter-prompts" aria-label={suggestionSource === "gemini" ? "Gemini starter ideas" : "Starter ideas"}>
+            <div className="starter-prompts" aria-label="Starter ideas">
               {starterPrompts.map((prompt) => (
                 <button key={prompt} type="button" onClick={() => onStart(prompt, "chat")}>
                   {prompt}

@@ -27,8 +27,12 @@ CREATE TABLE IF NOT EXISTS curio_workspaces (
   instance_id UUID PRIMARY KEY REFERENCES curio_instances(id) ON DELETE CASCADE,
   design JSONB NOT NULL,
   selected_palette_id TEXT,
+  poster_edits JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE curio_workspaces
+  ADD COLUMN IF NOT EXISTS poster_edits JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS curio_chat_messages (
   instance_id UUID NOT NULL REFERENCES curio_instances(id) ON DELETE CASCADE,

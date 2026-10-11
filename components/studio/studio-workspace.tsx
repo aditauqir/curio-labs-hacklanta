@@ -7,12 +7,12 @@ import { ChatScreen } from "./chat-screen";
 import { CreativeDirector } from "./creative-director";
 import { DesignCanvas } from "./design-canvas";
 import { ExportControls } from "./export-controls";
-import { InspirationBoard } from "./inspiration-board";
 import { OnboardingStudio, type StartDestination } from "./onboarding-studio";
+import { StudioInspector, type InspectorTab } from "./studio-inspector";
 import { getWorkspaceHostUrl } from "@/lib/host-routing";
-import { PanelLeftIcon, PanelRightIcon, ResetIcon } from "./icons";
+import type { PosterLayerEdit, PosterTool } from "@/lib/poster-editor";
+import { LayersIcon, ResetIcon } from "./icons";
 
-type Tab = "chat" | "canvas" | "inspiration";
 export type StudioView = "start" | "chat" | "editor";
 
 const VIEW_ROUTES: Record<StudioView, string> = {
@@ -21,13 +21,16 @@ const VIEW_ROUTES: Record<StudioView, string> = {
   editor: "/app",
 };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "chat", label: "Director" },
-  { id: "canvas", label: "Canvas" },
-  { id: "inspiration", label: "Inspiration" },
-];
-
 const ONBOARDING_KEY = "curio-onboarding-complete-v1";
+
+function viewForPathname(pathname: string): StudioView {
+  if (pathname === VIEW_ROUTES.chat) return "chat";
+  if (pathname === "/editor") return "editor";
+  if (pathname === VIEW_ROUTES.editor) {
+    return window.history.state?.curioView === "editor" ? "editor" : "start";
+  }
+  return "start";
+}
 
 export default function StudioWorkspace({ initialView }: { initialView: StudioView }) {
   const [state, dispatch] = useReducer(
@@ -35,10 +38,22 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     undefined,
     createDefaultState,
   );
-  const [tab, setTab] = useState<Tab>("canvas");
-  const [view, setView] = useState<StudioView>(initialView);
+  const [view, setView] = useState<StudioView>(() => {
+    if (
+      initialView === "start" &&
+      typeof window !== "undefined" &&
+      window.location.pathname === VIEW_ROUTES.editor &&
+      window.history.state?.curioView === "editor"
+    ) {
+      return "editor";
+    }
+    return initialView;
+  });
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("reference");
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>("headline-0");
+  const [activeTool, setActiveTool] = useState<PosterTool>("select");
   const [persistence, setPersistence] = useState<{
     ready: boolean;
     instanceId: string | null;
@@ -118,13 +133,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   useEffect(() => {
     function handlePopState() {
-      const pathname = window.location.pathname;
-      const nextView =
-        pathname === VIEW_ROUTES.chat
-          ? "chat"
-          : pathname === VIEW_ROUTES.editor || pathname === "/editor"
-            ? "editor"
-            : "start";
+      const nextView = viewForPathname(window.location.pathname);
       setInitialPrompt(null);
       setView(nextView);
     }
@@ -133,7 +142,25 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const { design, messages, selectedPaletteId } = state;
+  const { design, messages, selectedPaletteId, posterEdits } = state;
+
+  function changeLayer(id: string, patch: Partial<PosterLayerEdit>) {
+    dispatch({ type: "setPosterLayerEdit", id, patch });
+  }
+
+  function deleteLayer(id: string) {
+    if (id === "background") return;
+    changeLayer(id, { visible: false });
+    setSelectedLayerId(null);
+  }
+
+  function toggleLayerVisibility(id: string) {
+    changeLayer(id, { visible: !(posterEdits[id]?.visible ?? true) });
+  }
+
+  function toggleLayerLock(id: string) {
+    changeLayer(id, { locked: !(posterEdits[id]?.locked ?? false) });
+  }
 
   function resetProject() {
     if (window.confirm("Reset the whole project, including the conversation?")) {
@@ -149,8 +176,14 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       return;
     }
 
+    const nextHistoryState = {
+      ...(window.history.state && typeof window.history.state === "object" ? window.history.state : {}),
+      curioView: nextView,
+    };
     if (window.location.pathname !== nextPath) {
-      window.history.pushState({}, "", nextPath);
+      window.history.pushState(nextHistoryState, "", nextPath);
+    } else {
+      window.history.replaceState(nextHistoryState, "", nextPath);
     }
     setView(nextView);
   }
@@ -159,11 +192,6 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     window.localStorage.setItem(ONBOARDING_KEY, "true");
     setInitialPrompt(prompt?.trim() || null);
     navigateTo(destination);
-  }
-
-  function openChat() {
-    setInitialPrompt(null);
-    navigateTo("chat");
   }
 
   function openEditor() {
@@ -221,51 +249,28 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
         </label>
 
         <nav className="studio-editor-actions" aria-label="Editor actions">
-          <button type="button" className="studio-header-action" onClick={openChat}>
-            <PanelLeftIcon />
-            <span>Director</span>
-          </button>
           <button
             type="button"
             className={`studio-header-action ${inspectorOpen ? "is-active" : ""}`}
-            onClick={() => setInspectorOpen((open) => !open)}
+            onClick={() => {
+              setInspectorTab("layers");
+              setInspectorOpen((open) => !open);
+            }}
           >
-            <PanelRightIcon />
-            <span>Inspector</span>
+            <LayersIcon />
+            <span>Layers</span>
           </button>
           <button type="button" className="studio-header-action" onClick={resetProject}>
             <ResetIcon />
             <span>Reset</span>
           </button>
           <button type="button" className="studio-header-action" onClick={openStart}>
-            <span>Exit</span>
+            <span>Home</span>
           </button>
-          <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
+          <ExportControls design={design} selectedPaletteId={selectedPaletteId} posterEdits={posterEdits} />
         </nav>
       </header>
-
-      <div
-        role="tablist"
-        aria-label="Workspace panels"
-        className="grid grid-cols-3 border-b border-line bg-panel lg:hidden"
-      >
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`py-3 text-xs font-medium uppercase tracking-[0.14em] transition-colors ${
-              tab === item.id ? "border-b-2 border-ink text-ink" : "text-muted"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <main className="studio-editor-grid min-h-0 flex-1" data-tab={tab}>
+      <main className="studio-editor-grid min-h-0 flex-1">
         <section className="studio-editor-surface">
           <aside className="studio-editor-chat">
             <CreativeDirector
@@ -280,15 +285,32 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
             <DesignCanvas
               design={design}
               dispatch={dispatch}
-              onToggleInspector={() => setInspectorOpen((open) => !open)}
+              posterEdits={posterEdits}
+              selectedLayerId={selectedLayerId}
+              activeTool={activeTool}
+              onToolChange={setActiveTool}
+              onSelectLayer={setSelectedLayerId}
+              onChangeLayer={changeLayer}
+              onDeleteLayer={deleteLayer}
+              onToggleInspector={(nextTab = "reference") => {
+                setInspectorTab(nextTab);
+                setInspectorOpen(true);
+              }}
             />
           </div>
           {inspectorOpen ? (
             <aside className="studio-editor-inspector">
-              <InspirationBoard
+              <StudioInspector
+                activeTab={inspectorTab}
                 design={design}
                 selectedPaletteId={selectedPaletteId}
                 dispatch={dispatch}
+                posterEdits={posterEdits}
+                selectedLayerId={selectedLayerId}
+                onSelectLayer={setSelectedLayerId}
+                onToggleLayerVisibility={toggleLayerVisibility}
+                onToggleLayerLock={toggleLayerLock}
+                onTabChange={setInspectorTab}
               />
             </aside>
           ) : null}

@@ -7,6 +7,7 @@ import {
   type Dispatch,
   type FormEvent,
 } from "react";
+import { VoiceBeam } from "voice-glow";
 import type { AssetSuggestion, ChatMessage, DesignState } from "@/lib/design-types";
 import { describePatch, patchToActions } from "@/lib/ai-patch";
 import { directionConfigs } from "@/lib/design-presets";
@@ -14,6 +15,8 @@ import { interpretRequest } from "@/lib/demo-director";
 import { askDirector, DirectorError } from "@/lib/director-client";
 import { makeId, type StudioAction } from "@/lib/design-state";
 import { MicIcon, MicOffIcon, SendIcon } from "./icons";
+import { StreamingText } from "./StreamingText";
+import { ThinkingState } from "./ThinkingState";
 import { useCapabilities } from "./use-capabilities";
 import { useVoice } from "./use-voice";
 import { VoiceKeyframes } from "./voice-keyframes";
@@ -22,13 +25,13 @@ const MAX_MESSAGE = 500;
 
 const SOURCE_LABEL: Record<NonNullable<ChatMessage["source"]>, string> = {
   example: "Example conversation",
-  demo: "Demo rules",
-  gemini: "Gemini",
+  demo: "Curio",
+  gemini: "AI direction",
 };
 
 const PROVIDER_LABEL: Record<string, string> = {
-  whisper: "Whisper (offline)",
-  elevenlabs: "ElevenLabs",
+  whisper: "Voice input",
+  elevenlabs: "Voice reply",
 };
 
 const PROMPTS: Record<DesignState["direction"], string[]> = {
@@ -80,6 +83,7 @@ export function CreativeDirector({
   const capabilities = useCapabilities();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  const [desktopVoiceBeam, setDesktopVoiceBeam] = useState(false);
   const [heard, setHeard] = useState<{ text: string; provider: string | null } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef(false);
@@ -99,6 +103,14 @@ export function CreativeDirector({
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, pending]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setDesktopVoiceBeam(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   async function interpret(content: string): Promise<Outcome> {
     const local = () => {
@@ -130,8 +142,8 @@ export function CreativeDirector({
       return {
         ...local(),
         notice: limited
-          ? "Too many requests to Gemini, so this used local demo rules."
-          : "Gemini was unavailable, so this used local demo rules.",
+          ? "Curio is using a fallback for this change."
+          : "Curio is using a fallback for this change.",
       };
     }
   }
@@ -190,6 +202,24 @@ export function CreativeDirector({
   }
 
   const lastId = messages[messages.length - 1]?.id;
+  const creativeStages = [
+    {
+      label: "Brief",
+      complete: messages.some((message) => message.role === "user"),
+    },
+    {
+      label: "Concept",
+      complete: messages.some(
+        (message) => message.role === "assistant" && Boolean(message.suggestions?.length),
+      ),
+    },
+    {
+      label: "References",
+      complete: messages.some((message) => Boolean(message.assetSuggestions?.length)),
+    },
+    { label: "Compose", current: true },
+    { label: "Refine" },
+  ];
   const listening = voice.phase === "listening";
   const micDisabled =
     voice.block !== null || pending || voice.phase === "transcribing";
@@ -201,7 +231,7 @@ export function CreativeDirector({
   let voiceStatus: string;
   switch (voice.block) {
     case "not-configured":
-      voiceStatus = "Voice is off: no speech-to-text service is running on this server. Text mode only.";
+      voiceStatus = "Voice input is unavailable right now. Text mode only.";
       break;
     case "insecure":
       voiceStatus =
@@ -213,6 +243,57 @@ export function CreativeDirector({
     default:
       voiceStatus = "Press the mic, speak, then press it again to send.";
   }
+
+  const beamProcessing = pending || voice.phase === "transcribing";
+  const beamActive = beamProcessing || voice.phase === "listening" || voice.phase === "speaking";
+  const beamLevel = beamProcessing || voice.phase === "speaking" ? 0.34 : 0;
+  const chatComposer = (
+    <form
+      onSubmit={onSubmit}
+      aria-label="Chat with the creative director"
+      data-testid="editor-chat-box"
+      className="director-chat-box flex items-center gap-2 rounded-2xl border border-line bg-paper p-1.5"
+    >
+      <button
+        type="button"
+        disabled={micDisabled}
+        aria-label={micLabel}
+        aria-pressed={listening}
+        title={voice.block ? voiceStatus : micLabel}
+        onClick={() => (listening ? voice.stop() : void voice.start())}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition-colors disabled:opacity-50 ${
+          listening
+            ? "border-ink bg-ink text-paper"
+            : "border-line text-ink hover:border-ink"
+        }`}
+      >
+        {voice.block ? (
+          <MicOffIcon />
+        ) : voice.phase === "speaking" ? (
+          <VoiceKeyframes active />
+        ) : (
+          <MicIcon />
+        )}
+      </button>
+      <input
+        type="text"
+        value={draft}
+        maxLength={MAX_MESSAGE}
+        onChange={(event) => setDraft(event.target.value)}
+        placeholder="Describe a change or a direction"
+        aria-label="Message the creative director"
+        className="h-10 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
+      />
+      <button
+        type="submit"
+        disabled={pending || !draft.trim()}
+        aria-label="Send message"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper transition-opacity disabled:opacity-30"
+      >
+        <SendIcon />
+      </button>
+    </form>
+  );
 
   return (
     <section
@@ -226,20 +307,32 @@ export function CreativeDirector({
           </span>
           <div>
             <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
-              Creative director
+              Chatbox area
             </h2>
             <p className="mt-1 text-xs text-muted">
               {!capabilities.loaded
                 ? "Checking which services are available..."
-                : capabilities.gemini
-                  ? "Powered by Gemini. Every change is validated before it touches your poster."
-                  : "Demo mode: local rules are guiding the direction until Gemini is available."}
+                  : capabilities.gemini
+                  ? "AI direction is ready. Every change is checked before it touches your poster."
+                  : "Direction mode is ready. Changes stay focused on your request."}
             </p>
           </div>
         </div>
+        <ol className="creative-process" aria-label="Creative process">
+          {creativeStages.map((stage, index) => (
+            <li
+              key={stage.label}
+              className={stage.current ? "is-current" : stage.complete ? "is-complete" : undefined}
+              aria-current={stage.current ? "step" : undefined}
+            >
+              <span className="creative-process-index">{String(index + 1).padStart(2, "0")}</span>
+              <span>{stage.label}</span>
+            </li>
+          ))}
+        </ol>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5" aria-live="polite">
+      <div className="studio-chat-messages min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5" aria-live="polite">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -256,15 +349,21 @@ export function CreativeDirector({
                   ) : null}
                 </p>
               ) : null}
-              <p
-                className={`rounded-lg px-3.5 py-2.5 text-sm leading-relaxed ${
-                  message.role === "user"
-                    ? "bg-ink text-paper"
-                    : "border border-line bg-paper text-ink"
-                }`}
-              >
-                {message.content}
-              </p>
+              {message.role === "assistant" && message.id === lastId ? (
+                <div className="rounded-lg border border-line bg-paper px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+                  <StreamingText text={message.content} className="streaming-text" />
+                </div>
+              ) : (
+                <p
+                  className={`rounded-lg px-3.5 py-2.5 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "bg-ink text-paper"
+                      : "border border-line bg-paper text-ink"
+                  }`}
+                >
+                  {message.content}
+                </p>
+              )}
               {message.notice ? (
                 <p className="mt-1.5 text-[11px] text-muted">{message.notice}</p>
               ) : null}
@@ -282,12 +381,12 @@ export function CreativeDirector({
               ) : null}
               {message.skipped && message.skipped.length > 0 ? (
                 <p className="mt-1.5 text-[11px] text-muted">
-                  Skipped invalid suggestions: {message.skipped.join(", ")}
+                  Some suggestions were skipped to keep the poster safe.
                 </p>
               ) : null}
               {message.assetSuggestions && message.assetSuggestions.length > 0 ? (
                 <p className="mt-2 text-[11px] text-muted">
-                  Library references: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
+                  Related references: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
                 </p>
               ) : null}
               {message.id === lastId && message.suggestions?.length ? (
@@ -311,18 +410,13 @@ export function CreativeDirector({
 
         {pending ? (
           <p className="text-xs text-muted" role="status">
-            Curio Labs is thinking
-            <span className="inline-flex gap-0.5 pl-1" aria-hidden="true">
-              <span className="dot" />
-              <span className="dot" />
-              <span className="dot" />
-            </span>
+            Curio is <ThinkingState />
           </p>
         ) : null}
         <div ref={endRef} />
       </div>
 
-      <div className="border-t border-line px-5 pb-5 pt-4">
+      <div className="studio-chat-footer border-t border-line px-5 pb-5 pt-4">
         <div className="mb-3 flex flex-wrap gap-1.5">
           {PROMPTS[design.direction].map((prompt) => (
             <button
@@ -349,51 +443,24 @@ export function CreativeDirector({
           </p>
         ) : null}
 
-        <form
-          onSubmit={onSubmit}
-          aria-label="Chat with the creative director"
-          data-testid="editor-chat-box"
-          className="director-chat-box flex items-center gap-2 rounded-2xl border border-line bg-paper p-1.5"
-        >
-          <button
-            type="button"
-            disabled={micDisabled}
-            aria-label={micLabel}
-            aria-pressed={listening}
-            title={voice.block ? voiceStatus : micLabel}
-            onClick={() => (listening ? voice.stop() : void voice.start())}
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition-colors disabled:opacity-50 ${
-              listening
-                ? "border-ink bg-ink text-paper"
-                : "border-line text-ink hover:border-ink"
-            }`}
+        {desktopVoiceBeam ? (
+          <VoiceBeam
+            className="editor-voice-beam"
+            type="default"
+            stream={voice.stream}
+            level={beamLevel}
+            active={beamActive}
+            motion={beamProcessing ? { gather: 0.82, stretch: 0.18, heldLevel: 0.34, cornerFollow: 0.2 } : null}
+            theme="dark"
+            colorVariant="mono"
+            strength={0.6}
+            idle={0.05}
           >
-            {voice.block ? (
-              <MicOffIcon />
-            ) : voice.phase === "speaking" ? (
-              <VoiceKeyframes active />
-            ) : (
-              <MicIcon />
-            )}
-          </button>
-          <input
-            type="text"
-            value={draft}
-            maxLength={MAX_MESSAGE}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Describe a change or a direction"
-            aria-label="Message the creative director"
-            className="h-10 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
-          />
-          <button
-            type="submit"
-            disabled={pending || !draft.trim()}
-            aria-label="Send message"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper transition-opacity disabled:opacity-30"
-          >
-            <SendIcon />
-          </button>
-        </form>
+            {chatComposer}
+          </VoiceBeam>
+        ) : (
+          chatComposer
+        )}
 
         <div className="mt-2 flex items-start justify-between gap-3">
           <p className="min-w-0 text-[11px] text-muted" role="status" data-testid="voice-status">
@@ -422,7 +489,7 @@ export function CreativeDirector({
           </p>
 
           <span className={`shrink-0 text-[11px] ${voice.canSpeak ? "text-ink" : "text-muted"}`}>
-            {voice.canSpeak ? "ElevenLabs voice on" : "Text replies only"}
+            {voice.canSpeak ? "Voice replies on" : "Text replies only"}
           </span>
         </div>
 

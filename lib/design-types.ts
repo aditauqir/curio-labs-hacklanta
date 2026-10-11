@@ -1,3 +1,5 @@
+import type { PosterEdits } from "./poster-editor";
+
 export type DesignDirection = "vintage" | "minimal" | "experimental";
 export type TextAlignment = "left" | "center" | "right";
 export type Spacing = "compact" | "normal" | "spacious";
@@ -62,4 +64,5 @@ export type PersistedStudioState = {
   messages: ChatMessage[];
   /** null when the colors no longer match a curated palette. */
   selectedPaletteId: string | null;
+  posterEdits: PosterEdits;
 };
