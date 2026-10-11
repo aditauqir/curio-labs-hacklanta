@@ -61,7 +61,7 @@ test.describe("studio workspace", () => {
     await page.getByRole("button", { name: "Send message" }).click();
 
     await expect(page.getByText("Direction: Berlin Swiss ivory")).toBeVisible();
-    await expect(page.getByLabel("After Image poster, Berlin Swiss ivory direction")).toBeVisible();
+    await expect(page.getByLabel("Half Tone poster, Berlin Swiss ivory direction")).toBeVisible();
   });
 
   test("exports the current poster from the canvas action bar", async ({ page }) => {

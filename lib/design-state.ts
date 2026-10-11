@@ -72,7 +72,7 @@ const seedMessages: ChatMessage[] = [
     id: "seed-user",
     role: "user",
     content:
-      "I need a poster for a warehouse night. Something printed and raw, not glossy.",
+      "I need a poster for a print and photography exhibition opening. Something printed and tactile, not glossy.",
   },
   {
     id: "seed-assistant",
