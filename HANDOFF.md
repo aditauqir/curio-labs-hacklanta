@@ -24,6 +24,8 @@ Latest toolbar alignment behavior: the floating toolbar highlight is anchored to
 
 Latest CI verification: the desktop E2E suite now follows the canonical `/app` editor landmarks and current canvas action bar; local checks pass all 18 browser tests after the production workflow exposed stale selectors.
 
+Current toolbar follow-up: brush and fill use compact dark tool-options popovers beside the left rail, the current foreground/background colors stay in that rail, lasso selection is removed, and canvas zoom uses explicit minus/percentage/plus controls.
+
 Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) contains the data-grounding/tuning scope, evaluation requirements, safety boundaries, and PR sign-off checklist for the next Gemini-quality pass.
 
 Gemini merge priority: conflicts in the intelligence/data layer must be resolved manually in favor of preserving the server-only Gemini path, structured patch validation, knowledge retrieval, and `data/gemini/*`; UI code should adapt around those contracts rather than deleting or bypassing them.
@@ -328,4 +330,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-deploy-verified` | 2026-10-11 | Record the green production deployment and public endpoint verification | merged | PR #18 records the green final production run; apex redirects to `/home`, and `/app` returns 200 over HTTPS |
 | `ui-and-feature` | 2026-10-11 | UI and feature work after the production editor deployment | in progress | |
 | `codex/e2e-ci-fix` | 2026-10-11 | Fix the stale desktop E2E editor setup after the merged UI release | merged | PR #21; apex-only workspace routing deployed as `d218585` |
+| `codex/tool-options-palette` | 2026-10-11 | Replace the full-screen brush properties surface with compact toolbar options | in progress | |
 <!-- BRANCH-LOG-INSERT -->
