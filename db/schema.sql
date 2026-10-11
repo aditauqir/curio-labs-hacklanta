@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS curio_workspaces (
   selected_palette_id TEXT,
   poster_edits JSONB NOT NULL DEFAULT '{}'::jsonb,
   layer_order JSONB NOT NULL DEFAULT '[]'::jsonb,
-  reference_treatment JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -39,9 +38,6 @@ ALTER TABLE curio_workspaces
 ALTER TABLE curio_workspaces
   ADD COLUMN IF NOT EXISTS layer_order JSONB NOT NULL DEFAULT '[]'::jsonb;
 
-ALTER TABLE curio_workspaces
-  ADD COLUMN IF NOT EXISTS reference_treatment JSONB NOT NULL DEFAULT '{}'::jsonb;
-
 CREATE TABLE IF NOT EXISTS curio_chat_messages (
   instance_id UUID NOT NULL REFERENCES curio_instances(id) ON DELETE CASCADE,
   message_id TEXT NOT NULL,
@@ -49,7 +45,6 @@ CREATE TABLE IF NOT EXISTS curio_chat_messages (
   content TEXT NOT NULL,
   source TEXT CHECK (source IS NULL OR source IN ('example', 'demo', 'gemini')),
   suggestions JSONB,
-  follow_ups JSONB,
   changes JSONB,
   skipped JSONB,
   notice TEXT,
@@ -101,9 +96,6 @@ CREATE INDEX IF NOT EXISTS curio_library_assets_kind_idx
 ALTER TABLE curio_chat_messages
   ADD COLUMN IF NOT EXISTS asset_suggestions JSONB;
 
-ALTER TABLE curio_chat_messages
-  ADD COLUMN IF NOT EXISTS follow_ups JSONB;
-
 CREATE TABLE IF NOT EXISTS curio_knowledge_sources (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -113,22 +105,6 @@ CREATE TABLE IF NOT EXISTS curio_knowledge_sources (
   page_count INTEGER NOT NULL CHECK (page_count >= 0),
   extraction_method TEXT NOT NULL,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Creative pipeline -----------------------------------------------------------
--- Projects owned by an instance. Every pipeline table hangs off this row, so a
--- single instance_id predicate on curio_projects is enough to scope access.
-
-CREATE TABLE IF NOT EXISTS curio_projects (
-  id UUID PRIMARY KEY,
-  instance_id UUID NOT NULL REFERENCES curio_instances(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  format TEXT NOT NULL DEFAULT 'print-poster',
-  status TEXT NOT NULL DEFAULT 'draft'
-    CHECK (status IN ('draft', 'concepts', 'designing', 'complete')),
-  selected_concept_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -159,6 +135,23 @@ CREATE INDEX IF NOT EXISTS curio_knowledge_clips_tags_idx
 
 CREATE INDEX IF NOT EXISTS curio_knowledge_clips_search_idx
   ON curio_knowledge_clips USING GIN (to_tsvector('simple', normalized_text));
+
+-- Creative pipeline -----------------------------------------------------------
+-- Projects owned by an instance. Every pipeline table hangs off this row, so a
+-- single instance_id predicate on curio_projects is enough to scope access.
+
+CREATE TABLE IF NOT EXISTS curio_projects (
+  id UUID PRIMARY KEY,
+  instance_id UUID NOT NULL REFERENCES curio_instances(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  format TEXT NOT NULL DEFAULT 'print-poster',
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'concepts', 'designing', 'complete')),
+  selected_concept_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS curio_projects_instance_created_idx
   ON curio_projects (instance_id, created_at DESC);
 

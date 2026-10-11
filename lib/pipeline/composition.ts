@@ -5,7 +5,7 @@
 // arithmetic, and a layout that fails its own overflow check is worse than a
 // plain one that does not. The model's creative decisions (which strategy,
 // which treatment, which colour story) are what drive the template choice.
-import type { Concept, CompositionStrategy, VisualLanguage } from "./concepts.ts";
+import type { Concept, CompositionStrategy } from "./concepts.ts";
 import type { PlannedAsset } from "./assets.ts";
 import type { StructuredBrief } from "./brief.ts";
 import {
@@ -29,75 +29,23 @@ const FONT_SETS: Record<string, Fonts> = {
   mixed: { heading: "Georgia, Times New Roman, serif", body: "Verdana, Geneva, sans-serif", mono: MONO },
 };
 
-const HUES: Array<[RegExp, number]> = [
-  [/turquoise|teal|aqua/, 174],
-  [/terracotta|rust|brick|coral/, 14],
-  [/butter yellow|mustard|ochre|gold/, 45],
-  [/cobalt|navy|royal blue|indigo/, 224],
-  [/lavender|violet|plum|purple/, 278],
-  [/pink|magenta|fuchsia/, 326],
-  [/orange|tangerine|apricot/, 28],
-  [/olive|moss|sage|forest|green/, 106],
-  [/red|vermilion|scarlet/, 4],
-  [/blue|sky|azure/, 202],
-];
-
-function hueFromConcept(concept: Concept) {
-  const words = `${concept.colorStrategy} ${concept.materialStrategy} ${concept.title}`.toLocaleLowerCase();
-  const matches = HUES.filter(([pattern]) => pattern.test(words)).map(([, hue]) => hue);
-  if (matches.length > 0) return matches[0];
-
-  // The fallback is still driven by Gemini's returned concept, so a new
-  // title/material story does not collapse into one of four fixed presets.
-  let hash = 2166136261;
-  for (const character of words) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash) % 360;
-}
-
-function hsl(hue: number, saturation: number, lightness: number) {
-  const s = saturation / 100;
-  const l = lightness / 100;
-  const chroma = (1 - Math.abs(2 * l - 1)) * s;
-  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = l - chroma / 2;
-  const [r, g, b] = hue < 60 ? [chroma, x, 0]
-    : hue < 120 ? [x, chroma, 0]
-      : hue < 180 ? [0, chroma, x]
-        : hue < 240 ? [0, x, chroma]
-          : hue < 300 ? [x, 0, chroma]
-            : [chroma, 0, x];
-  return `#${[r, g, b].map((value) => Math.round((value + m) * 255).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
-}
-
-function generatedPalette(concept: Concept): Palette {
-  const words = `${concept.colorStrategy} ${concept.materialStrategy}`.toLocaleLowerCase();
-  const dark = /dark|night|black|charcoal|noir/.test(words);
-  const matchedHues = HUES.filter(([pattern]) => pattern.test(words)).map(([, matchedHue]) => matchedHue);
-  const hue = matchedHues[0] ?? hueFromConcept(concept);
-  const secondaryHue = matchedHues.find((matchedHue) => matchedHue !== hue) ?? (hue + 54) % 360;
-  return dark
-    ? {
-        background: hsl(hue, 20, 10),
-        foreground: hsl((hue + 36) % 360, 18, 94),
-        accent: hsl(secondaryHue, 78, 62),
-        muted: hsl(hue, 14, 54),
-      }
-    : {
-        background: hsl(hue, 28, 94),
-        foreground: hsl((hue + 190) % 360, 26, 18),
-        accent: hsl(secondaryHue, 72, 46),
-        muted: hsl(hue, 18, 56),
-      };
-}
+const PALETTES: Record<string, Palette> = {
+  warmNeutral: { background: "#F3EBDD", foreground: "#2B2723", accent: "#D8784C", muted: "#A99C8C" },
+  paperInk: { background: "#F7F7F4", foreground: "#171717", accent: "#2F6F6F", muted: "#9A9A93" },
+  darkSignal: { background: "#151719", foreground: "#F2EEE6", accent: "#C9F05D", muted: "#8C918B" },
+  clay: { background: "#E7D5C5", foreground: "#332923", accent: "#A34D3B", muted: "#A88F80" },
+};
 
 /** Maps the concept's own words onto a concrete palette and type pairing. */
 export function stylesFor(concept: Concept): { palette: Palette; fonts: Fonts } {
+  const colour = `${concept.colorStrategy} ${concept.materialStrategy}`.toLocaleLowerCase();
   const type = `${concept.typographyDirection}`.toLocaleLowerCase();
 
-  const palette = concept.palette ?? generatedPalette(concept);
+  const palette =
+    /dark|night|electric|neon|high contrast/.test(colour) ? PALETTES.darkSignal
+    : /clay|earth|terracotta|rust|brick/.test(colour) ? PALETTES.clay
+    : /warm|aged|vintage|retro|cream|paper grain|newsprint|riso/.test(colour) ? PALETTES.warmNeutral
+    : PALETTES.paperInk;
 
   const fonts =
     /serif|editorial|display serif|garamond/.test(type) ? FONT_SETS.serif
@@ -236,48 +184,6 @@ function imagePlaceholder(asset: PlannedAsset, frame: Partial<TextElement["frame
       note: asset.note,
     },
   };
-}
-
-function visualLanguageElements(language: VisualLanguage, palette: Palette): DesignElement[] {
-  const base = {
-    rotation: 0,
-    opacity: 0.86,
-    blendMode: "normal" as const,
-    locked: false,
-    editable: true,
-    provenance: PROCEDURAL,
-  };
-
-  switch (language) {
-    case "organic-forms":
-      return [
-        { ...base, id: "organic-blob", name: "Organic form", type: "shape", shape: "ellipse", fill: palette.accent, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "top-right", x: 0.7, y: 0.04, width: 0.42, height: 0.28 }), rotation: -14 },
-        { ...base, id: "organic-cutout", name: "Organic cutout", type: "shape", shape: "ellipse", fill: palette.muted, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "bottom-left", x: 0.02, y: 0.72, width: 0.28, height: 0.2 }), rotation: 18, opacity: 0.48 },
-      ];
-    case "cut-paper":
-      return [
-        { ...base, id: "paper-slab", name: "Paper slab", type: "shape", shape: "rect", fill: palette.accent, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "middle-right", x: 0.62, y: 0.3, width: 0.44, height: 0.16 }), rotation: 7 },
-        { ...base, id: "paper-shadow", name: "Paper shadow", type: "shape", shape: "rect", fill: palette.foreground, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "middle-right", x: 0.58, y: 0.34, width: 0.44, height: 0.16 }), rotation: 7, opacity: 0.12 },
-      ];
-    case "line-work":
-      return [
-        { ...base, id: "line-orbit", name: "Line orbit", type: "shape", shape: "ellipse", fill: null, stroke: palette.accent, strokeWidth: 0.012, radius: 0, frame: defaultFrame({ anchor: "top-right", x: 0.62, y: 0.08, width: 0.48, height: 0.3 }), rotation: 28 },
-        { ...base, id: "line-crossing", name: "Crossing line", type: "shape", shape: "line", fill: null, stroke: palette.muted, strokeWidth: 0.008, radius: 0, frame: defaultFrame({ anchor: "middle-center", x: 0.12, y: 0.58, width: 0.76, height: 0.02 }), rotation: -8, opacity: 0.62 },
-      ];
-    case "collage":
-      return [
-        { ...base, id: "collage-card", name: "Collage card", type: "shape", shape: "rect", fill: palette.muted, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "top-left", x: 0.06, y: 0.56, width: 0.36, height: 0.22 }), rotation: -4, opacity: 0.72 },
-        { ...base, id: "collage-tab", name: "Collage tab", type: "shape", shape: "rect", fill: palette.accent, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "top-left", x: 0.36, y: 0.64, width: 0.3, height: 0.12 }), rotation: 8 },
-      ];
-    case "brutalist-blocks":
-      return [
-        { ...base, id: "brutalist-block", name: "Brutalist block", type: "shape", shape: "rect", fill: palette.foreground, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "bottom-right", x: 0.64, y: 0.76, width: 0.38, height: 0.15 }), rotation: 0, opacity: 0.94 },
-        { ...base, id: "brutalist-notch", name: "Brutalist notch", type: "shape", shape: "rect", fill: palette.accent, stroke: null, strokeWidth: 0, radius: 0, frame: defaultFrame({ anchor: "bottom-left", x: 0.08, y: 0.86, width: 0.18, height: 0.04 }), rotation: 0 },
-      ];
-    case "type-led":
-    default:
-      return [{ ...base, id: "type-led-rule", name: "Type-led rule", type: "shape", shape: "line", fill: null, stroke: palette.accent, strokeWidth: 0.006, radius: 0, frame: defaultFrame({ anchor: "middle-center", x: 0.1, y: 0.52, width: 0.8, height: 0.02 }), rotation: 0, opacity: 0.7 }];
-  }
 }
 
 export type CompositionInput = {
@@ -459,11 +365,6 @@ function layoutFor(
       break;
     }
   }
-
-  // The model chooses a visual language separately from the structural
-  // layout. This is what prevents every concept from becoming the same bar,
-  // circle, and lime accent with a different headline.
-  elements.push(...visualLanguageElements(input.concept.visualLanguage, palette));
 
   // A concept that asked for a hero image must get one in every strategy, not
   // only the two templates that place it explicitly. Dropping a planned asset

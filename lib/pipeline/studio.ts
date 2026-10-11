@@ -6,7 +6,7 @@
 // be silently placed on a user's canvas.
 
 import { getTextProvider } from "../ai/provider.ts";
-import { ENGINE_TEXTURE_TAG, engineTextureContext, listLibraryAssets } from "../library.ts";
+import { ENGINE_TEXTURE_TAG, listLibraryAssets } from "../library.ts";
 import type { LibraryAsset } from "../library.ts";
 import { composeDesign } from "./composition.ts";
 import { generateConcepts, type Concept, type ConceptAssetContext } from "./concepts.ts";
@@ -41,13 +41,6 @@ export type StudioPipelineResult = {
   canvasAsset: StudioPipelineAsset | null;
 };
 
-function tokenise(value: string) {
-  return value
-    .toLocaleLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 2);
-}
-
 function variationIndex(seed: string, count: number) {
   let hash = 2166136261;
   for (const character of seed) {
@@ -57,83 +50,8 @@ function variationIndex(seed: string, count: number) {
   return Math.abs(hash) % Math.max(count, 1);
 }
 
-function searchText(asset: LibraryAsset) {
-  return [asset.name, asset.description ?? "", ...asset.tags, JSON.stringify(asset.metadata)].join(" ").toLocaleLowerCase();
-}
-
-function scoreAsset(asset: LibraryAsset, terms: string[]) {
-  const haystack = searchText(asset);
-  return terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0);
-}
-
-function assetMatchesBriefDomain(asset: LibraryAsset, brief: StructuredBrief) {
-  const briefText = [
-    brief.subject,
-    brief.message,
-    ...brief.aesthetic,
-    ...brief.tone,
-  ].join(" ").toLocaleLowerCase();
-
-  // The current server library is mostly music/editorial reference material.
-  // A food brief must not inherit those images just because "poster" or
-  // "typography" happened to score well. Keep the boundary semantic so a
-  // future restaurant collection can opt in through its own tags.
-  const foodBrief = /\b(restaurant|cafe|café|diner|bistro|bakery|bar|food|dining|kebab|grill|pizza|menu)\b/.test(briefText);
-  if (!foodBrief) return true;
-
-  return asset.tags.some((tag) =>
-    /(^|:|[-_])(restaurant|cafe|café|diner|bistro|bakery|bar|food|dining|kebab|grill|pizza|menu)(:|$|[-_])/i.test(tag),
-  );
-}
-
-function assetUrl(asset: LibraryAsset) {
-  return asset.contentType?.startsWith("image/") && (asset.sizeBytes ?? 0) > 0
-    ? `/api/assets/${encodeURIComponent(asset.id)}`
-    : asset.sourceUrl;
-}
-
-function toAsset(asset: LibraryAsset, kind: StudioPipelineAsset["kind"]): StudioPipelineAsset {
-  return {
-    id: asset.id,
-    kind,
-    name: asset.name,
-    description: asset.description,
-    tags: asset.tags,
-    url: assetUrl(asset),
-  };
-}
-
-function rankAssets(
-  assets: LibraryAsset[],
-  brief: StructuredBrief,
-  concept: Concept | null,
-  limit: number,
-) {
-  const terms = [
-    ...tokenise(brief.subject),
-    ...brief.aesthetic.flatMap(tokenise),
-    ...brief.tone.flatMap(tokenise),
-    ...(concept
-      ? [
-          ...tokenise(concept.imageTreatment),
-          ...tokenise(concept.materialStrategy),
-          ...concept.suggestedReferenceTags.flatMap(tokenise),
-        ]
-      : []),
-  ];
-
-  return assets
-    .filter((asset) => assetMatchesBriefDomain(asset, brief))
-    .map((asset, index) => ({ asset, score: scoreAsset(asset, terms), index }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.asset.name.localeCompare(b.asset.name) || a.index - b.index)
-    .slice(0, limit)
-    .map(({ asset }) => asset);
-}
-
 function conceptsContext(
   references: LibraryAsset[],
-  textures: Awaited<ReturnType<typeof engineTextureContext>>,
 ): ConceptAssetContext {
   return {
     references: references.slice(0, 24).map((asset) => ({
@@ -142,12 +60,7 @@ function conceptsContext(
       description: asset.description,
       tags: asset.tags,
     })),
-    textures: textures.map((asset) => ({
-      id: asset.id,
-      name: asset.name,
-      description: asset.description,
-      tags: asset.tags,
-    })),
+    textures: [],
   };
 }
 
@@ -172,15 +85,12 @@ export async function generateStudioPipeline(input: {
   // These reads are intentionally failure-tolerant. Gemini can still turn a
   // brief into a layout when the database is down. They are metadata-only
   // context for concept grounding, never an implicit image attachment.
-  const [referenceRows, textureRows] = await Promise.all([
-    listLibraryAssets("image", 200, input.instanceId, { excludeTag: ENGINE_TEXTURE_TAG }).catch(() => []),
-    engineTextureContext(input.instanceId, 8),
-  ]);
+  const referenceRows = await listLibraryAssets("image", 200, input.instanceId, { excludeTag: ENGINE_TEXTURE_TAG }).catch(() => []);
 
   const concepts = await generateConcepts(
     provider,
     interpreted.brief,
-    conceptsContext(referenceRows, textureRows),
+    conceptsContext(referenceRows),
   );
   // Gemini returns deliberately different concept grammars. A fresh brief
   // should not silently collapse to concept zero every time the user retries
@@ -188,8 +98,10 @@ export async function generateStudioPipeline(input: {
   const selectedConcept = concepts.concepts[
     variationIndex(input.variationSeed ?? `${input.briefText}:${Date.now()}`, concepts.concepts.length)
   ];
-  const references = rankAssets(referenceRows, interpreted.brief, selectedConcept, 4).map((asset) => toAsset(asset, "reference"));
-  const textures = rankAssets(textureRows, interpreted.brief, selectedConcept, 4).map((asset) => toAsset(asset, "texture"));
+  // Server library images are inspiration metadata only. A user must import an
+  // image explicitly before it can become a canvas layer or renderer input.
+  const references: StudioPipelineAsset[] = [];
+  const textures: StudioPipelineAsset[] = [];
 
   const plan = planAssets({ brief: interpreted.brief, concept: selectedConcept });
   const document = composeDesign({ brief: interpreted.brief, concept: selectedConcept, assets: plan.assets });

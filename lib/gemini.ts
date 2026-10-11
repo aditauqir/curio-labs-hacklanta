@@ -16,10 +16,8 @@ import { LAYOUT_VARIANTS } from "./design-state";
 import { designPrinciplesContext } from "./knowledge";
 import {
   ENGINE_TEXTURE_TAG,
-  engineTextureContext,
   LIBRARY_KINDS,
   libraryContext,
-  referenceImageContext,
   searchLibraryAssets,
   type LibraryKind,
 } from "./library";
@@ -433,9 +431,7 @@ function pipelineAssetSuggestion(asset: PipelineAssetSummary): GeminiAssetCandid
 function assetSuggestionsFromModel(
   record: Record<string, unknown>,
   library: Awaited<ReturnType<typeof libraryContext>>,
-  referenceImages: Awaited<ReturnType<typeof referenceImageContext>>,
   pipelineAssets: PipelineAssetSummary[],
-  textureAssets: Awaited<ReturnType<typeof engineTextureContext>>,
 ) {
   const requested = Array.isArray(record.assetIds)
     ? record.assetIds.filter((id): id is string => typeof id === "string")
@@ -447,9 +443,7 @@ function assetSuggestionsFromModel(
     .toLocaleLowerCase();
   const candidates: GeminiAssetCandidate[] = [
     ...library.map((asset) => ({ ...asset, aliases: [] })),
-    ...referenceImages.map((asset) => ({ ...asset, aliases: [] })),
     ...pipelineAssets.map(pipelineAssetSuggestion),
-    ...textureAssets.map((asset) => ({ ...asset, aliases: [] })),
   ];
   const mentioned = candidates
     .filter(
@@ -477,26 +471,16 @@ function pipelineText(assets: PipelineAssetSummary[]) {
     : "No project pipeline asset plans are available for this instance.";
 }
 
-function textureText(assets: Awaited<ReturnType<typeof engineTextureContext>>) {
-  return assets.length
-    ? assets
-        .map(
-          (asset) =>
-            `- ${asset.id} | ${asset.name} | image texture | ${asset.description ?? "Raster engine texture"} | tags: ${asset.tags.join(", ")}`,
-        )
-        .join("\n")
-    : "No raster-engine textures are available for this instance.";
+function referenceImageText(_assets: Array<{ id: string }>) {
+  return _assets.length
+    ? "Server reference images are not supplied to Gemini automatically."
+    : "Server reference images are not supplied to Gemini automatically. Use only images explicitly imported by the user.";
 }
 
-function referenceImageText(assets: Awaited<ReturnType<typeof referenceImageContext>>) {
-  return assets.length
-    ? assets
-        .map(
-          (asset) =>
-            `- ${asset.id} | ${asset.name} | server reference image | ${asset.description ?? "Reference image"} | tags: ${asset.tags.join(", ")}`,
-        )
-        .join("\n")
-    : "No server reference images are available for this instance.";
+function textureText(_assets: Array<{ id: string }>) {
+  return _assets.length
+    ? "Raster-engine textures are not supplied to Gemini automatically."
+    : "Raster-engine textures are not supplied to Gemini automatically.";
 }
 
 function principleText(principles: Awaited<ReturnType<typeof designPrinciplesContext>>) {
@@ -538,13 +522,13 @@ export async function askGemini(input: {
     ? `Recent conversation (oldest first):\n${input.history.map((item) => `${item.role}: ${item.content}`).join("\n")}\n\n`
     : "";
 
-  const [library, referenceImages, pipelineAssets, textureAssets, principles] = await Promise.all([
+  const [library, pipelineAssets, principles] = await Promise.all([
     libraryContext(input.instanceId),
-    referenceImageContext(input.instanceId, 12, input.message),
     pipelineAssetContext(input.instanceId),
-    engineTextureContext(input.instanceId),
     designPrinciplesContext(input.message),
   ]);
+  const referenceImages: Array<{ id: string }> = [];
+  const textureAssets: Array<{ id: string }> = [];
   const libraryText = library.length
     ? library
         .map(
@@ -612,7 +596,7 @@ Live research is enabled for this request. Use Google Search for up to ${geminiS
     skipped.push("referenceTreatment.textureAssetId");
     if (Object.keys(patch.referenceTreatment).length === 0) delete patch.referenceTreatment;
   }
-  const assetSuggestions = assetSuggestionsFromModel(record, library, referenceImages, pipelineAssets, textureAssets);
+  const assetSuggestions = assetSuggestionsFromModel(record, library, pipelineAssets);
   const followUps = Array.isArray(record.followUps)
     ? record.followUps
         .filter((entry): entry is string => typeof entry === "string")
@@ -864,12 +848,11 @@ export async function askGeminiCoach(input: {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new GeminiError("not_configured", "GEMINI_API_KEY is not set");
 
-  const [principles, pipelineAssets, textureAssets] = await Promise.all([
+  const [principles, pipelineAssets] = await Promise.all([
     designPrinciplesContext(input.question ?? ""),
     pipelineAssetContext(input.instanceId),
-    engineTextureContext(input.instanceId),
   ]);
-  const prompt = `${input.question?.trim() || "Check this poster layout."}\n\nPoster state:\n${describeDesign(input.design, null)}\n\nInstance-owned creative pipeline asset plans from TigerData:\n${pipelineText(pipelineAssets)}\n\nRaster-engine texture catalog from TigerData (metadata only):\n${textureText(textureAssets)}\n\nRelevant design-principles clips from TigerData:\n${principleText(principles)}`;
+  const prompt = `${input.question?.trim() || "Check this poster layout."}\n\nPoster state:\n${describeDesign(input.design, null)}\n\nInstance-owned creative pipeline asset plans from TigerData:\n${pipelineText(pipelineAssets)}\n\nServer images and raster textures are not supplied automatically. Review only the current poster state and user-owned assets.\n\nRelevant design-principles clips from TigerData:\n${principleText(principles)}`;
   let lastStatus = 0;
 
   for (const model of modelChain()) {
