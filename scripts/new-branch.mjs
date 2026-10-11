@@ -2,10 +2,11 @@
 // Creates a branch from up-to-date main and logs it in HANDOFF.md.
 // Usage: npm run branch -- <branch-name> "<what the branch is for>"
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const MARKER = "<!-- BRANCH-LOG-INSERT -->";
 const HANDOFF = "HANDOFF.md";
+const PR_HANDOFF = "GEMINI_WORKFLOW_PR_HANDOFF.md";
 
 const [name, ...purposeParts] = process.argv.slice(2);
 const purpose = purposeParts.join(" ").trim();
@@ -17,6 +18,9 @@ function fail(message) {
 
 if (!name || !purpose) {
   fail('Usage: npm run branch -- <branch-name> "<what the branch is for>"');
+}
+if (!existsSync(PR_HANDOFF)) {
+  fail(`${PR_HANDOFF} is missing. Restore the PR handoff brief before creating a branch.`);
 }
 if (!/^[a-z0-9][a-z0-9._/-]*$/i.test(name)) {
   fail(`Invalid branch name: ${name}`);
@@ -52,4 +56,4 @@ writeFileSync(HANDOFF, doc);
 
 git("add", HANDOFF);
 git("commit", "-m", `Log branch ${name} in HANDOFF`);
-console.log(`Created branch ${name} and logged it in ${HANDOFF}.`);
+console.log(`Created branch ${name} and logged it in ${HANDOFF}. Review ${PR_HANDOFF} for the next Gemini workflow PR.`);

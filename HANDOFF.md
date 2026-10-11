@@ -22,6 +22,8 @@ Latest composer refinement: the quick suggestion is centered with the curved arr
 
 Latest toolbar alignment behavior: the floating toolbar highlight is anchored to the tray origin before applying measured button coordinates, keeping the Layers and other pressed/hover states directly aligned with their icons.
 
+Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) contains the data-grounding/tuning scope, evaluation requirements, safety boundaries, and PR sign-off checklist for the next Gemini-quality pass.
+
 Read this first. It is the single source of truth for where the project stands and where to work next.
 If you create a branch, you must also log it in the [Branch log](#branch-log). See [Working agreement](#working-agreement).
 
@@ -290,7 +292,7 @@ In priority order, matching the build phases:
 
 1. **Merge and deploy `tldraw-voice-onboarding`.** The branch contains the verified manual editor pass, improved warm Vintage Jazz canvas, transparent mascot container, and randomized five-frame speaking loop. Review the `/home` start flow into the `/app` editor, director, Gemini/TigerData coach, and PNG/JPG/PSD export flows before promoting it to `main`; do not push directly to `main`.
 2. **Canonical editor is `/app`.** Keep `/home` as the start screen and do not add another editor route unless the user asks.
-3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply. The friend implementing the Gemini backend should preserve `data/gemini/system-prompt.md` and the `layerEdits` semantics.
+3. **Gemini editing quality.** Follow the [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) to add versioned, permissioned design examples or a supported tuning path, evaluate real requests, and preserve the `layerEdits` semantics.
 4. **Reference depth.** Replace or supplement the 31 source-linked Pinterest searches with legally usable, verified assets when licensing/attribution requirements are settled.
 5. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
 
