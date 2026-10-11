@@ -1,0 +1,133 @@
+{
+  "note": "Baked from curio/assets by scripts/build-look-assets.py at the 1080x1350 reference size. Original procedural output, CC0-1.0.",
+  "width": 1080,
+  "height": 1350,
+  "assets": [
+    {
+      "id": "ht_am_round_p7p8_a51",
+      "file": "ht_am_round_p7p8_a51.png",
+      "kind": "halftone_threshold",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ht_line_p13p8_h",
+      "file": "ht_line_p13p8_h.png",
+      "kind": "halftone_threshold",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ht_dotgrain_p9p8_a0",
+      "file": "ht_dotgrain_p9p8_a0.png",
+      "kind": "halftone_threshold",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ht_ellipse_p14p4_a29",
+      "file": "ht_ellipse_p14p4_a29.png",
+      "kind": "halftone_threshold",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ht_square_p15p3_a0",
+      "file": "ht_square_p15p3_a0.png",
+      "kind": "halftone_threshold",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "paper_uncoated_r4",
+      "file": "paper_uncoated_r4.webp",
+      "kind": "paper",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "paper_aged_r5",
+      "file": "paper_aged_r5.webp",
+      "kind": "paper",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "paper_ivory_r4",
+      "file": "paper_ivory_r4.webp",
+      "kind": "paper",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_film_mono_std8",
+      "file": "grain_film_mono_std8.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_film_mono_std10",
+      "file": "grain_film_mono_std10.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_silver_gelatin_std12",
+      "file": "grain_silver_gelatin_std12.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_silver_gelatin_std14",
+      "file": "grain_silver_gelatin_std14.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_toner_grit_std8",
+      "file": "grain_toner_grit_std8.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_chroma_std14p7",
+      "file": "grain_chroma_std14p7.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "grain_airbrush_halation_std10",
+      "file": "grain_airbrush_halation_std10.webp",
+      "kind": "grain",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "overlay_photocopy_creases_2",
+      "file": "overlay_photocopy_creases_2.webp",
+      "kind": "overlay",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "overlay_photocopy_edge_blotch",
+      "file": "overlay_photocopy_edge_blotch.webp",
+      "kind": "overlay",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "overlay_cloud_smoke_s41",
+      "file": "overlay_cloud_smoke_s41.webp",
+      "kind": "overlay",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "pattern_scanlines_crt_p4",
+      "file": "pattern_scanlines_crt_p4.webp",
+      "kind": "pattern",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "pattern_interference_rings_p5",
+      "file": "pattern_interference_rings_p5.webp",
+      "kind": "pattern",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "vec_wireframe_coordinate_grid",
+      "file": "vec_wireframe_coordinate_grid.webp",
+      "kind": "vector",
+      "license": "CC0-1.0"
+    }
+  ]
+}

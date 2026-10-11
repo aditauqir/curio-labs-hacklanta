@@ -4909,23 +4909,33 @@ select {
   background: #3c3c3c;
 }
 
-.studio-compact-texture-swatch.is-paper {
-  background:
-    linear-gradient(135deg, rgba(247, 247, 244, 0.22) 25%, transparent 25%) 0 0 / 0.35rem 0.35rem,
-    #8a8379;
+.studio-compact-look {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.studio-compact-texture-swatch.is-ink {
-  background:
-    radial-gradient(circle at 30% 35%, rgba(247, 247, 244, 0.5) 0 4%, transparent 5%),
-    radial-gradient(circle at 70% 65%, rgba(247, 247, 244, 0.24) 0 8%, transparent 9%),
-    #2b2b2b;
+.studio-compact-look:hover .studio-compact-texture-swatch,
+.studio-compact-look:focus-visible .studio-compact-texture-swatch {
+  outline: 1px solid rgba(247, 247, 244, 0.4);
+  outline-offset: 2px;
 }
 
-.studio-compact-texture-swatch.is-signal {
-  background:
-    repeating-linear-gradient(0deg, rgba(247, 247, 244, 0.17) 0 1px, transparent 1px 4px),
-    #424242;
+.studio-compact-look[aria-pressed="true"] {
+  color: rgba(247, 247, 244, 0.92);
+}
+
+.studio-compact-look[aria-pressed="true"] .studio-compact-texture-swatch {
+  outline: 2px solid rgba(247, 247, 244, 0.9);
+  outline-offset: 2px;
 }
 
 /* Keep the editor's flex chain intact before the desktop media query too.

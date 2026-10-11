@@ -14,6 +14,8 @@ export type DesignState = {
   time: string;
   footer: string;
   direction: DesignDirection;
+  /** Reference look id from lib/reference-looks.ts, or "none" for flat colour. */
+  lookId: string;
   posterSize: PosterSize;
   styleLabel: string;
   mood: string;

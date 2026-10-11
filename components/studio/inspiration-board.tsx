@@ -6,6 +6,7 @@ import type { DesignState } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
 import type { ImportedReference } from "@/lib/image-import-client";
+import { referenceLooks, type ReferenceLook } from "@/lib/reference-looks";
 import { ColorPaletteSelector } from "./color-palette-selector";
 import { CreativeBrief } from "./creative-brief";
 import { TypographySelector } from "./typography-selector";
@@ -19,11 +20,17 @@ const THUMBNAIL_THEMES = [
   { background: "#F0D8D2", ink: "#351D1B", accent: "#C52F54" },
 ];
 
-const TEXTURE_STUDIES = [
-  { id: "paper", label: "Paper grain", className: "is-paper" },
-  { id: "ink", label: "Ink wash", className: "is-ink" },
-  { id: "signal", label: "Signal noise", className: "is-signal" },
-];
+/** A CSS preview of a look: its screen as a dot or line field, or its gradient map. */
+function lookSwatchStyle(look: ReferenceLook) {
+  const { background, foreground, accent } = look.palette;
+  if (!look.screen) {
+    return { background: `radial-gradient(circle at 68% 62%, ${foreground} 0 12%, ${accent} 30%, ${background} 62%)` };
+  }
+  const field = look.screen.asset.includes("line")
+    ? `repeating-linear-gradient(0deg, ${foreground} 0 1px, transparent 1px 4px)`
+    : `radial-gradient(circle, ${foreground} 0 32%, transparent 36%) 0 0 / 5px 5px`;
+  return { background: `${field}, ${background}` };
+}
 
 function ReferenceThumb({ index }: { index: number }) {
   const theme = THUMBNAIL_THEMES[index % THUMBNAIL_THEMES.length];
@@ -160,14 +167,22 @@ export function InspirationBoard({
         </div>
         <div className="studio-compact-reference-section" aria-labelledby="compact-textures-heading">
           <div className="studio-compact-reference-section-heading">
-            <span id="compact-textures-heading">Textures</span>
-            <span>Surface cues</span>
+            <span id="compact-textures-heading">Looks</span>
+            <span>Screen, paper, grain</span>
           </div>
-          <ul className="studio-compact-texture-grid" aria-label="Texture studies">
-            {TEXTURE_STUDIES.map((texture) => (
-              <li key={texture.id}>
-                <span className={`studio-compact-texture-swatch ${texture.className}`} aria-hidden="true" />
-                <span>{texture.label}</span>
+          <ul className="studio-compact-texture-grid" aria-label="Reference looks">
+            {referenceLooks.map((look) => (
+              <li key={look.id}>
+                <button
+                  type="button"
+                  className="studio-compact-look"
+                  aria-pressed={design.lookId === look.id}
+                  title={look.summary}
+                  onClick={() => dispatch({ type: "setLook", id: look.id })}
+                >
+                  <span className="studio-compact-texture-swatch" style={lookSwatchStyle(look)} aria-hidden="true" />
+                  <span>{look.name}</span>
+                </button>
               </li>
             ))}
           </ul>

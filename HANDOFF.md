@@ -28,6 +28,8 @@ Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOF
 
 Gemini merge priority: conflicts in the intelligence/data layer must be resolved manually in favor of preserving the server-only Gemini path, structured patch validation, knowledge retrieval, and `data/gemini/*`; UI code should adapt around those contracts rather than deleting or bypassing them.
 
+Latest look behavior (`reference-looks`): the poster now renders the raster engine's analysed reference looks. `lib/reference-looks.ts` defines eight looks from `curio/assets/style_links.json` and the `apply_demo.py` recipes; `lib/look-render.ts` ports `halftone_apply`/`gradient_map`/`blend` to the browser, so the SVG and PNG/JPG/PSD exports get a screened tonal plate plus paper/grain/overlay textures (`public/looks/`, baked by `scripts/build-look-assets.py`, CC0). `lookId` is a validated patch field, directions default to a look, the Reference dock's Looks section switches them, and every Gemini prompt (director, coach, image import, starters) and `data/gemini/*` now requires replies to anchor on a named look and cite its finish. PSD layers are now written bottom-to-top (Background was previously on top), with texture layers keeping their blend mode.
+
 Read this first. It is the single source of truth for where the project stands and where to work next.
 If you create a branch, you must also log it in the [Branch log](#branch-log). See [Working agreement](#working-agreement).
 
@@ -341,5 +343,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `ui-and-feature` | 2026-10-11 | UI and feature work after the production editor deployment | in progress | |
 | `codex/e2e-ci-fix` | 2026-10-11 | Fix the stale desktop E2E editor setup after the merged UI release | merged | PR #21; apex-only workspace routing deployed as `d218585` |
 | `library-engine-texture-filter` | 2026-10-11 | Keep engine-texture rows out of the Gemini library context so the curio/assets textures can be published to curio_library_assets | in progress | Gemini context and coach search skip rows tagged `engine-texture`; `/api/assets` still lists them. Prerequisite for publishing `curio/assets` from `curio-raster-engine`. |
-| `reference-looks` | 2026-10-11 | Ground the web poster and Gemini prompts in the analysed reference looks (curio/assets textures, halftones, style tags) | in progress | |
+| `reference-looks` | 2026-10-11 | Ground the web poster and Gemini prompts in the analysed reference looks (curio/assets textures, halftones, style tags) | PR open | Lint, typecheck, unit tests and secret scan pass; all 8 looks and the PNG export were checked in a real browser. Local E2E was limited by low RAM (dev server OOM, Chromium GPU crash), 10/11 studio tests passed |
 <!-- BRANCH-LOG-INSERT -->

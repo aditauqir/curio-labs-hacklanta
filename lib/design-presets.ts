@@ -5,6 +5,7 @@ import type {
   Spacing,
   TextAlignment,
 } from "./design-types";
+import { NO_LOOK, getReferenceLook, lookPaletteId, referenceLooks } from "./reference-looks";
 
 export type PosterSizeConfig = {
   id: PosterSize;
@@ -133,6 +134,13 @@ export const colorPalettes: ColorPalette[] = [
       muted: "#A88F80",
     },
   },
+  // Each analysed reference look also offers its colours as a curated palette.
+  ...referenceLooks.map((look) => ({
+    id: lookPaletteId(look),
+    name: look.name,
+    note: `Reference look · ${look.styleTags.slice(0, 2).join(", ")}`,
+    colors: { ...look.palette },
+  })),
 ];
 
 function pinterestSearch(query: string) {
@@ -366,6 +374,8 @@ export const referenceCards: ReferenceCard[] = [
 type DirectionConfig = {
   label: string;
   mood: string;
+  /** The analysed reference look this direction is rendered with. */
+  lookId: string;
   fontPairId: string;
   paletteId: string;
   alignment: TextAlignment;
@@ -376,24 +386,27 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
   vintage: {
     label: "Vintage Jazz",
     mood: "Cozy and artistic",
+    lookId: "aged-broadsheet",
     fontPairId: "playfair-inter",
-    paletteId: "roastery",
+    paletteId: "look-aged-broadsheet",
     alignment: "left",
     spacing: "normal",
   },
   minimal: {
     label: "Modern Minimal",
     mood: "Clear and considered",
+    lookId: "swiss-ivory",
     fontPairId: "space-inter",
-    paletteId: "paper-ink",
+    paletteId: "look-swiss-ivory",
     alignment: "left",
     spacing: "spacious",
   },
   experimental: {
     label: "Experimental Editorial",
     mood: "Restless and electric",
+    lookId: "acid-duotone",
     fontPairId: "space-inter",
-    paletteId: "night-signal",
+    paletteId: "look-acid-duotone",
     alignment: "right",
     spacing: "compact",
   },
@@ -434,11 +447,28 @@ export function applyDirection(
   return {
     ...design,
     direction,
+    lookId: config.lookId,
     styleLabel: config.label,
     mood: config.mood,
     typography: typographyFromPair(getFontPair(config.fontPairId)),
     colors: { ...palette.colors },
     layout: { alignment: config.alignment, spacing: config.spacing },
+  };
+}
+
+/**
+ * Applies an analysed reference look: its screen and textures, its palette, and its font pair.
+ * Copy, layout and direction stay as they are. "none" keeps colours and fonts and drops the finish.
+ */
+export function applyLook(design: DesignState, lookId: string): DesignState {
+  if (lookId === NO_LOOK) return { ...design, lookId: NO_LOOK };
+  const look = getReferenceLook(lookId);
+  if (!look) return design;
+  return {
+    ...design,
+    lookId: look.id,
+    typography: typographyFromPair(getFontPair(look.fontPairId)),
+    colors: { ...look.palette },
   };
 }
 
@@ -451,6 +481,7 @@ const baseDesign: DesignState = {
   time: "7:00 PM — 11:00 PM",
   footer: "COFFEE · MUSIC · CULTURE",
   direction: "vintage",
+  lookId: NO_LOOK,
   posterSize: "social",
   styleLabel: "",
   mood: "",
