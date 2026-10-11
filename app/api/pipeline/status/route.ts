@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { aiCapabilities } from "@/lib/ai/provider";
 import { FORMATS } from "@/lib/pipeline/brief";
+import { pythonPipelineStatus } from "@/lib/pipeline/python-engine";
 
 // Reports what the pipeline can actually do, never the credentials behind it.
 // connection() opts out of prerendering, matching app/api/status/route.ts:
@@ -9,10 +10,12 @@ import { FORMATS } from "@/lib/pipeline/brief";
 export async function GET() {
   await connection();
   const capabilities = aiCapabilities();
+  const python = pythonPipelineStatus();
 
   return Response.json(
     {
       capabilities,
+      python,
       stages: {
         brief: capabilities.text.available,
         concepts: capabilities.text.available,
@@ -20,6 +23,7 @@ export async function GET() {
         assetPlanning: true,
         composition: true,
         rendering: true,
+        pythonGeneration: python.available,
         deterministicChecks: true,
         creativeCritique: capabilities.text.available,
         revision: capabilities.text.available,

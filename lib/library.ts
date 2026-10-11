@@ -2,6 +2,7 @@
 // curio_files; this table is the reusable library that Gemini can reference.
 import { randomUUID } from "node:crypto";
 import type { Sql } from "postgres";
+import assetRouting from "@/data/asset-routing.json";
 import { getDatabase } from "./db";
 import type { AssetSuggestion } from "./design-types";
 
@@ -172,6 +173,60 @@ export async function engineTextureContext(ownerInstanceId?: string, limit = 8) 
     return await listLibraryAssets("image", Math.min(Math.max(limit, 1), 8), ownerInstanceId, {
       includeTag: ENGINE_TEXTURE_TAG,
     });
+  } catch {
+    return [];
+  }
+}
+
+/** A bounded slice of server-published reference images for Gemini grounding. */
+export async function referenceImageContext(ownerInstanceId?: string, limit = 12, query = "") {
+  return referenceImageContextForQuery(ownerInstanceId, limit, query);
+}
+
+function queryTokens(query: string) {
+  return query
+    .toLocaleLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 2)
+    .filter((token) => !new Set(["the", "and", "for", "with", "make", "use", "poster", "image", "design"]).has(token));
+}
+
+function assetSearchText(asset: LibraryAsset) {
+  const tagText = asset.tags.join(" ");
+  const collectionTerms = assetRouting.collections
+    .filter((collection) => collection.tags.some((tag) => asset.tags.includes(tag)))
+    .flatMap((collection) => [collection.domain, ...collection.terms]);
+  return [asset.name, asset.description ?? "", tagText, ...collectionTerms, JSON.stringify(asset.metadata)]
+    .join(" ")
+    .toLocaleLowerCase();
+}
+
+/**
+ * Returns only references with a positive semantic match. Previously this
+ * returned the alphabetically first images even when the brief had no match,
+ * which made a restaurant brief inherit Charli XCX and rave references.
+ */
+export async function referenceImageContextForQuery(
+  ownerInstanceId?: string,
+  limit = 12,
+  query = "",
+) {
+  try {
+    const assets = await listLibraryAssets("image", 200, ownerInstanceId, {
+      excludeTag: ENGINE_TEXTURE_TAG,
+    });
+    const tokens = queryTokens(query);
+    if (tokens.length === 0) return [];
+    return assets
+      .map((asset, index) => ({
+        asset,
+        index,
+        score: tokens.reduce((score, token) => score + (assetSearchText(asset).includes(token) ? 1 : 0), 0),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.asset.name.localeCompare(b.asset.name) || a.index - b.index)
+      .slice(0, Math.min(Math.max(limit, 1), 12))
+      .map(({ asset }) => asset);
   } catch {
     return [];
   }

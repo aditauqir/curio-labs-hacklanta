@@ -4,6 +4,25 @@ export type DesignDirection = "vintage" | "minimal" | "experimental";
 export type PosterSize = "social" | "letter" | "a4";
 export type TextAlignment = "left" | "center" | "right";
 export type Spacing = "compact" | "normal" | "spacious";
+export type LayoutVariant =
+  | "asymmetric-grid"
+  | "centred-stack"
+  | "diagonal-break"
+  | "edge-anchored"
+  | "full-bleed-image"
+  | "modular-grid"
+  | "typographic-stack";
+export type ReferenceFilter = "none" | "grayscale" | "high-contrast" | "duotone" | "invert";
+export type ReferenceBlendMode = "normal" | "multiply" | "screen" | "overlay";
+
+export type ReferenceTreatment = {
+  assetId: string | null;
+  textureAssetId: string | null;
+  filter: ReferenceFilter;
+  blendMode: ReferenceBlendMode;
+  opacity: number;
+  textureOpacity: number;
+};
 
 export type DesignState = {
   projectName: string;
@@ -33,6 +52,7 @@ export type DesignState = {
   layout: {
     alignment: TextAlignment;
     spacing: Spacing;
+    variant: LayoutVariant;
   };
 };
 
@@ -41,6 +61,7 @@ export type ChatCheckpoint = {
   selectedPaletteId: string | null;
   posterEdits: PosterEdits;
   layerOrder: string[];
+  referenceTreatment: ReferenceTreatment;
 };
 
 export type ChatMessage = {
@@ -53,12 +74,16 @@ export type ChatMessage = {
    */
   source?: "example" | "demo" | "gemini";
   suggestions?: DesignDirection[];
+  /** Model-generated next moves for the current conversation, not canned UI copy. */
+  followUps?: string[];
   changes?: string[];
   /** Properties the model proposed but that failed validation and were not applied. */
   skipped?: string[];
   /** Plain-language note, e.g. that Gemini was unavailable and local rules were used. */
   notice?: string;
   assetSuggestions?: AssetSuggestion[];
+  /** Sources returned by Gemini's optional Google Search grounding pass. */
+  groundingSources?: Array<{ title: string; url: string }>;
   /** The complete editable state immediately after this assistant response. */
   checkpoint?: ChatCheckpoint;
 };
@@ -77,4 +102,5 @@ export type PersistedStudioState = {
   selectedPaletteId: string | null;
   posterEdits: PosterEdits;
   layerOrder: string[];
+  referenceTreatment: ReferenceTreatment;
 };

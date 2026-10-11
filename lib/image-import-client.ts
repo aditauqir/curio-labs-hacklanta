@@ -7,6 +7,9 @@ export type ImageAnalysis = {
 export type ImportedReference = ImageAnalysis & {
   filename: string;
   previewUrl: string;
+  label?: string;
+  sourceAssetId?: string;
+  textureAssetId?: string;
 };
 
 export class ImageImportError extends Error {

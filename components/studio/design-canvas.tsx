@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { askCoach, CoachError, type CoachReply } from "@/lib/coach-client";
-import type { DesignState } from "@/lib/design-types";
+import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
 import type { CopyKey, StudioAction } from "@/lib/design-state";
 import { colorPalettes, directionConfigs, directionOrder, fontPairs } from "@/lib/design-presets";
 import { exportPoster } from "@/lib/export";
@@ -109,6 +109,8 @@ export function DesignCanvas({
   layerOrder,
   selectedLayerId,
   importedReference,
+  referenceTreatment,
+  textureImageUrl,
   activeTool,
   onToolChange,
   onSelectLayer,
@@ -132,6 +134,8 @@ export function DesignCanvas({
   layerOrder: string[];
   selectedLayerId: string | null;
   importedReference: ImportedReference | null;
+  referenceTreatment: ReferenceTreatment;
+  textureImageUrl?: string | null;
   activeTool: PosterTool;
   onToolChange: (tool: PosterTool) => void;
   onSelectLayer: (id: string | null) => void;
@@ -853,6 +857,8 @@ export function DesignCanvas({
               <Poster
                 design={design}
                 referenceImage={importedReference}
+                referenceTreatment={referenceTreatment}
+                textureImageUrl={textureImageUrl}
                 edits={posterEdits}
                 layerOrder={layerOrder}
                 selectedLayerId={selectedLayerId}

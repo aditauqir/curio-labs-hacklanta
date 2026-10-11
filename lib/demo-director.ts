@@ -25,6 +25,9 @@ const ACCENT_COLORS: Record<string, string> = {
 const VINTAGE = /\b(warm|warmer|vintage|retro|cozy|1970s|70s|smoky)\b/;
 const MINIMAL = /\b(minimal|minimalist|swiss|clean|cleaner|simple|modern|contemporary|sleek)\b/;
 const EXPERIMENTAL = /\b(experimental|bold|bolder|dark|edgy|loud|electric|night)\b/;
+const CLUB_POP = /\b(charli\s*x(?:cx)?|brat(?:\s+summer)?|club[- ]?pop|hyperpop|electropop)\b/;
+const RESTAURANT_BRIEF =
+  /\b(?:restaurant|cafe|caf[eé]|diner|bistro|bakery|bar|eatery|dining)\b[\s\S]{0,80}\b(?:poster|flyer|brief)\b|\b(?:poster|flyer|brief)\b[\s\S]{0,80}\b(?:restaurant|cafe|caf[eé]|diner|bistro|bakery|bar|eatery|dining)\b/i;
 
 function breakHeadline(value: string) {
   const words = value.trim().split(/\s+/);
@@ -40,10 +43,14 @@ function breakHeadline(value: string) {
 export function interpretRequest(input: string, design: DesignState): DirectorResult {
   const text = input.toLowerCase();
   const keepLayout = wantsLayoutKept(input);
+  const clubPop = CLUB_POP.test(text);
+  const restaurantBrief = RESTAURANT_BRIEF.test(input);
   const actions: StudioAction[] = [];
   const changes: string[] = [];
 
-  const family = VINTAGE.test(text)
+  const family = clubPop
+    ? "experimental"
+    : VINTAGE.test(text)
     ? "vintage"
     : EXPERIMENTAL.test(text)
       ? "experimental"
@@ -59,6 +66,27 @@ export function interpretRequest(input: string, design: DesignState): DirectorRe
   } else if (family) {
     actions.push({ type: "setDirection", direction: family });
     changes.push(`Direction: ${directionConfigs[family].label}`);
+  }
+
+  if (clubPop) {
+    // Named vibe requests need a concrete, editable result even when Gemini
+    // returns a good description without a structured patch. Keep this in
+    // Curio's vocabulary instead of attempting to copy a living artist.
+    actions.push({ type: "setColor", key: "accent", value: "#FF4FD8" });
+    actions.push({ type: "setMood", value: "Electric club-pop energy" });
+    changes.push("Accent: electric pink", "Mood: electric club-pop energy");
+  }
+
+  if (restaurantBrief) {
+    actions.push({ type: "setCopy", key: "projectName", value: "Restaurant Poster" });
+    actions.push({ type: "setCopy", key: "venue", value: "YOUR RESTAURANT" });
+    actions.push({ type: "setCopy", key: "headline", value: "RESTAURANT\nPOSTER" });
+    actions.push({ type: "setCopy", key: "subtitle", value: "A first brief to refine" });
+    actions.push({ type: "setCopy", key: "date", value: "DATE · TIME" });
+    actions.push({ type: "setCopy", key: "time", value: "RESERVATIONS / DETAILS" });
+    actions.push({ type: "setCopy", key: "footer", value: "BRIEF · REFERENCES · REFINE" });
+    actions.push({ type: "setMood", value: "Warm, inviting, editorial" });
+    changes.push("Brief: restaurant poster");
   }
 
   const colorWord = Object.keys(ACCENT_COLORS).find((word) => text.includes(word));

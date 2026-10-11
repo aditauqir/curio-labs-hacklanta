@@ -1,8 +1,9 @@
 // Server-only provider contracts for structured Gemini workflow requests.
 // Keep vendor and credential details behind this boundary so pipeline stages
 // can share one transport without bypassing Curio's validation layers.
+import { pythonPipelineStatus } from "../pipeline/python-engine.ts";
 
-export type AiErrorKind = "not_configured" | "upstream" | "bad_output" | "timeout";
+export type AiErrorKind = "not_configured" | "upstream" | "bad_output" | "timeout" | "grounding_unavailable";
 
 export class AiError extends Error {
   kind: AiErrorKind;
@@ -31,12 +32,18 @@ export type JsonRequest = {
   timeoutMs?: number;
   maxOutputTokens?: number;
   temperature?: number;
+  topP?: number;
+  topK?: number;
+  /** Enable Gemini's managed Google Search grounding for current web context. */
+  googleSearch?: boolean;
 };
 
 export type JsonResult = {
   data: unknown;
   model: string;
   provider: string;
+  googleSearchUsed?: boolean;
+  groundingSources?: Array<{ title: string; url: string }>;
 };
 
 export type TextProvider = {
@@ -58,6 +65,16 @@ export function isGeminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
+export function isGeminiGoogleSearchEnabled() {
+  return process.env.GEMINI_ENABLE_SEARCH === "1";
+}
+
+export function geminiSearchQueryLimit() {
+  const configured = Number(process.env.GEMINI_SEARCH_MAX_QUERIES ?? "5");
+  if (!Number.isFinite(configured)) return 5;
+  return Math.max(1, Math.min(5, Math.floor(configured)));
+}
+
 /** Returns the configured structured-text provider, or null when unavailable. */
 export async function getTextProvider(): Promise<TextProvider | null> {
   if (isMockEnabled()) {
@@ -74,12 +91,13 @@ export async function getTextProvider(): Promise<TextProvider | null> {
 export function aiCapabilities(): AiCapabilities {
   const mock = isMockEnabled();
   const text = mock || isGeminiConfigured();
+  const python = pythonPipelineStatus();
   return {
     text: { available: text, provider: mock ? "mock" : text ? "gemini" : null },
     imageGeneration: {
-      available: false,
-      provider: null,
-      reason: "No image generation provider is configured in this deployment.",
+      available: python.available,
+      provider: python.provider,
+      reason: python.reason,
     },
     vision: {
       available: false,

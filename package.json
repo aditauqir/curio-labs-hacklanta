@@ -15,7 +15,8 @@
     "test:unit": "node --test \"scripts/**/*.test.mjs\" \"lib/**/*.test.mjs\"",
     "branch": "node scripts/new-branch.mjs",
     "fonts:import": "node scripts/import-fonts.mjs",
-    "design-principles:import": "node scripts/import-design-principles.mjs"
+    "design-principles:import": "node scripts/import-design-principles.mjs",
+    "library:import": "node scripts/import-library-assets.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",

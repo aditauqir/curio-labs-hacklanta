@@ -5,7 +5,7 @@ test("redirects the entry route to the /home workspace", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/home$/);
   await expect(page.getByTestId("onboarding-screen")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What are you thinking of?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with an idea" })).toBeVisible();
 });
 
 test("uses the app and editor routes", async ({ page }) => {
@@ -20,7 +20,7 @@ test("uses the app and editor routes", async ({ page }) => {
 
   await page.goto("/app");
   await expect(page.getByTestId("onboarding-screen")).toBeVisible();
-  await page.getByRole("button", { name: /Open current workspace/ }).click();
+  await page.getByRole("button", { name: /Continue your current workspace/ }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId("editor-screen")).toBeVisible();
 });
@@ -30,7 +30,7 @@ test.describe("studio workspace", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/home");
     await expect(page.getByTestId("onboarding-screen")).toBeVisible();
-    await page.getByRole("button", { name: /Open current workspace/ }).click();
+    await page.getByRole("button", { name: /Continue your current workspace/ }).click();
     await expect(page.getByTestId("editor-screen")).toBeVisible();
     await expect(page.getByRole("region", { name: "Design canvas" })).toBeVisible();
   });
@@ -77,7 +77,26 @@ test.describe("studio workspace", () => {
     await page.getByRole("button", { name: "Send message" }).click();
 
     await expect(page.getByText("Direction: Modern Minimal")).toBeVisible();
-    await expect(page.getByLabel("Midnight Jazz poster, Modern Minimal direction")).toBeVisible();
+    await expect(page.getByLabel("Cedar & Salt poster, Modern Minimal direction")).toBeVisible();
+  });
+
+  test("starts a fresh restaurant poster from an onboarding idea", async ({ page }) => {
+    await page.goto("/home");
+    await page.getByLabel("Describe what you are making").fill("Start a poster for a restaurant");
+    await page.getByRole("button", { name: "Start with this idea" }).click();
+
+    await expect(page.getByTestId("editor-screen")).toBeVisible();
+    await expect(page.getByText("Brief: restaurant poster")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Restaurant Poster");
+  });
+
+  test("applies a named club-pop vibe to the canvas", async ({ page }) => {
+    await page.getByLabel("Describe a change").fill("Make it have like Charli XCX vibes");
+    await page.getByRole("button", { name: "Send message" }).click();
+
+    await expect(page.getByText("Direction: Experimental Editorial")).toBeVisible();
+    await expect(page.getByText("Accent: electric pink")).toBeVisible();
+    await expect(page.getByText("Mood: electric club-pop energy")).toBeVisible();
   });
 
   test("exports the current poster from the canvas action bar", async ({ page }) => {
@@ -190,7 +209,7 @@ test("moves from the start screen into the app workspace", async ({ page }) => {
   await page.goto("/home");
   await expect(page.getByTestId("onboarding-screen")).toBeVisible();
 
-  await page.getByRole("button", { name: /Warm identity/ }).click();
+  await page.getByRole("button", { name: /Sunday Market/ }).click();
   await expect(page.getByTestId("editor-screen")).toBeVisible();
   await expect(page.getByRole("region", { name: "Design canvas" })).toBeVisible();
 });
@@ -231,6 +250,17 @@ test("opens the preloaded pipeline demo and surfaces library assets", async ({ p
             metadata: { referenceId: "signal-noise" },
             sourceUrl: null,
           },
+          {
+            id: "image:restaurant-table",
+            kind: "image",
+            name: "Restaurant table",
+            description: "Warm editorial restaurant image",
+            tags: ["image", "restaurant", "food"],
+            metadata: {},
+            sourceUrl: null,
+            contentType: "image/jpeg",
+            sizeBytes: 1024,
+          },
         ],
         pipelineAssets: [
           {
@@ -251,7 +281,7 @@ test("opens the preloaded pipeline demo and surfaces library assets", async ({ p
   });
 
   await page.goto("/home");
-  await page.getByRole("button", { name: /Pipeline demo/ }).click();
+  await page.getByRole("button", { name: /Texture lab/ }).click();
   await expect(page.getByTestId("editor-screen")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Signal After Dark");
   await expect(page.getByText(/preloaded pipeline demo/)).toBeVisible();
@@ -260,6 +290,9 @@ test("opens the preloaded pipeline demo and surfaces library assets", async ({ p
   await expect(page.getByText("Night Signal", { exact: true })).toBeVisible();
   await expect(page.getByText("Signal After Dark · hero artwork", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open Signal / noise" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use Restaurant table on canvas" })).toBeVisible();
+  await page.getByRole("button", { name: "Use Restaurant table on canvas" }).click();
+  await expect(page.locator('[data-reference-image="true"]')).toHaveCount(1);
 });
 
 test("keeps an imported image visible on the poster canvas", async ({ page }) => {
@@ -278,7 +311,7 @@ test("keeps an imported image visible on the poster canvas", async ({ page }) =>
   });
 
   await page.goto("/home");
-  await page.getByRole("button", { name: /Open current workspace/ }).click();
+  await page.getByRole("button", { name: /Continue your current workspace/ }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: "reference.png",
     mimeType: "image/png",
@@ -339,7 +372,7 @@ test("keeps a newer local edit when the remote workspace is older", async ({ pag
   });
 
   await page.goto("/home");
-  await page.getByRole("button", { name: /Open current workspace/ }).click();
+  await page.getByRole("button", { name: /Continue your current workspace/ }).click();
   await page.getByRole("button", { name: "Open color properties" }).click();
   await expect(page.getByRole("textbox", { name: /^Headline Press Enter/ })).toHaveValue("Local newer");
 });

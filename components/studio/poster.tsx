@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { DesignState } from "@/lib/design-types";
+import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
 import type { ImportedReference } from "@/lib/image-import-client";
 import {
   POSTER_HEIGHT,
@@ -75,6 +75,8 @@ type PosterProps = {
   layerOrder?: string[];
   selectedLayerId?: string | null;
   referenceImage?: ImportedReference | null;
+  referenceTreatment?: ReferenceTreatment;
+  textureImageUrl?: string | null;
   activeTool?: PosterTool;
   onSelectLayer?: (id: string | null) => void;
   onChangeLayer?: (id: string, patch: Partial<ReturnType<typeof createPosterLayerEdit>>) => void;
@@ -122,7 +124,7 @@ function boundsForText(item: PosterText): Bounds {
 function transformFor(bounds: Bounds, edit: ReturnType<typeof createPosterLayerEdit>) {
   const cx = bounds.x + bounds.width / 2;
   const cy = bounds.y + bounds.height / 2;
-  return `translate(${edit.x} ${edit.y}) translate(${cx} ${cy}) rotate(${edit.rotation}) scale(${edit.scale}) translate(${-cx} ${-cy})`;
+  return `translate(${edit.x} ${edit.y}) translate(${cx} ${cy}) rotate(${edit.rotation}) scale(${edit.scale * edit.scaleX} ${edit.scale * edit.scaleY}) translate(${-cx} ${-cy})`;
 }
 
 function localPoint(svg: SVGSVGElement, event: ReactPointerEvent<SVGElement>) {
@@ -142,7 +144,7 @@ function brushPath(points: BrushPoint[]) {
   return `M ${first.x} ${first.y}${rest.map((point) => ` L ${point.x} ${point.y}`).join("")}`;
 }
 
-function renderShape(shape: PosterShape) {
+function renderShape(shape: PosterShape, edit: ReturnType<typeof createPosterLayerEdit>) {
   if (shape.kind === "rect") {
     return (
       <rect
@@ -150,9 +152,9 @@ function renderShape(shape: PosterShape) {
         y={shape.y}
         width={shape.width}
         height={shape.height}
-        fill={shape.fill ?? "none"}
-        stroke={shape.stroke}
-        strokeWidth={shape.strokeWidth}
+        fill={edit.fill ?? shape.fill ?? "none"}
+        stroke={edit.stroke ?? shape.stroke}
+        strokeWidth={edit.strokeWidth ?? shape.strokeWidth}
         opacity={shape.opacity}
       />
     );
@@ -163,9 +165,9 @@ function renderShape(shape: PosterShape) {
         cx={shape.cx}
         cy={shape.cy}
         r={shape.r}
-        fill={shape.fill ?? "none"}
-        stroke={shape.stroke}
-        strokeWidth={shape.strokeWidth}
+        fill={edit.fill ?? shape.fill ?? "none"}
+        stroke={edit.stroke ?? shape.stroke}
+        strokeWidth={edit.strokeWidth ?? shape.strokeWidth}
         opacity={shape.opacity}
       />
     );
@@ -176,8 +178,8 @@ function renderShape(shape: PosterShape) {
       y1={shape.y1}
       x2={shape.x2}
       y2={shape.y2}
-      stroke={shape.stroke}
-      strokeWidth={shape.strokeWidth}
+      stroke={edit.stroke ?? shape.stroke}
+      strokeWidth={edit.strokeWidth ?? shape.strokeWidth}
       opacity={shape.opacity}
     />
   );
@@ -193,6 +195,15 @@ export function Poster({
   layerOrder = [],
   selectedLayerId = null,
   referenceImage = null,
+  referenceTreatment = {
+    assetId: null,
+    textureAssetId: null,
+    filter: "none",
+    blendMode: "normal",
+    opacity: 0.72,
+    textureOpacity: 0.24,
+  },
+  textureImageUrl = null,
   activeTool = "select",
   onSelectLayer,
   onChangeLayer,
@@ -227,6 +238,8 @@ export function Poster({
 
   const selectedBounds = selectedLayerId ? layerBounds.get(selectedLayerId) : undefined;
   const selectedEdit = selectedLayerId ? editFor(edits, selectedLayerId) : null;
+  const referenceFilter =
+    referenceTreatment.filter === "none" ? undefined : `url(#reference-${referenceTreatment.filter})`;
   const layerColors = useMemo(() => {
     const result = new Map<string, string>();
     result.set("background", design.colors.background);
@@ -299,8 +312,8 @@ export function Poster({
   }
 
   function transformedBounds(bounds: Bounds, edit: ReturnType<typeof createPosterLayerEdit>): Bounds {
-    const width = bounds.width * edit.scale;
-    const height = bounds.height * edit.scale;
+    const width = bounds.width * edit.scale * edit.scaleX;
+    const height = bounds.height * edit.scale * edit.scaleY;
     const centerX = bounds.x + bounds.width / 2 + edit.x;
     const centerY = bounds.y + bounds.height / 2 + edit.y;
     return { x: centerX - width / 2, y: centerY - height / 2, width, height };
@@ -508,13 +521,13 @@ export function Poster({
           x={item.x}
           y={item.y}
           textAnchor={item.anchor}
-          fontSize={item.size}
-          fontWeight={item.weight}
+          fontSize={edit.fontSize ?? item.size}
+          fontWeight={edit.weight ?? item.weight}
           fontStyle={item.italic ? "italic" : "normal"}
-          fill={item.color}
+          fill={edit.fill ?? item.color}
           style={{
             fontFamily: item.font === "heading" ? design.typography.headingFont : design.typography.bodyFont,
-            letterSpacing: item.tracking,
+            letterSpacing: edit.tracking ?? item.tracking,
             whiteSpace: "pre",
           }}
         >
@@ -552,7 +565,7 @@ export function Poster({
                 : "crosshair",
         }}
       >
-        {renderShape(shape)}
+        {renderShape(shape, edit)}
       </g>
     );
   };
@@ -576,10 +589,28 @@ export function Poster({
               width={POSTER_WIDTH}
               height={POSTER_HEIGHT}
               preserveAspectRatio="xMidYMid slice"
-              opacity="0.72"
+              filter={referenceFilter}
+              opacity={referenceTreatment.opacity}
+              style={{ mixBlendMode: referenceTreatment.blendMode }}
               pointerEvents="none"
               data-imported-reference-image="true"
+              data-reference-image="true"
               aria-label={`Imported reference: ${referenceImage.filename}`}
+            />
+          ) : null}
+          {referenceImage && textureImageUrl && referenceTreatment.textureAssetId ? (
+            <image
+              href={textureImageUrl}
+              x="0"
+              y="0"
+              width={POSTER_WIDTH}
+              height={POSTER_HEIGHT}
+              preserveAspectRatio="xMidYMid slice"
+              opacity={referenceTreatment.textureOpacity}
+              style={{ mixBlendMode: referenceTreatment.blendMode }}
+              pointerEvents="none"
+              data-reference-texture="true"
+              aria-label="Selected reference texture"
             />
           ) : null}
         </g>
@@ -616,6 +647,31 @@ export function Poster({
       onPointerCancel={endInteraction}
       onKeyDown={handleKeyDown}
     >
+      <defs>
+        <filter id="reference-grayscale">
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <filter id="reference-high-contrast">
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="1.35" intercept="-0.16" />
+            <feFuncG type="linear" slope="1.35" intercept="-0.16" />
+            <feFuncB type="linear" slope="1.35" intercept="-0.16" />
+          </feComponentTransfer>
+        </filter>
+        <filter id="reference-duotone">
+          <feColorMatrix
+            type="matrix"
+            values="0.25 0.25 0.25 0 0.08 0.25 0.25 0.25 0 0.1 0.25 0.25 0.25 0 0.12 0 0 0 1 0"
+          />
+        </filter>
+        <filter id="reference-invert">
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="1 0" />
+            <feFuncG type="table" tableValues="1 0" />
+            <feFuncB type="table" tableValues="1 0" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
       {[...orderedLayerIds].reverse().map(renderLayer)}
 
       {brushStrokes.map((stroke) => (

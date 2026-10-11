@@ -21,6 +21,11 @@ function safeText(value: FormDataEntryValue | null, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function assetLimit(request: Request) {
+  const raw = Number(new URL(request.url).searchParams.get("limit"));
+  return Number.isFinite(raw) ? Math.min(200, Math.max(1, Math.floor(raw))) : 60;
+}
+
 export async function GET(request: Request) {
   const kind = new URL(request.url).searchParams.get("kind");
   if (kind && !(LIBRARY_KINDS as readonly string[]).includes(kind)) {
@@ -28,7 +33,7 @@ export async function GET(request: Request) {
   }
   try {
     const instance = await getAccountContext();
-    const assets = await listLibraryAssets(kind as LibraryKind | undefined, 60, instance.id);
+    const assets = await listLibraryAssets(kind as LibraryKind | undefined, assetLimit(request), instance.id);
     let pipelineAssets: PipelineAssetSummary[] = [];
     if (!kind) {
       try {

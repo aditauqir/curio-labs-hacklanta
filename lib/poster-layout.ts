@@ -101,14 +101,20 @@ const SPACING_FACTOR = { compact: 0.85, normal: 1, spacious: 1.15 } as const;
  */
 export function buildPoster(design: DesignState): PosterModel {
   const { direction, layout, colors } = design;
-  const { foreground, accent } = colors;
+  const { background, foreground, accent } = colors;
   const pair = getFontPair(design.typography.id);
   const factor = SPACING_FACTOR[layout.spacing];
+  const variant = layout.variant;
   const isVintage = direction === "vintage";
   const isMinimal = direction === "minimal";
   const isExperimental = direction === "experimental";
 
-  const align = layout.alignment;
+  const align =
+    variant === "centred-stack"
+      ? "center"
+      : variant === "edge-anchored"
+        ? "right"
+        : layout.alignment;
   const x =
     align === "left" ? MARGIN : align === "center" ? POSTER_WIDTH / 2 : POSTER_WIDTH - MARGIN;
   const anchor = align === "left" ? "start" : align === "center" ? "middle" : "end";
@@ -122,11 +128,15 @@ export function buildPoster(design: DesignState): PosterModel {
     .filter(Boolean)
     .slice(0, 4);
 
-  const tightening = isVintage ? 0 : 0.04;
-  const indent = isExperimental ? 110 : 0;
+  const tightening = variant === "typographic-stack" ? 0.01 : isVintage ? 0 : 0.04;
+  const indent = variant === "diagonal-break" ? 110 : variant === "edge-anchored" ? 76 : 0;
   const usable = POSTER_WIDTH - MARGIN * 2;
   const effectiveRatio = pair.widthRatio - tightening;
-  const baseSize = isVintage ? 150 : isMinimal ? 176 : 208;
+  const baseSize =
+    variant === "typographic-stack" ? 220
+    : variant === "centred-stack" ? 150
+    : variant === "modular-grid" ? 142
+    : isVintage ? 150 : isMinimal ? 176 : 208;
 
   let size = baseSize;
   lines.forEach((line, index) => {
@@ -136,9 +146,14 @@ export function buildPoster(design: DesignState): PosterModel {
   size = Math.max(size, 40);
 
   const tracking = isVintage ? -2 : -tightening * size;
-  const headTop = 290 + (factor - 1) * 140;
+  const headTop =
+    variant === "typographic-stack" ? 184
+    : variant === "centred-stack" ? 248
+    : variant === "edge-anchored" ? 210
+    : variant === "modular-grid" ? 232
+    : 290 + (factor - 1) * 140;
   const firstBaseline = headTop + size * 0.8;
-  const gap = size * (isVintage ? 0.95 : 0.88);
+  const gap = size * (variant === "typographic-stack" ? 0.76 : isVintage ? 0.95 : 0.88);
 
   lines.forEach((line, index) => {
     const shift = index % 2 === 1 ? indent : 0;
@@ -159,8 +174,11 @@ export function buildPoster(design: DesignState): PosterModel {
   });
 
   const lastBaseline = firstBaseline + Math.max(lines.length - 1, 0) * gap;
-  const subtitleY = lastBaseline + 96 * factor;
-  const dateY = 1030 + (1 - factor) * 220;
+  const subtitleY = lastBaseline + (variant === "modular-grid" ? 62 : 96) * factor;
+  const dateY =
+    variant === "full-bleed-image" ? 1120
+    : variant === "modular-grid" ? 930
+    : 1030 + (1 - factor) * 220;
 
   const addBody = (
     id: string,
@@ -277,6 +295,52 @@ export function buildPoster(design: DesignState): PosterModel {
       { id: "edge-bar", kind: "rect", x: 0, y: 0, width: 28, height: POSTER_HEIGHT, fill: accent, strokeWidth: 0, opacity: 1 },
       { id: "ring", kind: "circle", cx: 990, cy: 80, r: 170, stroke: accent, strokeWidth: 10, opacity: 0.5 },
       { id: "base-bar", kind: "rect", x: 28, y: 1306, width: POSTER_WIDTH - 28, height: 44, fill: accent, strokeWidth: 0, opacity: 1 },
+    );
+  }
+
+  // Layout variants are separate from the three visual directions. Gemini's
+  // concept stage can therefore choose a genuinely different composition
+  // without collapsing every concept into the same preset poster.
+  if (variant === "centred-stack") {
+    shapes.push(
+      { id: "centre-rule", kind: "line", x1: POSTER_WIDTH / 2, y1: 124, x2: POSTER_WIDTH / 2, y2: 1230, stroke: accent, strokeWidth: 2, opacity: 0.55 },
+      { id: "centre-orbit", kind: "circle", cx: POSTER_WIDTH / 2, cy: 928, r: 212, stroke: accent, strokeWidth: 8, opacity: 0.82 },
+    );
+  }
+
+  if (variant === "diagonal-break") {
+    shapes.push(
+      { id: "diagonal-field", kind: "rect", x: -180, y: 470, width: 1440, height: 180, fill: accent, strokeWidth: 0, opacity: 0.88 },
+      { id: "diagonal-cut", kind: "line", x1: -80, y1: 660, x2: 1160, y2: 410, stroke: foreground, strokeWidth: 8, opacity: 0.92 },
+    );
+  }
+
+  if (variant === "edge-anchored") {
+    shapes.push(
+      { id: "edge-rule", kind: "line", x1: 150, y1: 208, x2: 960, y2: 208, stroke: foreground, strokeWidth: 2, opacity: 0.46 },
+      { id: "edge-marker", kind: "rect", x: 936, y: 236, width: 44, height: 172, fill: accent, strokeWidth: 0, opacity: 0.9 },
+    );
+  }
+
+  if (variant === "full-bleed-image") {
+    shapes.push(
+      { id: "image-scrim", kind: "rect", x: 0, y: 790, width: POSTER_WIDTH, height: 560, fill: background, strokeWidth: 0, opacity: 0.78 },
+    );
+  }
+
+  if (variant === "modular-grid") {
+    for (const [index, xLine] of [MARGIN, 360, 720, POSTER_WIDTH - MARGIN].entries()) {
+      shapes.push({ id: `grid-column-${index}`, kind: "line", x1: xLine, y1: 92, x2: xLine, y2: 1262, stroke: foreground, strokeWidth: 1, opacity: index === 0 || index === 3 ? 0.36 : 0.18 });
+    }
+    shapes.push(
+      { id: "grid-accent-cell", kind: "rect", x: 720, y: 810, width: 264, height: 214, fill: accent, strokeWidth: 0, opacity: 0.9 },
+    );
+  }
+
+  if (variant === "typographic-stack") {
+    shapes.push(
+      { id: "type-stack-rule", kind: "line", x1: MARGIN, y1: 1200, x2: POSTER_WIDTH - MARGIN, y2: 1200, stroke: accent, strokeWidth: 5, opacity: 0.95 },
+      { id: "type-stack-block", kind: "rect", x: MARGIN, y: 214, width: 18, height: 390, fill: accent, strokeWidth: 0, opacity: 1 },
     );
   }
 

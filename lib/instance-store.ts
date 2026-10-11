@@ -10,6 +10,7 @@ type WorkspaceRow = {
   selected_palette_id: string | null;
   poster_edits: unknown;
   layer_order: unknown;
+  reference_treatment: unknown;
   updated_at: Date | string;
 };
 
@@ -19,6 +20,7 @@ type MessageRow = {
   content: string;
   source: "example" | "demo" | "gemini" | null;
   suggestions: unknown;
+  follow_ups: unknown;
   changes: unknown;
   skipped: unknown;
   notice: string | null;
@@ -46,6 +48,7 @@ function toMessage(row: MessageRow) {
     content: row.content,
     source: row.source ?? undefined,
     suggestions: Array.isArray(row.suggestions) ? row.suggestions : undefined,
+    followUps: Array.isArray(row.follow_ups) ? row.follow_ups : undefined,
     changes: Array.isArray(row.changes) ? row.changes : undefined,
     skipped: Array.isArray(row.skipped) ? row.skipped : undefined,
     notice: row.notice ?? undefined,
@@ -58,7 +61,7 @@ export async function loadWorkspace(instanceId: string): Promise<{ state: Studio
   await ensureInstance(sql, instanceId);
 
   const workspace = await sql<WorkspaceRow[]>`
-    SELECT design, selected_palette_id, poster_edits, layer_order
+    SELECT design, selected_palette_id, poster_edits, layer_order, reference_treatment
            , updated_at
     FROM curio_workspaces
     WHERE instance_id = ${instanceId}::uuid
@@ -66,7 +69,7 @@ export async function loadWorkspace(instanceId: string): Promise<{ state: Studio
   if (workspace.length === 0) return { state: null, updatedAt: null };
 
   const messages = await sql<MessageRow[]>`
-    SELECT message_id, role, content, source, suggestions, changes, skipped, notice, asset_suggestions
+    SELECT message_id, role, content, source, suggestions, follow_ups, changes, skipped, notice, asset_suggestions
     FROM curio_chat_messages
     WHERE instance_id = ${instanceId}::uuid
     ORDER BY created_at ASC
@@ -79,6 +82,7 @@ export async function loadWorkspace(instanceId: string): Promise<{ state: Studio
       selectedPaletteId: workspace[0].selected_palette_id,
       posterEdits: workspace[0].poster_edits,
       layerOrder: workspace[0].layer_order,
+      referenceTreatment: workspace[0].reference_treatment,
     });
   return {
     state,
@@ -91,13 +95,14 @@ export async function saveWorkspace(instanceId: string, state: StudioState) {
   const updatedAt = await sql.begin(async (tx) => {
     await ensureInstance(tx, instanceId);
     const rows = await tx<{ updated_at: Date | string }[]>`
-      INSERT INTO curio_workspaces (instance_id, design, selected_palette_id, poster_edits, layer_order, updated_at)
-      VALUES (${instanceId}::uuid, ${tx.json(state.design)}, ${state.selectedPaletteId}, ${tx.json(state.posterEdits)}, ${tx.json(state.layerOrder)}, NOW())
+      INSERT INTO curio_workspaces (instance_id, design, selected_palette_id, poster_edits, layer_order, reference_treatment, updated_at)
+      VALUES (${instanceId}::uuid, ${tx.json(state.design)}, ${state.selectedPaletteId}, ${tx.json(state.posterEdits)}, ${tx.json(state.layerOrder)}, ${tx.json(state.referenceTreatment)}, NOW())
       ON CONFLICT (instance_id) DO UPDATE SET
         design = EXCLUDED.design,
         selected_palette_id = EXCLUDED.selected_palette_id,
         poster_edits = EXCLUDED.poster_edits,
         layer_order = EXCLUDED.layer_order,
+        reference_treatment = EXCLUDED.reference_treatment,
         updated_at = NOW()
       RETURNING updated_at
     `;
@@ -106,7 +111,7 @@ export async function saveWorkspace(instanceId: string, state: StudioState) {
     for (const message of state.messages) {
       await tx`
         INSERT INTO curio_chat_messages
-          (instance_id, message_id, role, content, source, suggestions, changes, skipped, notice, asset_suggestions)
+          (instance_id, message_id, role, content, source, suggestions, follow_ups, changes, skipped, notice, asset_suggestions)
         VALUES (
           ${instanceId}::uuid,
           ${message.id},
@@ -114,6 +119,7 @@ export async function saveWorkspace(instanceId: string, state: StudioState) {
           ${message.content},
           ${message.source ?? null},
           ${message.suggestions ? tx.json(message.suggestions) : null},
+          ${message.followUps ? tx.json(message.followUps) : null},
           ${message.changes ? tx.json(message.changes) : null},
           ${message.skipped ? tx.json(message.skipped) : null},
           ${message.notice ?? null},

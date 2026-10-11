@@ -1,6 +1,7 @@
 import type {
   DesignDirection,
   DesignState,
+  LayoutVariant,
   PosterSize,
   Spacing,
   TextAlignment,
@@ -370,16 +371,18 @@ type DirectionConfig = {
   paletteId: string;
   alignment: TextAlignment;
   spacing: Spacing;
+  layoutVariant: LayoutVariant;
 };
 
 export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
   vintage: {
-    label: "Vintage Jazz",
-    mood: "Cozy and artistic",
+    label: "Warm Editorial",
+    mood: "Tactile and considered",
     fontPairId: "playfair-inter",
     paletteId: "roastery",
     alignment: "left",
     spacing: "normal",
+    layoutVariant: "centred-stack",
   },
   minimal: {
     label: "Modern Minimal",
@@ -388,6 +391,7 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
     paletteId: "paper-ink",
     alignment: "left",
     spacing: "spacious",
+    layoutVariant: "asymmetric-grid",
   },
   experimental: {
     label: "Experimental Editorial",
@@ -396,6 +400,7 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
     paletteId: "night-signal",
     alignment: "right",
     spacing: "compact",
+    layoutVariant: "diagonal-break",
   },
 };
 
@@ -438,26 +443,26 @@ export function applyDirection(
     mood: config.mood,
     typography: typographyFromPair(getFontPair(config.fontPairId)),
     colors: { ...palette.colors },
-    layout: { alignment: config.alignment, spacing: config.spacing },
+    layout: { alignment: config.alignment, spacing: config.spacing, variant: config.layoutVariant },
   };
 }
 
 const baseDesign: DesignState = {
-  projectName: "Midnight Jazz",
-  venue: "THE ROASTERY",
-  headline: "MIDNIGHT\nJAZZ",
-  subtitle: "An Evening of Live Music",
-  date: "FRIDAY · OCTOBER 23",
-  time: "7:00 PM — 11:00 PM",
-  footer: "COFFEE · MUSIC · CULTURE",
-  direction: "vintage",
+  projectName: "Cedar & Salt",
+  venue: "CEDAR & SALT",
+  headline: "CEDAR\n&SALT",
+  subtitle: "Seasonal food, late dinners",
+  date: "SATURDAY · OCTOBER 18",
+  time: "6:00 PM — LATE",
+  footer: "FOOD · WINE · COMMUNITY",
+  direction: "minimal",
   posterSize: "social",
   styleLabel: "",
   mood: "",
   typography: typographyFromPair(fontPairs[0]),
   colors: { ...colorPalettes[0].colors },
-  layout: { alignment: "left", spacing: "normal" },
+  layout: { alignment: "left", spacing: "normal", variant: "asymmetric-grid" },
 };
 
-export const initialDesign: DesignState = applyDirection(baseDesign, "vintage");
-export const initialPaletteId = directionConfigs.vintage.paletteId;
+export const initialDesign: DesignState = applyDirection(baseDesign, "minimal");
+export const initialPaletteId = directionConfigs.minimal.paletteId;

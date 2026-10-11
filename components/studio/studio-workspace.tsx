@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type WheelEvent as ReactWheelEvent } from "react";
 import {
   createDefaultState,
-  createDemoState,
+  createFreshState,
   sanitizeState,
   studioReducer,
   type StudioAction,
@@ -98,6 +98,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
   const [referenceOpen, setReferenceOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
   const [importedReference, setImportedReference] = useState<ImportedReference | null>(null);
+  const [libraryReference, setLibraryReference] = useState<ImportedReference | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>("headline-0");
@@ -148,6 +149,8 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   const importImage = useCallback(async (file: File) => {
     const previewUrl = URL.createObjectURL(file);
+    setLibraryReference(null);
+    dispatch({ type: "setReferenceTreatment", patch: { assetId: null, textureAssetId: null } });
     setImportError(null);
     try {
       const analysis = await analyzeImage(file);
@@ -188,7 +191,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       URL.revokeObjectURL(previewUrl);
       throw error;
     }
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     function fileFromDrop(event: DragEvent) {
@@ -277,7 +280,44 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const { design, messages, selectedPaletteId, posterEdits, layerOrder } = state;
+  const { design, messages, selectedPaletteId, posterEdits, layerOrder, referenceTreatment } = state;
+  const persistedLibraryReference = referenceTreatment.assetId
+    ? {
+        filename: referenceTreatment.assetId,
+        label: "Curio library reference",
+        previewUrl: `/api/assets/${encodeURIComponent(referenceTreatment.assetId)}`,
+        sourceAssetId: referenceTreatment.assetId,
+        summary: "Curio library reference selected for the canvas.",
+        prompt: "",
+        suggestions: [],
+      }
+    : null;
+  const activeReference = referenceTreatment.assetId
+    ? libraryReference ?? persistedLibraryReference
+    : importedReference;
+  const textureImageUrl = referenceTreatment.textureAssetId
+    ? `/api/assets/${encodeURIComponent(referenceTreatment.textureAssetId)}`
+    : null;
+
+  function selectReferenceAsset(assetId: string, title: string, imageUrl: string) {
+    setLibraryReference({
+      filename: title,
+      label: title,
+      previewUrl: imageUrl,
+      sourceAssetId: assetId,
+      summary: "Curio library reference selected for the canvas.",
+      prompt: "",
+      suggestions: [],
+    });
+    dispatch({
+      type: "setReferenceTreatment",
+      patch: { assetId, textureAssetId: null, filter: "none", blendMode: "normal" },
+    });
+  }
+
+  function selectTextureAsset(assetId: string) {
+    dispatch({ type: "setReferenceTreatment", patch: { textureAssetId: assetId } });
+  }
 
   function changeLayer(id: string, patch: Partial<PosterLayerEdit>) {
     dispatch({ type: "setPosterLayerEdit", id, patch });
@@ -397,15 +437,15 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   function startStudio(prompt?: string) {
     window.localStorage.setItem(ONBOARDING_KEY, "true");
-    setInitialPrompt(prompt?.trim() || importedReference?.prompt || null);
-    navigateTo("editor");
-  }
-
-  function openDemo() {
-    demoRequestedRef.current = true;
-    window.localStorage.setItem(ONBOARDING_KEY, "true");
-    setHistory({ past: [], present: createDemoState(), future: [] });
-    setInitialPrompt(null);
+    const cleanPrompt = prompt?.trim() || importedReference?.prompt || "";
+    if (cleanPrompt) {
+      // A typed idea is a new brief, not a request to reopen the persisted
+      // workspace. Mark the restore as intentionally superseded before the
+      // async workspace request can hydrate the old project again.
+      demoRequestedRef.current = true;
+      setHistory({ past: [], present: createFreshState(), future: [] });
+    }
+    setInitialPrompt(cleanPrompt || null);
     navigateTo("editor");
   }
 
@@ -420,7 +460,6 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       <>
         <OnboardingStudio
           onStart={startStudio}
-          onOpenDemo={openDemo}
           onImportImage={importImage}
           importedReference={importedReference}
           projectName={design.projectName}
@@ -455,6 +494,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
             selectedPaletteId={selectedPaletteId}
             posterEdits={posterEdits}
             layerOrder={layerOrder}
+            referenceTreatment={referenceTreatment}
             dispatch={dispatch}
             dispatchBatch={dispatchActions}
             initialPrompt={initialPrompt}
@@ -515,7 +555,9 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                   posterEdits={posterEdits}
                   layerOrder={layerOrder}
                   selectedLayerId={selectedLayerId}
-                  importedReference={importedReference}
+                  importedReference={activeReference}
+                  referenceTreatment={referenceTreatment}
+                  textureImageUrl={textureImageUrl}
                   activeTool={activeTool}
                   onToolChange={setActiveTool}
                   onSelectLayer={setSelectedLayerId}
@@ -540,10 +582,11 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                   <StudioInspector
                     referenceOpen={referenceOpen}
                     layersOpen={layersOpen}
-                    importedReference={importedReference}
+                    importedReference={activeReference}
                     design={design}
                     selectedPaletteId={selectedPaletteId}
                     dispatch={dispatch}
+                    referenceTreatment={referenceTreatment}
                     posterEdits={posterEdits}
                     layerOrder={layerOrder}
                     selectedLayerId={selectedLayerId}
@@ -552,6 +595,8 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                     onToggleLayerLock={toggleLayerLock}
                     onDeleteLayer={deleteLayer}
                     onReorderLayer={(id, direction) => dispatch({ type: "reorderLayer", id, direction })}
+                    onSelectReference={selectReferenceAsset}
+                    onSelectTexture={selectTextureAsset}
                     onToggleReference={() => setReferenceOpen((open) => !open)}
                     onToggleLayers={() => setLayersOpen((open) => !open)}
                   />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type ReactNode } from "react";
 import Image from "next/image";
-import type { DesignState } from "@/lib/design-types";
+import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
 import type { ImportedReference } from "@/lib/image-import-client";
@@ -33,6 +33,8 @@ type LoadedLibraryAsset = {
   tags: string[];
   metadata: Record<string, unknown>;
   sourceUrl: string | null;
+  contentType?: string | null;
+  sizeBytes?: number | null;
 };
 
 type LoadedPipelineAsset = {
@@ -50,10 +52,13 @@ type LoadedPipelineAsset = {
 
 type DisplayReference = {
   id: string;
+  assetId: string;
+  kind: "reference" | "image";
   title: string;
   category: string;
   source: string;
   sourceUrl: string;
+  imageUrl: string | null;
 };
 
 function isLoadedLibraryAsset(value: unknown): value is LoadedLibraryAsset {
@@ -69,7 +74,9 @@ function isLoadedLibraryAsset(value: unknown): value is LoadedLibraryAsset {
     typeof asset.metadata === "object" &&
     asset.metadata !== null &&
     !Array.isArray(asset.metadata) &&
-    (asset.sourceUrl === null || typeof asset.sourceUrl === "string")
+    (asset.sourceUrl === null || typeof asset.sourceUrl === "string") &&
+    (asset.contentType === undefined || asset.contentType === null || typeof asset.contentType === "string") &&
+    (asset.sizeBytes === undefined || asset.sizeBytes === null || typeof asset.sizeBytes === "number")
   );
 }
 
@@ -90,6 +97,18 @@ function isLoadedPipelineAsset(value: unknown): value is LoadedPipelineAsset {
   );
 }
 
+function imageUrlForAsset(asset: LoadedLibraryAsset) {
+  if (asset.contentType?.startsWith("image/") && (asset.sizeBytes ?? 0) > 0) {
+    return `/api/assets/${encodeURIComponent(asset.id)}`;
+  }
+
+  for (const key of ["previewUrl", "imageUrl", "assetUrl"]) {
+    const value = asset.metadata[key];
+    if (typeof value === "string" && value.startsWith("/")) return value;
+  }
+  return null;
+}
+
 function referenceCardsFromLibrary(assets: LoadedLibraryAsset[]): DisplayReference[] {
   return assets.map((asset) => {
     const referenceId = typeof asset.metadata.referenceId === "string" ? asset.metadata.referenceId : null;
@@ -98,15 +117,31 @@ function referenceCardsFromLibrary(assets: LoadedLibraryAsset[]): DisplayReferen
     );
     return {
       id: asset.id,
+      assetId: asset.id,
+      kind: asset.kind === "image" ? "image" : "reference",
       title: asset.name || fallback?.title || "Curio reference",
       category: asset.description || fallback?.category || "Curio library reference",
       source: fallback?.source || "Curio library",
       sourceUrl: asset.sourceUrl || fallback?.sourceUrl || "",
+      imageUrl: imageUrlForAsset(asset),
     };
   });
 }
 
-function ReferenceThumb({ index }: { index: number }) {
+function ReferenceThumb({ index, imageUrl, title }: { index: number; imageUrl?: string | null; title?: string }) {
+  if (imageUrl) {
+    return (
+      <Image
+        src={imageUrl}
+        alt={title ? `${title} reference` : "Curio reference"}
+        width={320}
+        height={220}
+        unoptimized
+        className="block h-full w-full object-cover"
+      />
+    );
+  }
+
   const theme = THUMBNAIL_THEMES[index % THUMBNAIL_THEMES.length];
   const geometry = index % 4;
 
@@ -183,12 +218,18 @@ export function InspirationBoard({
   dispatch,
   compact = false,
   importedReference,
+  referenceTreatment,
+  onSelectReference,
+  onSelectTexture,
 }: {
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
   compact?: boolean;
   importedReference?: ImportedReference | null;
+  referenceTreatment?: ReferenceTreatment;
+  onSelectReference?: (assetId: string, title: string, imageUrl: string) => void;
+  onSelectTexture?: (assetId: string) => void;
 }) {
   const fontPair = getFontPair(design.typography.id);
   const [libraryAssets, setLibraryAssets] = useState<LoadedLibraryAsset[]>([]);
@@ -197,27 +238,63 @@ export function InspirationBoard({
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/assets", { signal: controller.signal, cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("library"))))
-      .then((json: { assets?: unknown; pipelineAssets?: unknown }) => {
-        const assets = Array.isArray(json.assets) ? json.assets.filter(isLoadedLibraryAsset) : [];
-        const loadedPipelineAssets = Array.isArray(json.pipelineAssets)
-          ? json.pipelineAssets.filter(isLoadedPipelineAsset)
-          : [];
-        setLibraryAssets(assets);
-        setPipelineAssets(loadedPipelineAssets);
-        setLibraryStatus(assets.length > 0 ? "ready" : "fallback");
-      })
-      .catch(() => setLibraryStatus("fallback"));
+    const assetRequests = [
+      "/api/assets",
+      "/api/assets?kind=image&limit=200",
+      "/api/assets?kind=reference",
+      "/api/assets?kind=palette",
+    ];
+
+    Promise.allSettled(
+      assetRequests.map(async (url) => {
+        const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error(`library:${response.status}`);
+        return (await response.json()) as { assets?: unknown; pipelineAssets?: unknown };
+      }),
+    ).then((results) => {
+      const payloads = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+      const assets = [
+        ...new Map(
+          payloads
+            .flatMap((json) => (Array.isArray(json.assets) ? json.assets.filter(isLoadedLibraryAsset) : []))
+            .map((asset) => [asset.id, asset] as const),
+        ).values(),
+      ];
+      const loadedPipelineAssets = payloads.flatMap((json) =>
+        Array.isArray(json.pipelineAssets) ? json.pipelineAssets.filter(isLoadedPipelineAsset) : [],
+      );
+      setLibraryAssets(assets);
+      setPipelineAssets(loadedPipelineAssets);
+      setLibraryStatus(assets.length > 0 ? "ready" : "fallback");
+    });
 
     return () => controller.abort();
   }, []);
 
-  const libraryReferences = referenceCardsFromLibrary(libraryAssets.filter((asset) => asset.kind === "reference"));
-  const visibleReferenceCards = libraryReferences.length > 0 ? libraryReferences : referenceCards;
+  const libraryReferences = referenceCardsFromLibrary(
+    libraryAssets.filter(
+      (asset) => asset.kind === "reference" || (asset.kind === "image" && !asset.tags.includes("engine-texture")),
+    ),
+  );
+  const localReferenceCards: DisplayReference[] = referenceCards.map((card) => ({
+    ...card,
+    assetId: `reference:${card.id}`,
+    kind: "reference",
+    imageUrl: null,
+  }));
+  const imageReferenceCards = libraryReferences.filter((card) => card.kind === "image");
+  const visibleReferenceCards = libraryReferences.length > 0
+    ? libraryReferences.filter((card) => card.kind !== "image")
+    : localReferenceCards;
   const loadedFonts = libraryAssets.filter((asset) => asset.kind === "font");
   const loadedPalettes = libraryAssets.filter((asset) => asset.kind === "palette");
-  const loadedReferences = libraryAssets.filter((asset) => asset.kind === "reference");
+  const loadedReferences = libraryAssets.filter(
+    (asset) => asset.kind === "reference" || (asset.kind === "image" && !asset.tags.includes("engine-texture")),
+  );
+  const loadedTextureCards = libraryAssets
+    .filter((asset) => asset.kind === "image" && asset.tags.includes("engine-texture"))
+    .map((asset) => ({ asset, imageUrl: imageUrlForAsset(asset) }))
+    .filter((item): item is { asset: LoadedLibraryAsset; imageUrl: string } => Boolean(item.imageUrl));
   const loadedAssetCount = libraryAssets.length + pipelineAssets.length;
   const libraryLabel =
     libraryStatus === "ready"
@@ -293,25 +370,80 @@ export function InspirationBoard({
           <ul className="studio-compact-reference-grid" aria-label="Reference studies">
             {visibleReferenceCards.slice(0, 4).map((card) => (
               <li key={card.id}>
-                <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
-                  <span className="studio-compact-reference-placeholder" aria-hidden="true" />
-                </a>
+                {card.imageUrl && onSelectReference ? (
+                  <button
+                    type="button"
+                    className="block w-full"
+                    onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                    aria-label={`Use ${card.title} on canvas`}
+                  >
+                    <ReferenceThumb index={visibleReferenceCards.indexOf(card)} imageUrl={card.imageUrl} title={card.title} />
+                  </button>
+                ) : card.sourceUrl ? (
+                  <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
+                    <ReferenceThumb index={visibleReferenceCards.indexOf(card)} imageUrl={card.imageUrl} title={card.title} />
+                  </a>
+                ) : (
+                  <ReferenceThumb index={visibleReferenceCards.indexOf(card)} imageUrl={card.imageUrl} title={card.title} />
+                )}
               </li>
             ))}
           </ul>
         </div>
+        {imageReferenceCards.length > 0 ? (
+          <div className="studio-compact-reference-section" aria-labelledby="compact-image-assets-heading">
+            <div className="studio-compact-reference-section-heading">
+              <span id="compact-image-assets-heading">Image assets</span>
+              <span>{imageReferenceCards.length} available</span>
+            </div>
+            <ul className="studio-compact-reference-grid" aria-label="Image assets">
+              {imageReferenceCards.slice(0, 4).map((card, index) => (
+                <li key={card.id}>
+                  {card.imageUrl && onSelectReference ? (
+                    <button
+                      type="button"
+                      className="block w-full"
+                      onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                      aria-label={`Use ${card.title} on canvas`}
+                    >
+                      <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
+                    </button>
+                  ) : (
+                    <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="studio-compact-reference-section" aria-labelledby="compact-textures-heading">
           <div className="studio-compact-reference-section-heading">
             <span id="compact-textures-heading">Textures</span>
             <span>Surface cues</span>
           </div>
           <ul className="studio-compact-texture-grid" aria-label="Texture studies">
-            {TEXTURE_STUDIES.map((texture) => (
-              <li key={texture.id}>
-                <span className={`studio-compact-texture-swatch ${texture.className}`} aria-hidden="true" />
-                <span>{texture.label}</span>
-              </li>
-            ))}
+            {loadedTextureCards.length > 0
+              ? loadedTextureCards.slice(0, 6).map(({ asset, imageUrl }) => (
+                  <li key={asset.id}>
+                    <button
+                      type="button"
+                      className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-45"
+                      disabled={!importedReference}
+                      aria-pressed={referenceTreatment?.textureAssetId === asset.id}
+                      title={importedReference ? `Apply ${asset.name} to the active reference` : "Select a reference first"}
+                      onClick={() => onSelectTexture?.(asset.id)}
+                    >
+                      <Image src={imageUrl} alt="" width={160} height={110} unoptimized className="block h-auto w-full rounded" />
+                      <span>{asset.name}</span>
+                    </button>
+                  </li>
+                ))
+              : TEXTURE_STUDIES.map((texture) => (
+                  <li key={texture.id}>
+                    <span className={`studio-compact-texture-swatch ${texture.className}`} aria-hidden="true" />
+                    <span>{texture.label}</span>
+                  </li>
+                ))}
           </ul>
         </div>
       </section>
@@ -355,31 +487,72 @@ export function InspirationBoard({
       <Section
         id="references-heading"
         title="Visual references"
-        note={`${visibleReferenceCards.length} ${libraryStatus === "ready" ? "library assets loaded from Curio" : "curated local"} references. Curio uses its own thumbnails; open a card for the source search.`}
+        note={`${visibleReferenceCards.length} ${libraryStatus === "ready" ? "references loaded from Curio" : "curated local references"}. Select an image to place it on the canvas.`}
       >
         <ul className="grid gap-3">
           {visibleReferenceCards.map((card, index) => (
             <li key={card.id} className="overflow-hidden rounded-md border border-line bg-paper">
-              <ReferenceThumb index={index} />
+              <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
               <div className="border-t border-line px-3 py-2.5">
                 <p className="text-sm font-medium">{card.title}</p>
                 <p className="text-xs text-muted">{card.category}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <p className="text-[11px] text-muted">{card.source}</p>
-                  <a
-                    href={card.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
-                  >
-                    Open ↗
-                  </a>
+                  <div className="flex items-center gap-2">
+                    {card.imageUrl && onSelectReference ? (
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
+                        onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                      >
+                        Use on canvas
+                      </button>
+                    ) : null}
+                    {card.sourceUrl ? (
+                      <a
+                        href={card.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
+                      >
+                        Open ↗
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </li>
           ))}
-        </ul>
+          </ul>
       </Section>
+      {imageReferenceCards.length > 0 ? (
+        <Section
+          id="image-assets-heading"
+          title="Image assets"
+          note="These image files came from the Curio library. Use one on the canvas, then refine it with the editor."
+        >
+          <ul className="grid gap-3">
+            {imageReferenceCards.map((card, index) => (
+              <li key={card.id} className="overflow-hidden rounded-md border border-line bg-paper">
+                <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
+                <div className="border-t border-line px-3 py-2.5">
+                  <p className="text-sm font-medium">{card.title}</p>
+                  <p className="text-xs text-muted">{card.category}</p>
+                  {card.imageUrl && onSelectReference ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
+                      onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                    >
+                      Use on canvas
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
     </section>
   );
 }

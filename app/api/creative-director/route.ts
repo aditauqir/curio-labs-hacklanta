@@ -1,4 +1,4 @@
-import { sanitizeState } from "@/lib/design-state";
+import { sanitizeState, sanitizeReferenceTreatment } from "@/lib/design-state";
 import { askGemini, GeminiError, isGeminiConfigured, type HistoryItem } from "@/lib/gemini";
 import { rateLimited } from "@/lib/rate-limit";
 import { getAccountContext } from "@/lib/instance";
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
   if (typeof body !== "object" || body === null) return fail(400, "invalid_body");
 
-  const { message, design, paletteId, posterEdits, history } = body as Record<string, unknown>;
+  const { message, design, paletteId, posterEdits, referenceTreatment, history } = body as Record<string, unknown>;
 
   if (typeof message !== "string") return fail(400, "invalid_message");
   const cleanMessage = message.replace(/[\u0000-\u001F\u007F]/g, " ").trim();
@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       design: state.design,
       paletteId: state.selectedPaletteId,
       posterEdits: state.posterEdits,
+      referenceTreatment: sanitizeReferenceTreatment(referenceTreatment),
       history: parseHistory(history),
       instanceId: instance.id,
     });
@@ -69,6 +70,8 @@ export async function POST(request: Request) {
         patch: result.patch,
         skipped: result.skipped,
         assets: result.assetSuggestions,
+        followUps: result.followUps,
+        groundingSources: result.groundingSources,
         model: result.model,
       },
       { headers: { "Cache-Control": "no-store" } },

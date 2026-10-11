@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS curio_workspaces (
   selected_palette_id TEXT,
   poster_edits JSONB NOT NULL DEFAULT '{}'::jsonb,
   layer_order JSONB NOT NULL DEFAULT '[]'::jsonb,
+  reference_treatment JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -38,6 +39,9 @@ ALTER TABLE curio_workspaces
 ALTER TABLE curio_workspaces
   ADD COLUMN IF NOT EXISTS layer_order JSONB NOT NULL DEFAULT '[]'::jsonb;
 
+ALTER TABLE curio_workspaces
+  ADD COLUMN IF NOT EXISTS reference_treatment JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE TABLE IF NOT EXISTS curio_chat_messages (
   instance_id UUID NOT NULL REFERENCES curio_instances(id) ON DELETE CASCADE,
   message_id TEXT NOT NULL,
@@ -45,6 +49,7 @@ CREATE TABLE IF NOT EXISTS curio_chat_messages (
   content TEXT NOT NULL,
   source TEXT CHECK (source IS NULL OR source IN ('example', 'demo', 'gemini')),
   suggestions JSONB,
+  follow_ups JSONB,
   changes JSONB,
   skipped JSONB,
   notice TEXT,
@@ -95,6 +100,9 @@ CREATE INDEX IF NOT EXISTS curio_library_assets_kind_idx
 
 ALTER TABLE curio_chat_messages
   ADD COLUMN IF NOT EXISTS asset_suggestions JSONB;
+
+ALTER TABLE curio_chat_messages
+  ADD COLUMN IF NOT EXISTS follow_ups JSONB;
 
 CREATE TABLE IF NOT EXISTS curio_knowledge_sources (
   id TEXT PRIMARY KEY,

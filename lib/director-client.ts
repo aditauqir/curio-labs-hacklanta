@@ -1,4 +1,4 @@
-import type { AssetSuggestion, ChatMessage, DesignState } from "./design-types";
+import type { AssetSuggestion, ChatMessage, DesignState, ReferenceTreatment } from "./design-types";
 import { validatePatch, type AiPatch } from "./ai-patch";
 import type { PosterEdits } from "./poster-editor";
 
@@ -8,6 +8,8 @@ export type DirectorReply = {
   skipped: string[];
   model: string;
   assets: AssetSuggestion[];
+  followUps: string[];
+  groundingSources: Array<{ title: string; url: string }>;
 };
 
 export class DirectorError extends Error {
@@ -28,6 +30,7 @@ export async function askDirector(input: {
   paletteId: string | null;
   posterEdits: PosterEdits;
   history: ChatMessage[];
+  referenceTreatment: ReferenceTreatment;
 }): Promise<DirectorReply> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
@@ -47,6 +50,7 @@ export async function askDirector(input: {
         design: input.design,
         paletteId: input.paletteId,
         posterEdits: input.posterEdits,
+        referenceTreatment: input.referenceTreatment,
         history,
       }),
       signal: controller.signal,
@@ -78,6 +82,18 @@ export async function askDirector(input: {
               typeof asset.name === "string" &&
               (asset.description === null || typeof asset.description === "string"),
           )
+        : [],
+      followUps: Array.isArray(json?.followUps)
+        ? json.followUps.filter((entry): entry is string => typeof entry === "string").slice(0, 3)
+        : [],
+      groundingSources: Array.isArray(json?.groundingSources)
+        ? json.groundingSources.filter(
+            (source): source is { title: string; url: string } =>
+              typeof source === "object" &&
+              source !== null &&
+              typeof source.title === "string" &&
+              /^https?:\/\//i.test(typeof source.url === "string" ? source.url : ""),
+          ).slice(0, 12)
         : [],
     };
   } finally {

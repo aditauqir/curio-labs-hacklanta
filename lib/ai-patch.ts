@@ -1,6 +1,10 @@
 import type {
   DesignDirection,
   DesignState,
+  LayoutVariant,
+  ReferenceBlendMode,
+  ReferenceFilter,
+  ReferenceTreatment,
   Spacing,
   TextAlignment,
 } from "./design-types";
@@ -12,8 +16,9 @@ import {
   getFontPair,
   getPalette,
 } from "./design-presets";
-import { HEX_COLOR, type StudioAction } from "./design-state";
+import { HEX_COLOR, LAYOUT_VARIANTS, type StudioAction } from "./design-state";
 import { buildPoster } from "./poster-layout";
+import type { PosterEdits } from "./poster-editor";
 
 export type AiLayerEdit = {
   /** Exact layer id from the canvas model. x/y are absolute transform offsets. */
@@ -21,11 +26,27 @@ export type AiLayerEdit = {
   x?: number;
   y?: number;
   scale?: number;
+  scaleX?: number;
+  scaleY?: number;
   rotation?: number;
   opacity?: number;
+  /** Text-only weight override, for requests such as "make the date bold". */
+  weight?: number;
+  /** Text-only font size in poster pixels. */
+  fontSize?: number;
+  /** Text-only tracking in poster pixels. */
+  tracking?: number;
+  /** Graphic/text fill and stroke overrides. */
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
   visible?: boolean;
   locked?: boolean;
 };
+
+export type AiReferenceTreatment = Partial<
+  Pick<ReferenceTreatment, "filter" | "blendMode" | "opacity" | "textureOpacity" | "textureAssetId">
+>;
 
 /**
  * The only shape AI output is allowed to take. Every field is optional because
@@ -40,10 +61,17 @@ export type AiPatch = {
   foreground?: string;
   alignment?: TextAlignment;
   spacing?: Spacing;
+  layoutVariant?: LayoutVariant;
+  projectName?: string;
+  venue?: string;
   headline?: string;
   subtitle?: string;
+  date?: string;
+  time?: string;
+  footer?: string;
   mood?: string;
   layerEdits?: AiLayerEdit[];
+  referenceTreatment?: AiReferenceTreatment;
 };
 
 export const PATCH_KEYS = [
@@ -55,14 +83,23 @@ export const PATCH_KEYS = [
   "foreground",
   "alignment",
   "spacing",
+  "layoutVariant",
+  "projectName",
+  "venue",
   "headline",
   "subtitle",
+  "date",
+  "time",
+  "footer",
   "mood",
   "layerEdits",
+  "referenceTreatment",
 ] as const satisfies readonly (keyof AiPatch)[];
 
 const ALIGNMENTS: readonly TextAlignment[] = ["left", "center", "right"];
 const SPACINGS: readonly Spacing[] = ["compact", "normal", "spacious"];
+const REFERENCE_FILTERS: readonly ReferenceFilter[] = ["none", "grayscale", "high-contrast", "duotone", "invert"];
+const REFERENCE_BLEND_MODES: readonly ReferenceBlendMode[] = ["normal", "multiply", "screen", "overlay"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -143,9 +180,25 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
     } else skipped.push("spacing");
   }
 
-  const textFields: { key: "headline" | "subtitle" | "mood"; max: number; newlines: boolean }[] = [
+  if (present("layoutVariant")) {
+    const value = raw.layoutVariant;
+    if (typeof value === "string" && LAYOUT_VARIANTS.includes(value as LayoutVariant)) {
+      patch.layoutVariant = value as LayoutVariant;
+    } else skipped.push("layoutVariant");
+  }
+
+  const textFields: {
+    key: "projectName" | "venue" | "headline" | "subtitle" | "date" | "time" | "footer" | "mood";
+    max: number;
+    newlines: boolean;
+  }[] = [
+    { key: "projectName", max: 80, newlines: false },
+    { key: "venue", max: 120, newlines: false },
     { key: "headline", max: 80, newlines: true },
     { key: "subtitle", max: 120, newlines: false },
+    { key: "date", max: 120, newlines: false },
+    { key: "time", max: 120, newlines: false },
+    { key: "footer", max: 160, newlines: false },
     { key: "mood", max: 80, newlines: false },
   ];
   for (const { key, max, newlines } of textFields) {
@@ -162,7 +215,7 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
       skipped.push("layerEdits");
     } else {
       const edits: AiLayerEdit[] = [];
-      for (const rawEdit of rawEdits.slice(0, 4)) {
+      for (const rawEdit of rawEdits.slice(0, 12)) {
         if (!isRecord(rawEdit) || typeof rawEdit.id !== "string") {
           skipped.push("layerEdits");
           continue;
@@ -177,7 +230,7 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
         const edit: AiLayerEdit = { id };
         let hasValue = false;
         let invalid = false;
-        for (const key of ["x", "y", "scale", "rotation", "opacity"] as const) {
+        for (const key of ["x", "y", "scale", "scaleX", "scaleY", "rotation", "opacity", "weight", "fontSize", "tracking", "strokeWidth"] as const) {
           if (rawEdit[key] === undefined) continue;
           if (typeof rawEdit[key] !== "number" || !Number.isFinite(rawEdit[key])) {
             invalid = true;
@@ -187,8 +240,14 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
             x: [-4000, 4000],
             y: [-4000, 4000],
             scale: [0.05, 12],
+            scaleX: [0.05, 12],
+            scaleY: [0.05, 12],
             rotation: [-360, 360],
             opacity: [0, 1],
+            weight: [100, 900],
+            fontSize: [8, 600],
+            tracking: [-80, 160],
+            strokeWidth: [0, 100],
           } as const;
           const [min, max] = ranges[key];
           if (rawEdit[key] < min || rawEdit[key] > max) {
@@ -197,6 +256,17 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
           }
           edit[key] = rawEdit[key];
           hasValue = true;
+        }
+        for (const key of ["fill", "stroke"] as const) {
+          if (rawEdit[key] === undefined) continue;
+          const value = rawEdit[key];
+          const hex = typeof value === "string" ? normalizeHex(value) : null;
+          if (hex) {
+            edit[key] = hex;
+            hasValue = true;
+          } else {
+            invalid = true;
+          }
         }
         for (const key of ["visible", "locked"] as const) {
           if (rawEdit[key] === undefined) continue;
@@ -215,6 +285,41 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
         }
       }
       if (edits.length > 0) patch.layerEdits = edits;
+    }
+  }
+
+  if (present("referenceTreatment")) {
+    const rawTreatment = raw.referenceTreatment;
+    if (!isRecord(rawTreatment)) {
+      skipped.push("referenceTreatment");
+    } else {
+      const treatment: AiReferenceTreatment = {};
+      let invalid = false;
+      if (rawTreatment.filter !== undefined) {
+        if (typeof rawTreatment.filter === "string" && REFERENCE_FILTERS.includes(rawTreatment.filter as ReferenceFilter)) {
+          treatment.filter = rawTreatment.filter as ReferenceFilter;
+        } else invalid = true;
+      }
+      if (rawTreatment.blendMode !== undefined) {
+        if (typeof rawTreatment.blendMode === "string" && REFERENCE_BLEND_MODES.includes(rawTreatment.blendMode as ReferenceBlendMode)) {
+          treatment.blendMode = rawTreatment.blendMode as ReferenceBlendMode;
+        } else invalid = true;
+      }
+      for (const key of ["opacity", "textureOpacity"] as const) {
+        if (rawTreatment[key] === undefined) continue;
+        if (typeof rawTreatment[key] !== "number" || !Number.isFinite(rawTreatment[key]) || rawTreatment[key] < 0 || rawTreatment[key] > 1) {
+          invalid = true;
+        } else {
+          treatment[key] = rawTreatment[key];
+        }
+      }
+      if (rawTreatment.textureAssetId !== undefined) {
+        if (typeof rawTreatment.textureAssetId === "string" && /^[-a-zA-Z0-9:_]+$/.test(rawTreatment.textureAssetId)) {
+          treatment.textureAssetId = rawTreatment.textureAssetId.slice(0, 160);
+        } else invalid = true;
+      }
+      if (invalid || Object.keys(treatment).length === 0) skipped.push("referenceTreatment");
+      else patch.referenceTreatment = treatment;
     }
   }
 
@@ -244,6 +349,8 @@ export function reconcilePatch(
   patch: AiPatch,
   design: DesignState,
   message: string,
+  referenceTreatment?: ReferenceTreatment,
+  posterEdits: PosterEdits = {},
 ): AiPatch {
   const next: AiPatch = { ...patch };
 
@@ -257,7 +364,31 @@ export function reconcilePatch(
     next.layerEdits = next.layerEdits.filter(
       (edit) => edit.id !== "background" && validIds.has(edit.id),
     );
+    next.layerEdits = next.layerEdits.map((edit) => {
+      const current = posterEdits[edit.id] ?? {
+        x: 0,
+        y: 0,
+        scale: 1,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+      };
+      return Object.fromEntries(
+        Object.entries(edit).filter(([key, value]) => key === "id" || value !== current[key as keyof typeof current]),
+      ) as AiLayerEdit;
+    });
     if (next.layerEdits.length === 0) delete next.layerEdits;
+  }
+
+  if (next.referenceTreatment && referenceTreatment) {
+    const current = referenceTreatment;
+    next.referenceTreatment = Object.fromEntries(
+      Object.entries(next.referenceTreatment).filter(([key, value]) => value !== current[key as keyof typeof current]),
+    ) as AiReferenceTreatment;
+    if (Object.keys(next.referenceTreatment).length === 0) delete next.referenceTreatment;
   }
 
   if (wantsLayoutKept(message)) {
@@ -269,14 +400,17 @@ export function reconcilePatch(
     delete next.direction;
     delete next.alignment;
     delete next.spacing;
+    delete next.layoutVariant;
   }
 
   if (next.direction === design.direction) delete next.direction;
   if (next.fontPairId === design.typography.id) delete next.fontPairId;
   if (next.alignment === design.layout.alignment) delete next.alignment;
   if (next.spacing === design.layout.spacing) delete next.spacing;
-  if (next.headline === design.headline) delete next.headline;
-  if (next.subtitle === design.subtitle) delete next.subtitle;
+  if (next.layoutVariant === design.layout.variant) delete next.layoutVariant;
+  for (const key of ["projectName", "venue", "headline", "subtitle", "date", "time", "footer"] as const) {
+    if (next[key] === design[key]) delete next[key];
+  }
   if (next.mood === design.mood) delete next.mood;
   if (next.accent && sameColor(next.accent, design.colors.accent)) delete next.accent;
   if (next.background && sameColor(next.background, design.colors.background)) delete next.background;
@@ -324,13 +458,16 @@ export function patchToActions(patch: AiPatch): StudioAction[] {
   if (patch.accent) actions.push({ type: "setColor", key: "accent", value: patch.accent });
   if (patch.alignment) actions.push({ type: "setAlignment", value: patch.alignment });
   if (patch.spacing) actions.push({ type: "setSpacing", value: patch.spacing });
-  if (patch.headline) actions.push({ type: "setCopy", key: "headline", value: patch.headline });
-  if (patch.subtitle) actions.push({ type: "setCopy", key: "subtitle", value: patch.subtitle });
+  if (patch.layoutVariant) actions.push({ type: "setLayoutVariant", value: patch.layoutVariant });
+  for (const key of ["projectName", "venue", "headline", "subtitle", "date", "time", "footer"] as const) {
+    if (patch[key]) actions.push({ type: "setCopy", key, value: patch[key] });
+  }
   if (patch.mood) actions.push({ type: "setMood", value: patch.mood });
   for (const edit of patch.layerEdits ?? []) {
     const { id, ...layerPatch } = edit;
     actions.push({ type: "setPosterLayerEdit", id, patch: layerPatch });
   }
+  if (patch.referenceTreatment) actions.push({ type: "setReferenceTreatment", patch: patch.referenceTreatment });
 
   return actions;
 }
@@ -347,11 +484,29 @@ export function describePatch(patch: AiPatch): string[] {
   if (patch.accent) changes.push(`Accent: ${patch.accent}`);
   if (patch.alignment) changes.push(`Alignment: ${patch.alignment}`);
   if (patch.spacing) changes.push(`Spacing: ${patch.spacing}`);
+  if (patch.layoutVariant) changes.push(`Layout: ${patch.layoutVariant}`);
   if (patch.headline) changes.push(`Headline: ${patch.headline.replace(/\n/g, " / ")}`);
   if (patch.subtitle) changes.push("Subtitle updated");
   if (patch.mood) changes.push(`Mood: ${patch.mood}`);
   for (const edit of patch.layerEdits ?? []) {
-    changes.push(`Canvas: ${edit.id} adjusted`);
+    const details = edit.visible === false
+      ? "hidden"
+      : [
+          edit.x !== undefined || edit.y !== undefined ? "position" : null,
+          edit.scale !== undefined || edit.scaleX !== undefined || edit.scaleY !== undefined ? "size" : null,
+          edit.rotation !== undefined ? `rotation ${edit.rotation}°` : null,
+          edit.fontSize !== undefined ? `font ${edit.fontSize}px` : null,
+          edit.weight !== undefined ? `weight ${edit.weight}` : null,
+          edit.tracking !== undefined ? `tracking ${edit.tracking}` : null,
+          edit.fill || edit.stroke ? "color" : null,
+          edit.locked !== undefined ? (edit.locked ? "locked" : "unlocked") : null,
+        ].filter(Boolean).join(" · ") || "adjusted";
+    changes.push(`Canvas: ${edit.id} ${details}`);
+  }
+  if (patch.referenceTreatment) {
+    const treatment = patch.referenceTreatment;
+    const details = [treatment.filter, treatment.blendMode, treatment.textureAssetId ? "texture" : null].filter(Boolean);
+    changes.push(`Reference: ${details.join(" · ") || "treatment updated"}`);
   }
 
   return changes;

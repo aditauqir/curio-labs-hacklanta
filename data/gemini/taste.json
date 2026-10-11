@@ -83,6 +83,11 @@
       "headline",
       "subtitle",
       "mood",
+      "referenceTreatment.filter",
+      "referenceTreatment.blendMode",
+      "referenceTreatment.opacity",
+      "referenceTreatment.textureOpacity",
+      "referenceTreatment.textureAssetId",
       "layerEdits.x",
       "layerEdits.y",
       "layerEdits.scale",
@@ -116,6 +121,7 @@
     "rotate [specific object]": "update that layer's absolute rotation",
     "hide or show [specific object]": "update that layer's visible boolean",
     "center or align everything": "use the global alignment field",
-    "change the wording": "update only headline or subtitle"
+    "change the wording": "update only headline or subtitle",
+    "apply a filter or texture to the reference": "use referenceTreatment with an allowed filter, blend mode, opacity, or exact engine-texture id"
   }
 }

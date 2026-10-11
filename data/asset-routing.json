@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "purpose": "Demo routing vocabulary for asset metadata. This is not model training and does not claim that pixels were classified.",
+  "collections": [
+    {
+      "tags": ["charli-xcx", "underground-rave-club-flyers"],
+      "domain": "music",
+      "terms": ["music", "concert", "festival", "rave", "club", "artist", "nightlife", "charli", "charli-xcx"]
+    },
+    {
+      "tags": ["typography-brutalist"],
+      "domain": "graphic-design",
+      "terms": ["typography", "type", "font", "brutalist", "editorial", "swiss", "graphic"]
+    }
+  ],
+  "demoUseCases": [
+    {
+      "id": "restaurant",
+      "terms": ["restaurant", "cafe", "café", "diner", "bistro", "bakery", "bar", "food", "dining", "kebab", "grill", "pizza", "menu"]
+    },
+    {
+      "id": "music-festival",
+      "terms": ["music", "festival", "concert", "rave", "club", "dj", "artist", "nightlife"]
+    }
+  ]
+}

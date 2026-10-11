@@ -93,6 +93,8 @@ export function pipelineFailure(error: unknown) {
       return fail(502, "ai_bad_output");
     case "upstream":
       return fail(502, "ai_upstream");
+    case "grounding_unavailable":
+      return fail(502, "ai_grounding_unavailable");
     default:
       return fail(500, "internal");
   }
