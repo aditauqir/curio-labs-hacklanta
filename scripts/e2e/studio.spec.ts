@@ -161,6 +161,58 @@ test("moves from the start screen into the app workspace", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Design canvas" })).toBeVisible();
 });
 
+test("opens the preloaded pipeline demo and surfaces library assets", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() => localStorage.removeItem("curio-onboarding-complete-v1"));
+  await page.route("**/api/assets", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        assets: [
+          {
+            id: "font:space-inter",
+            kind: "font",
+            name: "Space Grotesk + Inter",
+            description: "Geometric grotesk",
+            tags: ["font", "geometric grotesk"],
+            metadata: { fontPairId: "space-inter" },
+            sourceUrl: null,
+          },
+          {
+            id: "palette:night-signal",
+            kind: "palette",
+            name: "Night Signal",
+            description: "High contrast after dark",
+            tags: ["palette", "night signal"],
+            metadata: { paletteId: "night-signal" },
+            sourceUrl: null,
+          },
+          {
+            id: "reference:signal-noise",
+            kind: "reference",
+            name: "Signal / noise",
+            description: "Experimental poster · high contrast",
+            tags: ["reference", "experimental"],
+            metadata: { referenceId: "signal-noise" },
+            sourceUrl: null,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/home");
+  await page.getByRole("button", { name: /Pipeline demo/ }).click();
+  await expect(page.getByTestId("editor-screen")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("Signal After Dark");
+  await expect(page.getByText(/preloaded pipeline demo/)).toBeVisible();
+  await expect(page.getByText("Loaded assets")).toBeVisible();
+  await expect(page.getByText("Space Grotesk + Inter", { exact: true })).toBeVisible();
+  await expect(page.getByText("Night Signal", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Signal / noise" })).toBeVisible();
+});
+
 test("keeps a newer local edit when the remote workspace is older", async ({ page }) => {
   const instanceId = "11111111-1111-4111-8111-111111111111";
   let remoteHeadline = "Remote old";

@@ -82,11 +82,13 @@ function VoiceActivityOrb({ active, level, processing }: { active: boolean; leve
 
 export function OnboardingStudio({
   onStart,
+  onOpenDemo,
   onImportImage,
   importedReference,
   projectName = "Midnight Jazz",
 }: {
   onStart: (prompt?: string) => void;
+  onOpenDemo: () => void;
   onImportImage: (file: File) => Promise<ImportedReference>;
   importedReference: ImportedReference | null;
   projectName?: string;
@@ -255,14 +257,14 @@ export function OnboardingStudio({
             <button
               type="button"
               className="onboarding-project-card"
-              onClick={() => onStart(starterPrompts[2])}
+              onClick={onOpenDemo}
             >
               <span className="onboarding-project-index">03</span>
               <span>
-                <strong>Signal / noise</strong>
-                <small>Start a new brief</small>
+                <strong>Pipeline demo</strong>
+                <small>Open the preloaded workspace</small>
               </span>
-              <span aria-hidden="true">+</span>
+              <span aria-hidden="true">↗</span>
             </button>
           </aside>
         </Card>

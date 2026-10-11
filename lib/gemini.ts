@@ -1,6 +1,8 @@
 // Server-only. Never import this from a Client Component: it reads GEMINI_API_KEY.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { AiError } from "./ai/provider";
+import { geminiTextProvider } from "./ai/gemini-json";
 import { reconcilePatch, validatePatch, type AiPatch } from "./ai-patch";
 import {
   colorPalettes,
@@ -372,77 +374,42 @@ export async function askGemini(input: {
     : "No shared asset library is currently available. Do not invent asset ids.";
   const principlesText = principleText(principles);
 
-  const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Current poster state:\n${describeDesign(input.design, input.paletteId, input.posterEdits)}\n\nShared Curio library from PostgreSQL:\n${libraryText}\n\nDesign-principles source of truth from TigerData (short extracts and paraphrased clips retrieved for this brief):\n${principlesText}\n\n${conversation}User request:\n"""\n${input.message}\n"""`,
-          },
-        ],
-      },
-    ],
-    generationConfig: {
+  let result: Awaited<ReturnType<typeof geminiTextProvider.generateJson>>;
+  try {
+    result = await geminiTextProvider.generateJson({
+      scope: "creative-director",
+      system: SYSTEM_PROMPT,
+      prompt: `Current poster state:\n${describeDesign(input.design, input.paletteId, input.posterEdits)}\n\nShared Curio library from PostgreSQL:\n${libraryText}\n\nDesign-principles source of truth from TigerData (short extracts and paraphrased clips retrieved for this brief):\n${principlesText}\n\n${conversation}User request:\n"""\n${input.message}\n"""`,
+      schema: RESPONSE_SCHEMA,
       temperature: 0.3,
       maxOutputTokens: 500,
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  });
-
-  let lastStatus = 0;
-
-  for (const model of modelChain()) {
-    let response: Response;
-    try {
-      response = await callModel(model, apiKey, body);
-    } catch {
-      lastStatus = 0; // timeout or network failure: try the next model
-      continue;
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    });
+  } catch (error) {
+    if (error instanceof AiError) {
+      throw new GeminiError(
+        error.kind === "not_configured" ? "not_configured" : error.kind === "bad_output" ? "bad_output" : "upstream",
+        error.message,
+      );
     }
-
-    lastStatus = response.status;
-
-    // Misconfiguration will not be fixed by another model. Fail fast.
-    if (response.status === 400 || response.status === 401 || response.status === 403) {
-      throw new GeminiError("upstream", `Gemini rejected the request (${response.status})`);
-    }
-    // Retired model, rate limit, or overload: move on to the next one.
-    if (!response.ok) continue;
-
-    const json: unknown = await response.json().catch(() => null);
-    const text = (json as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null)
-      ?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "")
-      .join("");
-    if (!text) throw new GeminiError("bad_output", "Gemini returned no content");
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      throw new GeminiError("bad_output", "Gemini returned invalid JSON");
-    }
-
-    const record = (typeof parsed === "object" && parsed !== null ? parsed : {}) as Record<string, unknown>;
-    const reply =
-      typeof record.reply === "string"
-        ? record.reply.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, 400)
-        : "";
-
-    const { patch, skipped } = validatePatch(record);
-    const assetSuggestions = assetSuggestionsFromModel(record, library);
-    return {
-      reply: reply || "Done.",
-      patch: reconcilePatch(patch, input.design, input.message),
-      skipped,
-      model,
-      assetSuggestions,
-    };
+    throw error;
   }
 
-  throw new GeminiError("upstream", `Gemini is unavailable (last status ${lastStatus})`);
+  const record = (typeof result.data === "object" && result.data !== null ? result.data : {}) as Record<string, unknown>;
+  const reply =
+    typeof record.reply === "string"
+      ? record.reply.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, 400)
+      : "";
+
+  const { patch, skipped } = validatePatch(record);
+  const assetSuggestions = assetSuggestionsFromModel(record, library);
+  return {
+    reply: reply || "Done.",
+    patch: reconcilePatch(patch, input.design, input.message),
+    skipped,
+    model: result.model,
+    assetSuggestions,
+  };
 }
 
 const STARTER_SUGGESTION_SYSTEM_PROMPT = `You create the three small idea chips shown on Curio Labs' welcome screen.

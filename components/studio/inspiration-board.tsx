@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, ReactNode } from "react";
+import { useEffect, useState, type Dispatch, type ReactNode } from "react";
 import Image from "next/image";
 import type { DesignState } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
@@ -24,6 +24,57 @@ const TEXTURE_STUDIES = [
   { id: "ink", label: "Ink wash", className: "is-ink" },
   { id: "signal", label: "Signal noise", className: "is-signal" },
 ];
+
+type LoadedLibraryAsset = {
+  id: string;
+  kind: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  sourceUrl: string | null;
+};
+
+type DisplayReference = {
+  id: string;
+  title: string;
+  category: string;
+  source: string;
+  sourceUrl: string;
+};
+
+function isLoadedLibraryAsset(value: unknown): value is LoadedLibraryAsset {
+  if (typeof value !== "object" || value === null) return false;
+  const asset = value as Record<string, unknown>;
+  return (
+    typeof asset.id === "string" &&
+    typeof asset.kind === "string" &&
+    typeof asset.name === "string" &&
+    (asset.description === null || typeof asset.description === "string") &&
+    Array.isArray(asset.tags) &&
+    asset.tags.every((tag) => typeof tag === "string") &&
+    typeof asset.metadata === "object" &&
+    asset.metadata !== null &&
+    !Array.isArray(asset.metadata) &&
+    (asset.sourceUrl === null || typeof asset.sourceUrl === "string")
+  );
+}
+
+function referenceCardsFromLibrary(assets: LoadedLibraryAsset[]): DisplayReference[] {
+  return assets.map((asset) => {
+    const referenceId = typeof asset.metadata.referenceId === "string" ? asset.metadata.referenceId : null;
+    const fallback = referenceCards.find(
+      (card) => card.id === referenceId || asset.id === `reference:${card.id}`,
+    );
+    return {
+      id: asset.id,
+      title: asset.name || fallback?.title || "Curio reference",
+      category: asset.description || fallback?.category || "Curio library reference",
+      source: fallback?.source || "Curio library",
+      sourceUrl: asset.sourceUrl || fallback?.sourceUrl || "",
+    };
+  });
+}
 
 function ReferenceThumb({ index }: { index: number }) {
   const theme = THUMBNAIL_THEMES[index % THUMBNAIL_THEMES.length];
@@ -110,6 +161,34 @@ export function InspirationBoard({
   importedReference?: ImportedReference | null;
 }) {
   const fontPair = getFontPair(design.typography.id);
+  const [libraryAssets, setLibraryAssets] = useState<LoadedLibraryAsset[]>([]);
+  const [libraryStatus, setLibraryStatus] = useState<"loading" | "ready" | "fallback">("loading");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/assets", { signal: controller.signal, cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("library"))))
+      .then((json: { assets?: unknown }) => {
+        const assets = Array.isArray(json.assets) ? json.assets.filter(isLoadedLibraryAsset) : [];
+        setLibraryAssets(assets);
+        setLibraryStatus(assets.length > 0 ? "ready" : "fallback");
+      })
+      .catch(() => setLibraryStatus("fallback"));
+
+    return () => controller.abort();
+  }, []);
+
+  const libraryReferences = referenceCardsFromLibrary(libraryAssets.filter((asset) => asset.kind === "reference"));
+  const visibleReferenceCards = libraryReferences.length > 0 ? libraryReferences : referenceCards;
+  const loadedFonts = libraryAssets.filter((asset) => asset.kind === "font");
+  const loadedPalettes = libraryAssets.filter((asset) => asset.kind === "palette");
+  const loadedReferences = libraryAssets.filter((asset) => asset.kind === "reference");
+  const libraryLabel =
+    libraryStatus === "ready"
+      ? `${libraryAssets.length} loaded`
+      : libraryStatus === "loading"
+        ? "Loading"
+        : "Local fallback";
 
   if (compact) {
     return (
@@ -143,13 +222,29 @@ export function InspirationBoard({
             <span>{fontPair.body}</span>
           </div>
         </div>
+        <div className="studio-compact-reference-section" aria-labelledby="compact-library-heading">
+          <div className="studio-compact-reference-section-heading">
+            <span id="compact-library-heading">Loaded assets</span>
+            <span>{libraryLabel}</span>
+          </div>
+          <ul className="flex flex-wrap gap-1.5" aria-label="Loaded Curio library assets">
+            {[...loadedFonts.slice(0, 2), ...loadedPalettes.slice(0, 2), ...loadedReferences.slice(0, 2)].map((asset) => (
+              <li key={asset.id} className="rounded-full border border-line px-2 py-1 text-[10px] text-muted">
+                {asset.name}
+              </li>
+            ))}
+            {libraryStatus === "fallback" ? (
+              <li className="text-[10px] text-muted">Using curated local presets</li>
+            ) : null}
+          </ul>
+        </div>
         <div className="studio-compact-reference-section" aria-labelledby="compact-references-heading">
           <div className="studio-compact-reference-section-heading">
             <span id="compact-references-heading">References</span>
             <span>Studies</span>
           </div>
           <ul className="studio-compact-reference-grid" aria-label="Reference studies">
-            {referenceCards.slice(0, 4).map((card) => (
+            {visibleReferenceCards.slice(0, 4).map((card) => (
               <li key={card.id}>
                 <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
                   <span className="studio-compact-reference-placeholder" aria-hidden="true" />
@@ -213,10 +308,10 @@ export function InspirationBoard({
       <Section
         id="references-heading"
         title="Visual references"
-        note={`${referenceCards.length} Pinterest poster studies. Curio uses its own thumbnails; open a card for the source search.`}
+        note={`${visibleReferenceCards.length} ${libraryStatus === "ready" ? "library assets loaded from Curio" : "curated local"} references. Curio uses its own thumbnails; open a card for the source search.`}
       >
         <ul className="grid gap-3">
-          {referenceCards.map((card, index) => (
+          {visibleReferenceCards.map((card, index) => (
             <li key={card.id} className="overflow-hidden rounded-md border border-line bg-paper">
               <ReferenceThumb index={index} />
               <div className="border-t border-line px-3 py-2.5">

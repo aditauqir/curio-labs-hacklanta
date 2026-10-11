@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type Dispatch, type WheelEvent as ReactWheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type WheelEvent as ReactWheelEvent } from "react";
 import {
   createDefaultState,
+  createDemoState,
   sanitizeState,
   studioReducer,
   type StudioAction,
@@ -82,6 +83,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     return initialView;
   });
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const demoRequestedRef = useRef(false);
   const [referenceOpen, setReferenceOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
   const [importedReference, setImportedReference] = useState<ImportedReference | null>(null);
@@ -107,11 +109,13 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
         const remote = sanitizeState(json.state);
         const local = instanceId ? loadStudioSnapshot(instanceId) ?? loadStudioSnapshot() : loadStudioSnapshot();
         const remoteUpdatedAt = typeof json.updatedAt === "string" ? Date.parse(json.updatedAt) : NaN;
-        const restored =
-          local && (!Number.isFinite(remoteUpdatedAt) || local.savedAt > remoteUpdatedAt)
-            ? local.state
-            : remote ?? local?.state ?? null;
-        if (restored) dispatch({ type: "restoreState", state: restored });
+        if (!demoRequestedRef.current) {
+          const restored =
+            local && (!Number.isFinite(remoteUpdatedAt) || local.savedAt > remoteUpdatedAt)
+              ? local.state
+              : remote ?? local?.state ?? null;
+          if (restored) dispatch({ type: "restoreState", state: restored });
+        }
         setPersistence({
           ready: true,
           instanceId,
@@ -364,6 +368,14 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     navigateTo("editor");
   }
 
+  function openDemo() {
+    demoRequestedRef.current = true;
+    window.localStorage.setItem(ONBOARDING_KEY, "true");
+    setHistory({ past: [], present: createDemoState(), future: [] });
+    setInitialPrompt(null);
+    navigateTo("editor");
+  }
+
   function openStart() {
     window.localStorage.removeItem(ONBOARDING_KEY);
     setInitialPrompt(null);
@@ -375,6 +387,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       <>
         <OnboardingStudio
           onStart={startStudio}
+          onOpenDemo={openDemo}
           onImportImage={importImage}
           importedReference={importedReference}
           projectName={design.projectName}

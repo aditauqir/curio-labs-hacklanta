@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   DesignDirection,
   DesignState,
+  AssetSuggestion,
   PersistedStudioState,
   PosterSize,
   Spacing,
@@ -87,6 +88,66 @@ const seedMessages: ChatMessage[] = [
   },
 ];
 
+const DEMO_DESIGN = applyDirection(
+  {
+    ...initialDesign,
+    projectName: "Signal After Dark",
+    venue: "THE SIGNAL ROOM",
+    headline: "SIGNAL\nAFTER DARK",
+    subtitle: "A Curio Labs pipeline demo",
+    date: "THURSDAY · NOVEMBER 14",
+    time: "8:00 PM — LATE",
+    footer: "BRIEF · REFERENCES · REFINE",
+  },
+  "experimental",
+);
+const DEMO_PALETTE_ID = directionConfigs.experimental.paletteId;
+const DEMO_LAYER_ORDER = getDefaultLayerOrder(buildPoster(DEMO_DESIGN));
+const DEMO_ASSETS: AssetSuggestion[] = [
+  {
+    id: "font:space-inter",
+    kind: "font",
+    name: "Space Grotesk + Inter",
+    description: "Geometric grotesk",
+  },
+  {
+    id: "palette:night-signal",
+    kind: "palette",
+    name: "Night Signal",
+    description: "High contrast after dark",
+  },
+  {
+    id: "reference:signal-noise",
+    kind: "reference",
+    name: "Signal / noise",
+    description: "Experimental poster · high contrast",
+  },
+];
+
+const demoMessages: ChatMessage[] = [
+  {
+    id: "demo-brief",
+    role: "user",
+    content:
+      "Create a high-contrast poster for Signal After Dark, a late-night creative technology showcase. Use a dark field, an electric accent, geometric type, and an asymmetric editorial layout.",
+  },
+  {
+    id: "demo-ready",
+    role: "assistant",
+    source: "demo",
+    content:
+      "This preloaded pipeline demo has a structured brief, Curio library assets, and a composed poster ready to refine. Ask for one focused change to see the validated patch update only that property.",
+    suggestions: ["experimental"],
+    assetSuggestions: DEMO_ASSETS,
+    checkpoint: {
+      design: DEMO_DESIGN,
+      selectedPaletteId: DEMO_PALETTE_ID,
+      posterEdits: {},
+      layerOrder: DEMO_LAYER_ORDER,
+    },
+  },
+];
+
 export function createDefaultState(): StudioState {
   return {
     design: initialDesign,
@@ -94,6 +155,17 @@ export function createDefaultState(): StudioState {
     selectedPaletteId: initialPaletteId,
     posterEdits: {},
     layerOrder: INITIAL_LAYER_ORDER,
+  };
+}
+
+/** A clearly labeled, preloaded workspace for demos and judge walkthroughs. */
+export function createDemoState(): StudioState {
+  return {
+    design: DEMO_DESIGN,
+    messages: demoMessages,
+    selectedPaletteId: DEMO_PALETTE_ID,
+    posterEdits: {},
+    layerOrder: DEMO_LAYER_ORDER,
   };
 }
 
