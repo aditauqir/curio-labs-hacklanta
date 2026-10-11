@@ -152,6 +152,28 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       setInitialPrompt(analysis.prompt);
       return imported;
     } catch (error) {
+      // Keep the local image visible even when optional Gemini analysis is down.
+      // The reference itself is still useful on the canvas; only the analysis
+      // result is unavailable.
+      if (error instanceof ImageImportError && error.status >= 500) {
+        const fallback: ImportedReference = {
+          filename: file.name || "reference-image",
+          previewUrl,
+          summary: "Imported reference loaded. Visual analysis is unavailable right now.",
+          prompt: "",
+          suggestions: [
+            "Use this image as a visual reference",
+            "Build a poster around this image",
+            "Keep the image and refine the typography",
+          ],
+        };
+        setImportedReference((previous) => {
+          if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl);
+          return fallback;
+        });
+        setInitialPrompt(null);
+        return fallback;
+      }
       URL.revokeObjectURL(previewUrl);
       throw error;
     }
@@ -480,6 +502,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                   posterEdits={posterEdits}
                   layerOrder={layerOrder}
                   selectedLayerId={selectedLayerId}
+                  importedReference={importedReference}
                   activeTool={activeTool}
                   onToolChange={setActiveTool}
                   onSelectLayer={setSelectedLayerId}

@@ -56,6 +56,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FloatingButtonGroup } from "@/components/ui/floating-button-group";
+import type { ImportedReference } from "@/lib/image-import-client";
 
 type InspectorTab = "layers" | "reference";
 type CanvasActionDialog = "reset-design" | "reset-project" | "delete-layer" | "save";
@@ -107,6 +108,7 @@ export function DesignCanvas({
   posterEdits,
   layerOrder,
   selectedLayerId,
+  importedReference,
   activeTool,
   onToolChange,
   onSelectLayer,
@@ -128,6 +130,7 @@ export function DesignCanvas({
   posterEdits: PosterEdits;
   layerOrder: string[];
   selectedLayerId: string | null;
+  importedReference: ImportedReference | null;
   activeTool: PosterTool;
   onToolChange: (tool: PosterTool) => void;
   onSelectLayer: (id: string | null) => void;
@@ -855,6 +858,7 @@ export function DesignCanvas({
             >
               <Poster
                 design={design}
+                referenceImage={importedReference}
                 edits={posterEdits}
                 layerOrder={layerOrder}
                 selectedLayerId={selectedLayerId}

@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { DesignState } from "@/lib/design-types";
+import type { ImportedReference } from "@/lib/image-import-client";
 import {
   POSTER_HEIGHT,
   POSTER_WIDTH,
@@ -73,6 +74,7 @@ type PosterProps = {
   edits?: PosterEdits;
   layerOrder?: string[];
   selectedLayerId?: string | null;
+  referenceImage?: ImportedReference | null;
   activeTool?: PosterTool;
   onSelectLayer?: (id: string | null) => void;
   onChangeLayer?: (id: string, patch: Partial<ReturnType<typeof createPosterLayerEdit>>) => void;
@@ -190,6 +192,7 @@ export function Poster({
   edits,
   layerOrder = [],
   selectedLayerId = null,
+  referenceImage = null,
   activeTool = "select",
   onSelectLayer,
   onChangeLayer,
@@ -557,14 +560,29 @@ export function Poster({
   function renderLayer(id: string) {
     if (id === "background") {
       return (
-        <rect
-          key="background"
-          data-layer-id="background"
-          width={POSTER_WIDTH}
-          height={POSTER_HEIGHT}
-          fill={design.colors.background}
-          onPointerDown={(event) => beginInteraction(event, "background")}
-        />
+        <g key="background">
+          <rect
+            data-layer-id="background"
+            width={POSTER_WIDTH}
+            height={POSTER_HEIGHT}
+            fill={design.colors.background}
+            onPointerDown={(event) => beginInteraction(event, "background")}
+          />
+          {referenceImage ? (
+            <image
+              href={referenceImage.previewUrl}
+              x="0"
+              y="0"
+              width={POSTER_WIDTH}
+              height={POSTER_HEIGHT}
+              preserveAspectRatio="xMidYMid slice"
+              opacity="0.72"
+              pointerEvents="none"
+              data-imported-reference-image="true"
+              aria-label={`Imported reference: ${referenceImage.filename}`}
+            />
+          ) : null}
+        </g>
       );
     }
     const shape = shapes.find((item) => item.id === id);

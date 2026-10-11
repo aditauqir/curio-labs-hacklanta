@@ -32,6 +32,8 @@ Latest Gemini workflow integration: the interactive director now uses the shared
 
 Latest demo workflow: the home screen now opens a clearly labeled preloaded `Signal After Dark` pipeline workspace, and the editor Reference inspector reads seeded font, palette, and reference assets from `GET /api/assets` with the curated local presets as a fallback.
 
+Latest image import behavior: imported references now remain visible on the poster canvas even when Gemini image analysis is unavailable; the Reference inspector clearly labels that analysis fallback while the local preview remains usable.
+
 Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) contains the data-grounding/tuning scope, evaluation requirements, safety boundaries, and PR sign-off checklist for the next Gemini-quality pass.
 
 Gemini merge priority: conflicts in the intelligence/data layer must be resolved manually in favor of preserving the server-only Gemini path, structured patch validation, knowledge retrieval, and `data/gemini/*`; UI code should adapt around those contracts rather than deleting or bypassing them.

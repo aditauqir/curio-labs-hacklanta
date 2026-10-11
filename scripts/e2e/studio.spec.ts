@@ -213,6 +213,37 @@ test("opens the preloaded pipeline demo and surfaces library assets", async ({ p
   await expect(page.getByRole("link", { name: "Open Signal / noise" })).toBeVisible();
 });
 
+test("keeps an imported image visible on the poster canvas", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() => localStorage.removeItem("curio-onboarding-complete-v1"));
+  await page.route("**/api/image-import", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        summary: "A warm editorial reference",
+        prompt: "Use the imported image as a visual reference.",
+        suggestions: ["Use the warm palette", "Keep the texture", "Make the type more editorial"],
+      }),
+    });
+  });
+
+  await page.goto("/home");
+  await page.getByRole("button", { name: /Open current workspace/ }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "reference.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+
+  const importedCanvasImage = page.locator('[data-imported-reference-image="true"]');
+  await expect(importedCanvasImage).toBeVisible();
+  await expect(importedCanvasImage).toHaveCount(1);
+});
+
 test("keeps a newer local edit when the remote workspace is older", async ({ page }) => {
   const instanceId = "11111111-1111-4111-8111-111111111111";
   let remoteHeadline = "Remote old";
