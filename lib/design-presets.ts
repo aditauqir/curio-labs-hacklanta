@@ -214,13 +214,13 @@ export function applyLook(design: DesignState, lookId: string): DesignState {
 }
 
 const baseDesign: DesignState = {
-  projectName: "After Image",
-  venue: "WAREHOUSE 9",
-  headline: "AFTER\nIMAGE",
-  subtitle: "A Night of Sound and Light",
-  date: "SATURDAY · NOVEMBER 14",
-  time: "10:00 PM — 4:00 AM",
-  footer: "SOUND · LIGHT · PRINT",
+  projectName: "Half Tone",
+  venue: "GALLERY NINE",
+  headline: "HALF\nTONE",
+  subtitle: "Print and Photography, 1968–1999",
+  date: "OPENING · NOVEMBER 14",
+  time: "6:00 PM — 9:00 PM",
+  footer: "PRINT · PHOTOGRAPHY · PAPER",
   direction: "vintage",
   lookId: NO_LOOK,
   posterSize: "social",
