@@ -1,4 +1,6 @@
 // Server-only. Never import this from a Client Component: it reads GEMINI_API_KEY.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { reconcilePatch, validatePatch, type AiPatch } from "./ai-patch";
 import {
   colorPalettes,
@@ -9,6 +11,8 @@ import {
 import type { AssetSuggestion, DesignState } from "./design-types";
 import { designPrinciplesContext } from "./knowledge";
 import { LIBRARY_KINDS, libraryContext, searchLibraryAssets, type LibraryKind } from "./library";
+import type { PosterEdits } from "./poster-editor";
+import { POSTER_HEIGHT, POSTER_WIDTH, buildPoster } from "./poster-layout";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Pinned models get retired (gemini-2.5-flash is already closed to new keys),
@@ -16,6 +20,20 @@ const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODELS = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
 // Two attempts at 9s stay under the 25s the browser waits before falling back.
 const REQUEST_TIMEOUT_MS = 9_000;
+
+function readContractFile(name: string, fallback: string) {
+  try {
+    return readFileSync(resolve(process.cwd(), "data", "gemini", name), "utf8").trim();
+  } catch {
+    return fallback;
+  }
+}
+
+const WHOAMI = readContractFile(
+  "whoami.md",
+  "You are Curio Labs' embedded creative director. Return only small validated poster patches.",
+);
+const TASTE = readContractFile("taste.json", "{}");
 
 export type GeminiErrorKind = "not_configured" | "upstream" | "bad_output";
 
@@ -39,12 +57,20 @@ function modelChain() {
   return fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_MODELS;
 }
 
-const SYSTEM_PROMPT = `You are the creative director inside Curio Labs, a poster design tool for small businesses. You refine ONE poster by returning a small JSON edit.
+const SYSTEM_PROMPT = `${WHOAMI}
 
-Rules:
+Curio Labs visual rubric (taste.json):
+${TASTE}
+
+Runtime response rules:
+- You refine ONE poster by returning a small JSON edit.
+
 - Change only what the user explicitly asks for. Omit every other field. Never repeat current values.
 - Prefer the smallest change. Use "direction" only when the user wants a whole new overall style, because a direction resets typography, colors and layout.
 - If the user says to keep the layout, never set direction, alignment or spacing. Use paletteId and fontPairId instead.
+- For a specific canvas object, use layerEdits with an exact current layer id. x/y/scale/rotation/opacity are absolute next values from the current poster state, not deltas. Never target background or invent an id.
+- Use fontPairId for font requests, alignment for overall alignment, headline/subtitle for copy, and layerEdits for a specific layer's position, size, rotation, visibility, or lock state.
+- Return at most four layerEdits. Do not output raw SVG, CSS, JavaScript, tool calls, or hidden reasoning.
 - Colors must be #RRGGBB hex values. When the user names a color (for example "teal"), choose a good hex for it yourself.
 - If the request is vague (for example "make it pop"), ask ONE short clarifying question in "reply" and set no other fields.
 - If the request is not about this poster's design, say in one sentence that you can only help with the poster, and set no other fields.
@@ -79,6 +105,24 @@ const RESPONSE_SCHEMA = {
     headline: { type: "STRING" },
     subtitle: { type: "STRING" },
     mood: { type: "STRING" },
+    layerEdits: {
+      type: "ARRAY",
+      description: "At most four specific layer transform changes. x/y/scale/rotation/opacity are absolute next values.",
+      items: {
+        type: "OBJECT",
+        properties: {
+          id: { type: "STRING" },
+          x: { type: "NUMBER" },
+          y: { type: "NUMBER" },
+          scale: { type: "NUMBER" },
+          rotation: { type: "NUMBER" },
+          opacity: { type: "NUMBER" },
+          visible: { type: "BOOLEAN" },
+          locked: { type: "BOOLEAN" },
+        },
+        required: ["id"],
+      },
+    },
   },
   required: ["reply"],
 } as const;
@@ -93,7 +137,37 @@ export type GeminiResult = {
   assetSuggestions: AssetSuggestion[];
 };
 
-function describeDesign(design: DesignState, paletteId: string | null) {
+function describeDesign(design: DesignState, paletteId: string | null, posterEdits: PosterEdits = {}) {
+  const poster = buildPoster(design);
+  const layers = [
+    {
+      id: "background",
+      kind: "background",
+      editable: false,
+      geometry: { x: 0, y: 0, width: POSTER_WIDTH, height: POSTER_HEIGHT },
+      edit: posterEdits.background ?? null,
+    },
+    ...poster.shapes.map((shape) => ({
+      id: shape.id,
+      kind: shape.kind,
+      editable: true,
+      geometry:
+        shape.kind === "rect"
+          ? { x: shape.x, y: shape.y, width: shape.width, height: shape.height }
+          : shape.kind === "circle"
+            ? { cx: shape.cx, cy: shape.cy, radius: shape.r }
+            : { x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2 },
+      edit: posterEdits[shape.id] ?? null,
+    })),
+    ...poster.texts.map((text) => ({
+      id: text.id,
+      kind: "text",
+      editable: true,
+      geometry: { x: text.x, y: text.y, size: text.size, anchor: text.anchor, text: text.text },
+      edit: posterEdits[text.id] ?? null,
+    })),
+  ];
+
   return JSON.stringify(
     {
       direction: design.direction,
@@ -107,6 +181,12 @@ function describeDesign(design: DesignState, paletteId: string | null) {
       headline: design.headline,
       subtitle: design.subtitle,
       mood: design.mood,
+      canvas: {
+        width: POSTER_WIDTH,
+        height: POSTER_HEIGHT,
+        transformNote: "layerEdits x/y/scale/rotation/opacity are absolute non-destructive values from each layer's base geometry",
+        layers,
+      },
     },
     null,
     2,
@@ -165,6 +245,7 @@ export async function askGemini(input: {
   message: string;
   design: DesignState;
   paletteId: string | null;
+  posterEdits: PosterEdits;
   history: HistoryItem[];
   instanceId?: string;
 }): Promise<GeminiResult> {
@@ -194,7 +275,7 @@ export async function askGemini(input: {
         role: "user",
         parts: [
           {
-           text: `Current poster state:\n${describeDesign(input.design, input.paletteId)}\n\nShared Curio library from PostgreSQL:\n${libraryText}\n\nDesign-principles source of truth from TigerData (short extracts and paraphrased clips retrieved for this brief):\n${principlesText}\n\n${conversation}User request:\n"""\n${input.message}\n"""`,
+            text: `Current poster state:\n${describeDesign(input.design, input.paletteId, input.posterEdits)}\n\nShared Curio library from PostgreSQL:\n${libraryText}\n\nDesign-principles source of truth from TigerData (short extracts and paraphrased clips retrieved for this brief):\n${principlesText}\n\n${conversation}User request:\n"""\n${input.message}\n"""`,
           },
         ],
       },

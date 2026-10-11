@@ -3,6 +3,7 @@
 import type { Dispatch } from "react";
 import type { ChatMessage, DesignState } from "@/lib/design-types";
 import type { StudioAction } from "@/lib/design-state";
+import type { PosterEdits } from "@/lib/poster-editor";
 import { CreativeBrief } from "./creative-brief";
 import { CreativeDirector } from "./creative-director";
 import { Poster } from "./poster";
@@ -11,6 +12,7 @@ export function ChatScreen({
   design,
   messages,
   selectedPaletteId,
+  posterEdits,
   dispatch,
   initialPrompt,
   onBack,
@@ -19,6 +21,7 @@ export function ChatScreen({
   design: DesignState;
   messages: ChatMessage[];
   selectedPaletteId: string | null;
+  posterEdits: PosterEdits;
   dispatch: Dispatch<StudioAction>;
   initialPrompt: string | null;
   onBack: () => void;
@@ -58,6 +61,7 @@ export function ChatScreen({
             messages={messages}
             design={design}
             selectedPaletteId={selectedPaletteId}
+            posterEdits={posterEdits}
             dispatch={dispatch}
             initialPrompt={initialPrompt}
           />

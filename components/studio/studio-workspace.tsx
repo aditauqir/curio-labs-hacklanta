@@ -213,6 +213,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
         design={design}
         messages={messages}
         selectedPaletteId={selectedPaletteId}
+        posterEdits={posterEdits}
         dispatch={dispatch}
         initialPrompt={initialPrompt}
         onBack={openStart}
@@ -277,6 +278,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
               messages={messages}
               design={design}
               selectedPaletteId={selectedPaletteId}
+              posterEdits={posterEdits}
               dispatch={dispatch}
               initialPrompt={initialPrompt}
             />

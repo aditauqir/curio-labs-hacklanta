@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
   if (typeof body !== "object" || body === null) return fail(400, "invalid_body");
 
-  const { message, design, paletteId, history } = body as Record<string, unknown>;
+  const { message, design, paletteId, posterEdits, history } = body as Record<string, unknown>;
 
   if (typeof message !== "string") return fail(400, "invalid_message");
   const cleanMessage = message.replace(/[\u0000-\u001F\u007F]/g, " ").trim();
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   if (cleanMessage.length > MAX_MESSAGE_CHARS) return fail(400, "message_too_long");
 
   // sanitizeState validates and bounds every field of the design the client sent.
-  const state = sanitizeState({ design, selectedPaletteId: paletteId, messages: [] });
+  const state = sanitizeState({ design, selectedPaletteId: paletteId, posterEdits, messages: [] });
   if (!state) return fail(400, "invalid_design");
 
   try {
@@ -58,6 +58,7 @@ export async function POST(request: Request) {
       message: cleanMessage,
       design: state.design,
       paletteId: state.selectedPaletteId,
+      posterEdits: state.posterEdits,
       history: parseHistory(history),
       instanceId: instance.id,
     });

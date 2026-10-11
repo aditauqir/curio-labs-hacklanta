@@ -14,6 +14,7 @@ import { directionConfigs } from "@/lib/design-presets";
 import { interpretRequest } from "@/lib/demo-director";
 import { askDirector, DirectorError } from "@/lib/director-client";
 import { makeId, type StudioAction } from "@/lib/design-state";
+import type { PosterEdits } from "@/lib/poster-editor";
 import { MicIcon, MicOffIcon, SendIcon } from "./icons";
 import { StreamingText } from "./StreamingText";
 import { ThinkingState } from "./ThinkingState";
@@ -71,12 +72,14 @@ export function CreativeDirector({
   messages,
   design,
   selectedPaletteId,
+  posterEdits,
   dispatch,
   initialPrompt,
 }: {
   messages: ChatMessage[];
   design: DesignState;
   selectedPaletteId: string | null;
+  posterEdits: PosterEdits;
   dispatch: Dispatch<StudioAction>;
   initialPrompt?: string | null;
 }) {
@@ -127,7 +130,13 @@ export function CreativeDirector({
     if (!capabilities.gemini) return local();
 
     try {
-      const ai = await askDirector({ message: content, design, paletteId: selectedPaletteId, history: messages });
+      const ai = await askDirector({
+        message: content,
+        design,
+        paletteId: selectedPaletteId,
+        posterEdits,
+        history: messages,
+      });
       return {
         reply: ai.reply,
         actions: patchToActions(ai.patch),
