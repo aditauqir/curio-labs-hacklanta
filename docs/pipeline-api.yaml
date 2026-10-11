@@ -1,0 +1,910 @@
+openapi: 3.1.0
+info:
+  title: Curio Labs creative pipeline API
+  version: 1.0.0
+  description: |
+    Backend for the AI creative direction pipeline.
+
+    Flow: brief -> concepts -> select -> references + asset plan + composition
+    -> render -> evaluate -> revise -> export.
+
+    Identity: every request carries the `curio_instance_id` cookie, which the
+    server sets on first use. A project belongs to one instance and is scoped by
+    it on every query. A project owned by another instance returns 404, never
+    403, so the API does not confirm that an id exists for somebody else.
+
+    Errors: always `{"error": "<snake_case_code>"}` with the relevant status.
+    Upstream provider messages are never forwarded. Every response sets
+    `Cache-Control: no-store`.
+
+    Honesty: this deployment has no image generation and no vision model.
+    `GET /api/pipeline/status` reports both as unavailable, planned image assets
+    are returned with `status: "unavailable"`, and creative critique is labelled
+    `basis: "design-document"` because it has not seen the rendered output.
+
+servers:
+  - url: /
+
+tags:
+  - name: Capabilities
+  - name: Projects
+  - name: Concepts
+  - name: Design
+  - name: Quality
+  - name: Export
+
+paths:
+  /api/pipeline/status:
+    get:
+      tags: [Capabilities]
+      summary: What the pipeline can actually do
+      responses:
+        "200":
+          description: Capability report. Booleans only; never a credential.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PipelineStatus" }
+
+  /api/projects:
+    get:
+      tags: [Projects]
+      summary: List the caller's projects
+      responses:
+        "200":
+          description: Projects owned by this instance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items: { $ref: "#/components/schemas/Project" }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+    post:
+      tags: [Projects]
+      summary: Create a project, interpreting a brief when one is supplied
+      description: |
+        When `brief` is present it is interpreted in the same request (Stage A).
+        If no model is configured the project is still created and the response
+        carries `warning: "ai_not_configured"` rather than a fabricated brief.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                brief: { type: string, maxLength: 4000 }
+                format: { $ref: "#/components/schemas/FormatId" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project: { $ref: "#/components/schemas/Project" }
+                  brief:
+                    oneOf:
+                      - { $ref: "#/components/schemas/StructuredBrief" }
+                      - { type: "null" }
+                  warning: { type: string, enum: [ai_not_configured] }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /api/projects/{projectId}:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    get:
+      tags: [Projects]
+      summary: Project with brief, concepts, assets and version history
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+    patch:
+      tags: [Projects]
+      summary: Replace the brief and re-interpret it
+      description: Concepts and design versions are deliberately left untouched.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [brief]
+              properties:
+                brief: { type: string, maxLength: 4000 }
+      responses:
+        "200":
+          description: Updated brief
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  brief: { $ref: "#/components/schemas/StructuredBrief" }
+                  model: { type: string }
+                  provider: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /api/projects/{projectId}/concepts:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    get:
+      tags: [Concepts]
+      summary: Stored concepts
+      responses:
+        "200":
+          description: Concepts and the selected id
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  concepts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Concept" }
+                  selectedConceptId: { type: [string, "null"] }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Concepts]
+      summary: Generate three distinct concepts (Stage B)
+      description: |
+        Deduplicated by a hash of the brief: an identical repeat request returns
+        the stored result with `reused: true` instead of paying for a second
+        model call. `adjustments` lists composition strategies the server
+        reassigned to keep the three structurally distinct; those are the
+        server's corrections, not the model's choices.
+      responses:
+        "200":
+          description: Concepts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  concepts:
+                    type: array
+                    minItems: 3
+                    maxItems: 3
+                    items: { $ref: "#/components/schemas/Concept" }
+                  adjustments: { type: array, items: { type: string } }
+                  model: { type: string }
+                  provider: { type: string }
+                  jobId: { type: string, format: uuid }
+                  reused: { type: boolean }
+        "409":
+          description: No brief has been interpreted yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: brief_required }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "502": { $ref: "#/components/responses/AiFailure" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /api/projects/{projectId}/concepts/select:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    post:
+      tags: [Concepts]
+      summary: Select a concept and build version 1 (Stages C, D, E)
+      description: |
+        Runs reference retrieval, asset planning and composition, then stores
+        version 1 of the design document. None of it needs a model.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conceptId]
+              properties:
+                conceptId: { type: string }
+      responses:
+        "200":
+          description: Selection result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conceptId: { type: string }
+                  version: { type: integer }
+                  document: { $ref: "#/components/schemas/DesignDocument" }
+                  assets:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlannedAsset" }
+                  blockedAssets:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlannedAsset" }
+                  references: { type: array, items: { type: object } }
+                  principles:
+                    description: The design principle each reference contributes
+                    type: array
+                    items: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: No brief yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/projects/{projectId}/references:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+      - name: conceptId
+        in: query
+        schema: { type: string }
+    get:
+      tags: [Design]
+      summary: References retrieved for a concept (Stage C)
+      description: |
+        Every record carries `license` and `usage`. The seeded catalogue is
+        `inspiration-only`: original written descriptions of design techniques,
+        not copies of artwork and not licensed production assets.
+      responses:
+        "200":
+          description: References and their contributed principles
+          content:
+            application/json:
+              schema: { type: object }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: A brief and a concept are required first
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/projects/{projectId}/assets:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    get:
+      tags: [Design]
+      summary: The asset plan (Stage D)
+      responses:
+        "200":
+          description: Planned assets, including any that cannot be produced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assets:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlannedAsset" }
+                  blocked:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlannedAsset" }
+                  capabilities: { type: object }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/projects/{projectId}/design:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+      - { $ref: "#/components/parameters/Version" }
+    get:
+      tags: [Design]
+      summary: A design document
+      responses:
+        "200":
+          description: Design document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: integer }
+                  parentVersion: { type: [integer, "null"] }
+                  summary: { type: string }
+                  elementCount: { type: integer }
+                  document: { $ref: "#/components/schemas/DesignDocument" }
+        "404":
+          description: No design yet, or unknown project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/projects/{projectId}/preview:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+      - { $ref: "#/components/parameters/Version" }
+      - name: width
+        in: query
+        description: Output width in px. Height follows the canvas aspect ratio.
+        schema: { type: integer, minimum: 64, maximum: 4096 }
+      - name: transparent
+        in: query
+        description: Set to 1 to omit the background
+        schema: { type: string, enum: ["1"] }
+    get:
+      tags: [Design]
+      summary: Render a version to SVG (Stage F)
+      responses:
+        "200":
+          description: |
+            SVG. Served with a restrictive Content-Security-Policy because the
+            document contains user- and model-authored text.
+          headers:
+            X-Curio-Version:
+              schema: { type: integer }
+            X-Curio-Render-Warnings:
+              description: Count of unresolved assets and unsupported elements
+              schema: { type: integer }
+          content:
+            image/svg+xml:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/projects/{projectId}/evaluate:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+      - { $ref: "#/components/parameters/Version" }
+    get:
+      tags: [Quality]
+      summary: The stored evaluation for a version
+      responses:
+        "200":
+          description: Evaluation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Evaluation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Quality]
+      summary: Run quality checks (Stage G)
+      description: |
+        Two independent systems. `deterministic` is always present and is a set
+        of facts about the rendered geometry. `creative` is a model opinion and
+        is reported as `{ available: false, reason }` when no model is
+        configured, never silently skipped.
+
+        `blocking` is derived only from critical deterministic failures, so a
+        generous creative score cannot mask a missing headline or a broken
+        asset.
+      responses:
+        "200":
+          description: Evaluation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Evaluation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/projects/{projectId}/revise:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    post:
+      tags: [Design]
+      summary: Apply a targeted revision (Stage H)
+      description: |
+        Translates the request into whitelisted operations on named elements
+        and saves the result as a NEW version; the base version is never
+        mutated. Text marked required by the brief cannot be rewritten here.
+        `rejected` explains every operation that was not applied.
+
+        A request that maps onto nothing returns `created: false` and does not
+        create an empty version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request]
+              properties:
+                request: { type: string, maxLength: 600 }
+                version:
+                  description: Base version. Defaults to the latest.
+                  type: integer
+      responses:
+        "200":
+          description: Revision result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevisionResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/AiFailure" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /api/projects/{projectId}/versions:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    get:
+      tags: [Design]
+      summary: Version history
+      responses:
+        "200":
+          description: Versions, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions: { type: array, items: { type: object } }
+    post:
+      tags: [Design]
+      summary: Restore an earlier version
+      description: |
+        Appends a copy of the chosen version as a new version. History is
+        append-only, so a restore can itself be undone.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: integer }
+                  restoredFrom: { type: integer }
+                  document: { $ref: "#/components/schemas/DesignDocument" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/projects/{projectId}/exports:
+    parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+    get:
+      tags: [Export]
+      summary: List stored exports
+      responses:
+        "200":
+          description: Exports
+          content:
+            application/json:
+              schema: { type: object }
+    post:
+      tags: [Export]
+      summary: Produce an export (Stage I)
+      description: |
+        Gated on the deterministic checks. A design with missing required copy
+        or an unresolved asset returns 409 with the blocking reasons. `force`
+        overrides the gate but the response still reports what was wrong.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format: { type: string, enum: [svg, json], default: svg }
+                version: { type: integer }
+                width: { type: integer, minimum: 64, maximum: 4096 }
+                force: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Export created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  export: { type: object }
+                  downloadUrl: { type: string }
+                  forced: { type: boolean }
+                  blocking: { type: array, items: { type: object } }
+        "409":
+          description: Blocked by a critical deterministic failure
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, enum: [export_blocked] }
+                  blocking: { type: array, items: { type: object } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/projects/{projectId}/exports/{exportId}:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+      - name: exportId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Export]
+      summary: Download an export
+      responses:
+        "200":
+          description: |
+            The stored bytes, as an attachment with a sandboxing CSP.
+          content:
+            image/svg+xml: { schema: { type: string } }
+            application/json: { schema: { type: object } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/projects/{projectId}/jobs/{jobId}:
+    parameters:
+      - { $ref: "#/components/parameters/ProjectId" }
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Projects]
+      summary: Pipeline job state
+      description: |
+        Stages run inline today, so a job is already terminal when it can be
+        read. The record exists for provenance and request deduplication, and
+        is the seam a background worker would attach to without changing this
+        contract.
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      kind: { type: string }
+                      state: { type: string, enum: [queued, running, succeeded, failed] }
+                      progress: { type: [string, "null"] }
+                      error: { type: [string, "null"] }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Version:
+      name: version
+      in: query
+      description: Defaults to the latest version
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Unknown, or owned by another instance
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: not_found }
+    TooLarge:
+      description: Body exceeded the route's limit
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: too_large }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: rate_limited }
+    AiFailure:
+      description: The model failed or returned unusable output
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: ai_bad_output }
+    DatabaseUnavailable:
+      description: Persistence is unavailable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: database_unavailable }
+    Unavailable:
+      description: A required dependency is not configured
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: ai_not_configured }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Stable snake_case code. Never a provider message.
+
+    FormatId:
+      type: string
+      enum: [print-poster, social-square, social-story, editorial-spread, presentation-slide]
+
+    PipelineStatus:
+      type: object
+      properties:
+        capabilities:
+          type: object
+          properties:
+            text:
+              type: object
+              properties:
+                available: { type: boolean }
+                provider: { type: [string, "null"] }
+            imageGeneration:
+              type: object
+              properties:
+                available: { type: boolean }
+                provider: { type: [string, "null"] }
+                reason: { type: string }
+            vision:
+              type: object
+              properties:
+                available: { type: boolean }
+                provider: { type: [string, "null"] }
+                reason: { type: string }
+        stages:
+          type: object
+          additionalProperties: { type: boolean }
+        formats: { type: array, items: { type: object } }
+        exportFormats: { type: array, items: { type: string } }
+
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        format: { $ref: "#/components/schemas/FormatId" }
+        status: { type: string, enum: [draft, concepts, designing, complete] }
+        selectedConceptId: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ProjectDetail:
+      type: object
+      properties:
+        project: { $ref: "#/components/schemas/Project" }
+        brief:
+          oneOf:
+            - { $ref: "#/components/schemas/StructuredBrief" }
+            - { type: "null" }
+        concepts: { type: array, items: { $ref: "#/components/schemas/Concept" } }
+        assets: { type: array, items: { $ref: "#/components/schemas/PlannedAsset" } }
+        currentVersion: { type: [object, "null"] }
+        versions: { type: array, items: { type: object } }
+
+    StructuredBrief:
+      type: object
+      properties:
+        projectType: { type: string, enum: [poster, social-graphic, editorial, presentation, brand-asset] }
+        outputFormat: { $ref: "#/components/schemas/FormatId" }
+        subject: { type: string }
+        message: { type: string }
+        objective: { type: string }
+        audience: { type: string }
+        tone: { type: array, items: { type: string } }
+        aesthetic: { type: array, items: { type: string } }
+        requiredText:
+          type: object
+          properties:
+            headline: { type: string }
+            subheadline: { type: [string, "null"] }
+            callToAction: { type: [string, "null"] }
+            details: { type: array, items: { type: string } }
+        constraints: { type: array, items: { type: string } }
+        brandRequirements: { type: array, items: { type: string } }
+        dimensions:
+          description: Taken from the format table, never from the model.
+          type: object
+          properties:
+            width: { type: integer }
+            height: { type: integer }
+            aspectRatio: { type: string }
+        exclusions: { type: array, items: { type: string } }
+        missingInformation: { type: array, items: { type: string } }
+        clarifyingQuestions:
+          description: Blocking ambiguity only. At most two.
+          type: array
+          maxItems: 2
+          items: { type: string }
+
+    Concept:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        rationale: { type: string }
+        metaphor: { type: string }
+        compositionStrategy:
+          description: Unique across the three concepts; enforced server-side.
+          type: string
+          enum: [asymmetric-grid, centred-stack, diagonal-break, edge-anchored, full-bleed-image, modular-grid, typographic-stack]
+        imageTreatment: { type: string }
+        typographyDirection: { type: string }
+        colorStrategy: { type: string }
+        materialStrategy: { type: string }
+        suggestedReferenceTags: { type: array, items: { type: string } }
+        assetRequirements: { type: array, items: { type: object } }
+        avoid: { type: array, items: { type: string } }
+        objectiveFit: { type: string }
+
+    PlannedAsset:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [hero-image, supporting-image, texture, vector-shape, typography, logo, chart] }
+        role: { type: string }
+        description: { type: string }
+        source: { type: string, enum: [user-upload, licensed-retrieval, generated, procedural, none] }
+        status:
+          description: '"unavailable" means it cannot be produced here; `note` says why.'
+          type: string
+          enum: [planned, ready, unavailable]
+        note: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        aspectRatio: { type: string }
+        transparent: { type: boolean }
+        priority: { type: integer }
+        license: { type: [string, "null"] }
+        cleared:
+          description: False means inspiration-only; export is blocked.
+          type: boolean
+
+    DesignDocument:
+      type: object
+      description: |
+        Editable, serialisable, versionable. Geometry is relative: frame values
+        are fractions of the canvas and type sizes are a fraction of canvas
+        width, so a document renders at any output size. Elements form a tree;
+        groups may clip their children.
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        canvas:
+          type: object
+          properties:
+            width: { type: integer }
+            height: { type: integer }
+            background: { type: string, pattern: "^#[0-9A-F]{6}$" }
+            safeMargin: { type: number }
+        typography:
+          type: object
+          properties:
+            heading: { type: string }
+            body: { type: string }
+            mono: { type: string }
+        palette:
+          type: object
+          properties:
+            background: { type: string }
+            foreground: { type: string }
+            accent: { type: string }
+            muted: { type: string }
+        elements:
+          type: array
+          items: { $ref: "#/components/schemas/DesignElement" }
+        meta:
+          type: object
+          properties:
+            conceptId: { type: [string, "null"] }
+            format: { type: string }
+            notes: { type: array, items: { type: string } }
+
+    DesignElement:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [text, image, shape, texture, group] }
+        frame:
+          type: object
+          properties:
+            anchor:
+              type: string
+              enum: [top-left, top-center, top-right, middle-left, middle-center, middle-right, bottom-left, bottom-center, bottom-right]
+            x: { type: number }
+            y: { type: number }
+            width: { type: number }
+            height: { type: number }
+        rotation: { type: number }
+        opacity: { type: number }
+        blendMode: { type: string, enum: [normal, multiply, screen, overlay, darken, lighten] }
+        locked: { type: boolean }
+        editable: { type: boolean }
+        provenance:
+          type: [object, "null"]
+          properties:
+            source: { type: string }
+            assetId: { type: [string, "null"] }
+            creator: { type: [string, "null"] }
+            sourceUrl: { type: [string, "null"] }
+            license: { type: [string, "null"] }
+            cleared: { type: boolean }
+            generator: { type: [string, "null"] }
+
+    Evaluation:
+      type: object
+      properties:
+        version: { type: integer }
+        status: { type: string, enum: [pass, warn, fail] }
+        deterministic:
+          type: object
+          description: Facts about the rendered geometry.
+          properties:
+            status: { type: string, enum: [pass, warn, fail] }
+            checks:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  label: { type: string }
+                  status: { type: string, enum: [pass, warn, fail] }
+                  detail: { type: string }
+                  elementIds: { type: array, items: { type: string } }
+                  critical: { type: boolean }
+        creative:
+          description: A model opinion, or an explicit statement that none was made.
+          oneOf:
+            - type: object
+              properties:
+                available: { const: false }
+                reason: { type: string }
+            - type: object
+              properties:
+                available: { const: true }
+                basis:
+                  description: |
+                    "design-document" means no vision model saw the render.
+                  type: string
+                  enum: [rendered-image, design-document]
+                scores: { type: object, additionalProperties: { type: number } }
+                averageScore: { type: number }
+                observations: { type: array, items: { type: string } }
+                issues: { type: array, items: { type: object } }
+                revisionInstructions: { type: array, items: { type: string } }
+        blocking:
+          description: Critical deterministic failures only.
+          type: array
+          items: { type: object }
+        exportable: { type: boolean }
+
+    RevisionResult:
+      type: object
+      properties:
+        version: { type: integer }
+        created: { type: boolean }
+        parentVersion: { type: integer }
+        applied:
+          type: array
+          items:
+            type: object
+            properties:
+              op: { type: string }
+              target: { type: string }
+              detail: { type: string }
+        rejected:
+          type: array
+          items:
+            type: object
+            properties:
+              op: { type: string }
+              target: { type: string }
+              reason: { type: string }
+        summary: { type: string }
+        document: { $ref: "#/components/schemas/DesignDocument" }
+        model: { type: string }
+        provider: { type: string }

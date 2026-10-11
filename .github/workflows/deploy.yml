@@ -161,11 +161,10 @@ jobs:
           EOF
 
       - name: Verify public endpoint
-        env:
-          VULTR_HOST: ${{ secrets.VULTR_HOST }}
         run: |
           curl --fail --silent --show-error \
+            --location \
             --retry 10 --retry-delay 3 --retry-connrefused \
             --max-time 15 \
-            "http://${VULTR_HOST}/" > /dev/null
+            "https://idkjustmakeitlookgood.gay/" > /dev/null
           echo "Public endpoint is responding."

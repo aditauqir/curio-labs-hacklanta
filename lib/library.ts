@@ -60,9 +60,9 @@ function summary(asset: LibraryRow): AssetSuggestion {
 }
 
 /**
- * Rows published by the Python engine (`python -m curio assets publish-library`) carry this
- * tag. They are halftone maps, grain and paper for the renderer, not design suggestions,
- * so they are kept out of the Gemini context.
+ * Rows published by the Python engine (`python -m curio publish-library`) carry this tag.
+ * They are halftone maps, grain and paper for the renderer, not design suggestions, so
+ * the Gemini context and coach search leave them out. `/api/assets` still lists them.
  */
 export const ENGINE_TEXTURE_TAG = "engine-texture";
 
@@ -97,6 +97,45 @@ export async function listLibraryAssets(
         LIMIT ${limit}
       `;
   return rows.map((asset) => ({ ...summary(asset), tags: asset.tags, metadata: asset.metadata, sourceUrl: asset.sourceUrl, contentType: asset.contentType, sizeBytes: asset.sizeBytes }));
+}
+
+/** Search the TigerData-backed library for the small set of references a coach needs. */
+export async function searchLibraryAssets(
+  query: string,
+  options: { kind?: LibraryKind; limit?: number; ownerInstanceId?: string; excludeTag?: string } = {},
+): Promise<LibraryAsset[]> {
+  const sql = await getDatabase();
+  const ownerFilter = options.ownerInstanceId
+    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${options.ownerInstanceId}::uuid)`
+    : sql`AND owner_instance_id IS NULL`;
+  const kindFilter = options.kind ? sql`AND kind = ${options.kind}` : sql``;
+  const tagFilter = options.excludeTag ? sql`AND NOT (${options.excludeTag} = ANY(tags))` : sql``;
+  const needle = `%${query.trim().slice(0, 80)}%`;
+  const limit = Math.max(1, Math.min(options.limit ?? 6, 12));
+  const rows = await sql<LibraryRow[]>`
+    SELECT id, kind, name, description, tags, metadata,
+           source_url AS "sourceUrl", content_type AS "contentType", owner_instance_id,
+           size_bytes AS "sizeBytes", created_at AS "createdAt"
+    FROM curio_library_assets
+    WHERE (
+      name ILIKE ${needle}
+      OR COALESCE(description, '') ILIKE ${needle}
+      OR array_to_string(tags, ' ') ILIKE ${needle}
+    )
+    ${kindFilter}
+    ${tagFilter}
+    ${ownerFilter}
+    ORDER BY updated_at DESC, name ASC
+    LIMIT ${limit}
+  `;
+  return rows.map((asset) => ({
+    ...summary(asset),
+    tags: asset.tags,
+    metadata: asset.metadata,
+    sourceUrl: asset.sourceUrl,
+    contentType: asset.contentType,
+    sizeBytes: asset.sizeBytes,
+  }));
 }
 
 /** Context sent to Gemini. Failure is intentionally non-fatal: the poster still works. */
