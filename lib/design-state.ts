@@ -72,14 +72,14 @@ const seedMessages: ChatMessage[] = [
     id: "seed-user",
     role: "user",
     content:
-      "I need a poster for my coffee shop's jazz night. Something vintage but modern.",
+      "I need a poster for a warehouse night. Something printed and raw, not glossy.",
   },
   {
     id: "seed-assistant",
     role: "assistant",
     source: "example",
     content:
-      "Let's narrow that down. Are you imagining a warm, textured 1970s jazz-poster aesthetic, or something more minimal and contemporary?",
+      "Let's narrow that down. Should it feel like a newsprint broadsheet with a line screen and silver grain, or a cleaner Berlin Swiss grid on ivory stock?",
     suggestions: [...directionOrder],
     checkpoint: {
       design: initialDesign,

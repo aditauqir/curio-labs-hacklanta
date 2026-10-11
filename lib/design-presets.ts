@@ -5,7 +5,7 @@ import type {
   Spacing,
   TextAlignment,
 } from "./design-types";
-import { NO_LOOK, getReferenceLook, lookPaletteId, referenceLooks } from "./reference-looks";
+import { NO_LOOK, getReferenceLook, lookAssetUrl, lookPaletteId, referenceLooks } from "./reference-looks";
 
 export type PosterSizeConfig = {
   id: PosterSize;
@@ -89,287 +89,25 @@ export const fontPairs: FontPair[] = [
   },
 ];
 
-export const colorPalettes: ColorPalette[] = [
-  {
-    id: "roastery",
-    name: "Roastery",
-    note: "Warm cream and burnt orange",
-    colors: {
-      background: "#F3EBDD",
-      foreground: "#2B2723",
-      accent: "#D8784C",
-      muted: "#A99C8C",
-    },
-  },
-  {
-    id: "paper-ink",
-    name: "Paper & Ink",
-    note: "Clear, quiet, precise",
-    colors: {
-      background: "#F7F7F4",
-      foreground: "#171717",
-      accent: "#171717",
-      muted: "#9A9A93",
-    },
-  },
-  {
-    id: "night-signal",
-    name: "Night Signal",
-    note: "High contrast after dark",
-    colors: {
-      background: "#151719",
-      foreground: "#F2EEE6",
-      accent: "#C9F05D",
-      muted: "#8C918B",
-    },
-  },
-  {
-    id: "clay-studio",
-    name: "Clay Studio",
-    note: "Earthy with a sharp edge",
-    colors: {
-      background: "#E7D5C5",
-      foreground: "#332923",
-      accent: "#A34D3B",
-      muted: "#A88F80",
-    },
-  },
-  // Each analysed reference look also offers its colours as a curated palette.
-  ...referenceLooks.map((look) => ({
-    id: lookPaletteId(look),
-    name: look.name,
-    note: `Reference look · ${look.styleTags.slice(0, 2).join(", ")}`,
-    colors: { ...look.palette },
-  })),
-];
-
-function pinterestSearch(query: string) {
-  return `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
-}
+/** Every palette comes from an analysed reference look in curio/assets. */
+export const colorPalettes: ColorPalette[] = referenceLooks.map((look) => ({
+  id: lookPaletteId(look),
+  name: look.name,
+  note: `Reference look · ${look.styleTags.slice(0, 2).join(", ")}`,
+  colors: { ...look.palette },
+}));
 
 /**
- * Curated Pinterest searches are references, not assets. Curio renders its own
- * abstract thumbnails and links out so the original work stays on Pinterest.
+ * References are the analysed reference looks from curio/assets. Each card links to the
+ * look's own screen or texture asset, so the source is something Curio actually ships.
  */
-export const referenceCards: ReferenceCard[] = [
-  {
-    id: "late-set",
-    title: "Late set / warm circles",
-    category: "Music poster · warm geometry",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("warm jazz concert poster circles typography"),
-  },
-  {
-    id: "paper-studies",
-    title: "Paper studies / Swiss grid",
-    category: "Swiss poster · quiet hierarchy",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("Swiss grid poster design typography"),
-  },
-  {
-    id: "signal-noise",
-    title: "Signal / noise",
-    category: "Experimental poster · high contrast",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("experimental graphic poster high contrast typography"),
-  },
-  {
-    id: "primary-beats",
-    title: "Primary beats",
-    category: "Music poster · primary color blocks",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("primary colors music poster graphic design"),
-  },
-  {
-    id: "red-black-type",
-    title: "Red / black type",
-    category: "Editorial poster · compressed type",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("red black typography poster editorial design"),
-  },
-  {
-    id: "blue-note",
-    title: "Blue note",
-    category: "Jazz poster · cool monochrome",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("blue jazz poster graphic design"),
-  },
-  {
-    id: "grid-tension",
-    title: "Grid tension",
-    category: "Swiss poster · asymmetrical grid",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("asymmetrical Swiss typography poster"),
-  },
-  {
-    id: "oversized-italic",
-    title: "Oversized italic",
-    category: "Type poster · kinetic headline",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("oversized italic typography poster design"),
-  },
-  {
-    id: "midnight-flare",
-    title: "Midnight flare",
-    category: "Event poster · dark field and glow",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("dark night event poster neon accent"),
-  },
-  {
-    id: "new-wave-cut",
-    title: "New wave cut",
-    category: "Music poster · collage crop",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("new wave music poster collage typography"),
-  },
-  {
-    id: "museum-index",
-    title: "Museum index",
-    category: "Cultural poster · information hierarchy",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("museum exhibition poster typography grid"),
-  },
-  {
-    id: "acid-letterforms",
-    title: "Acid letterforms",
-    category: "Experimental poster · warped type",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("acid typography poster experimental graphic design"),
-  },
-  {
-    id: "cream-and-coral",
-    title: "Cream and coral",
-    category: "Brand poster · soft contrast",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("cream coral modern poster design"),
-  },
-  {
-    id: "mono-assembly",
-    title: "Mono assembly",
-    category: "Editorial poster · black and white",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("black white editorial typography poster"),
-  },
-  {
-    id: "circle-and-bar",
-    title: "Circle and bar",
-    category: "Swiss poster · modular geometry",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("Swiss poster circle bar geometric design"),
-  },
-  {
-    id: "riso-register",
-    title: "Riso register",
-    category: "Print poster · offset color",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("riso print poster registration graphic design"),
-  },
-  {
-    id: "type-as-image",
-    title: "Type as image",
-    category: "Typography poster · letterform texture",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("typography as image poster design"),
-  },
-  {
-    id: "orange-after-dark",
-    title: "Orange after dark",
-    category: "Music poster · orange and ink",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("orange black concert poster typography"),
-  },
-  {
-    id: "soft-utility",
-    title: "Soft utility",
-    category: "Identity poster · functional layout",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("minimal identity poster functional typography"),
-  },
-  {
-    id: "green-room",
-    title: "Green room",
-    category: "Event poster · acid green signal",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("acid green event poster graphic design"),
-  },
-  {
-    id: "found-type",
-    title: "Found type",
-    category: "Collage poster · found textures",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("found typography collage poster design"),
-  },
-  {
-    id: "black-sun",
-    title: "Black sun",
-    category: "Cultural poster · solar motif",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("black sun exhibition poster graphic design"),
-  },
-  {
-    id: "quiet-red",
-    title: "Quiet red",
-    category: "Editorial poster · one-color accent",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("minimal red accent editorial poster"),
-  },
-  {
-    id: "jazz-archive",
-    title: "Jazz archive",
-    category: "Jazz poster · historical type",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("jazz archive poster typography design"),
-  },
-  {
-    id: "blueprint-type",
-    title: "Blueprint type",
-    category: "Poster system · blue technical grid",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("blue technical typography poster grid"),
-  },
-  {
-    id: "paper-cut",
-    title: "Paper cut",
-    category: "Experimental poster · layered paper",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("paper cut layered poster graphic design"),
-  },
-  {
-    id: "festival-list",
-    title: "Festival list",
-    category: "Event poster · dense information",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("music festival poster dense typography layout"),
-  },
-  {
-    id: "violet-frequency",
-    title: "Violet frequency",
-    category: "Music poster · electric gradient",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("purple electronic music poster typography"),
-  },
-  {
-    id: "editorial-slice",
-    title: "Editorial slice",
-    category: "Magazine poster · image crop",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("editorial magazine poster image crop typography"),
-  },
-  {
-    id: "form-forum",
-    title: "Form forum",
-    category: "Swiss poster · circle and type",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("Swiss Form Forum poster design"),
-  },
-  {
-    id: "one-line-poster",
-    title: "One-line poster",
-    category: "Minimal poster · single gesture",
-    source: "Pinterest search",
-    sourceUrl: pinterestSearch("minimal one line poster graphic design"),
-  },
-];
+export const referenceCards: ReferenceCard[] = referenceLooks.map((look) => ({
+  id: look.id,
+  title: look.name,
+  category: look.styleTags.slice(0, 2).join(" · "),
+  source: "Curio engine analysis",
+  sourceUrl: lookAssetUrl(look.screen?.asset ?? look.textures[0].asset),
+}));
 
 type DirectionConfig = {
   label: string;
@@ -384,17 +122,17 @@ type DirectionConfig = {
 
 export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
   vintage: {
-    label: "Vintage Jazz",
-    mood: "Cozy and artistic",
-    lookId: "aged-broadsheet",
+    label: "Newsprint broadsheet",
+    mood: "Cinematic and editorial",
+    lookId: "newsprint",
     fontPairId: "playfair-inter",
-    paletteId: "look-aged-broadsheet",
+    paletteId: "look-newsprint",
     alignment: "left",
     spacing: "normal",
   },
   minimal: {
-    label: "Modern Minimal",
-    mood: "Clear and considered",
+    label: "Berlin Swiss ivory",
+    mood: "Precise and minimal",
     lookId: "swiss-ivory",
     fontPairId: "space-inter",
     paletteId: "look-swiss-ivory",
@@ -402,8 +140,8 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
     spacing: "spacious",
   },
   experimental: {
-    label: "Experimental Editorial",
-    mood: "Restless and electric",
+    label: "Acid green duotone",
+    mood: "Loud and electric",
     lookId: "acid-duotone",
     fontPairId: "space-inter",
     paletteId: "look-acid-duotone",
@@ -473,13 +211,13 @@ export function applyLook(design: DesignState, lookId: string): DesignState {
 }
 
 const baseDesign: DesignState = {
-  projectName: "Midnight Jazz",
-  venue: "THE ROASTERY",
-  headline: "MIDNIGHT\nJAZZ",
-  subtitle: "An Evening of Live Music",
-  date: "FRIDAY · OCTOBER 23",
-  time: "7:00 PM — 11:00 PM",
-  footer: "COFFEE · MUSIC · CULTURE",
+  projectName: "After Image",
+  venue: "WAREHOUSE 9",
+  headline: "AFTER\nIMAGE",
+  subtitle: "A Night of Sound and Light",
+  date: "SATURDAY · NOVEMBER 14",
+  time: "10:00 PM — 4:00 AM",
+  footer: "SOUND · LIGHT · PRINT",
   direction: "vintage",
   lookId: NO_LOOK,
   posterSize: "social",

@@ -228,7 +228,7 @@ export function InspirationBoard({
       <Section
         id="references-heading"
         title="Visual references"
-        note={`${referenceCards.length} Pinterest poster studies. Curio uses its own thumbnails; open a card for the source search.`}
+        note={`${referenceCards.length} analysed reference looks from the Curio engine. Open a card to see its screen or texture.`}
       >
         <ul className="grid gap-3">
           {referenceCards.map((card, index) => (

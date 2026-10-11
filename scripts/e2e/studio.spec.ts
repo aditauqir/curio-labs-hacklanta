@@ -60,8 +60,8 @@ test.describe("studio workspace", () => {
     await page.getByLabel("Describe a change").fill("make it look more modern");
     await page.getByRole("button", { name: "Send message" }).click();
 
-    await expect(page.getByText("Direction: Modern Minimal")).toBeVisible();
-    await expect(page.getByLabel("Midnight Jazz poster, Modern Minimal direction")).toBeVisible();
+    await expect(page.getByText("Direction: Berlin Swiss ivory")).toBeVisible();
+    await expect(page.getByLabel("After Image poster, Berlin Swiss ivory direction")).toBeVisible();
   });
 
   test("exports the current poster from the canvas action bar", async ({ page }) => {

@@ -76,7 +76,7 @@ Reference-look rules (these come first; they override any generic taste):
 - Every poster sits on one reference look. The current one is "lookId" in the poster state.
 - Any request about style, mood, vibe, genre, era, energy, texture, finish, colour story, "make it better", "make it pop", or "make it look good" MUST set lookId to the closest reference look. Never answer those requests with only paletteId, accent, background or foreground.
 - If the poster's lookId is "none", set a lookId on any design request unless the user explicitly asked for flat colour.
-- Match by the look's style tags and summary, not by the word the user used. For example: jazz, vintage, warm, letterpress -> aged-broadsheet or newsprint; techno, Berlin, Swiss, grid -> swiss-ivory or amber-crt; rave, club, flyer, punk, photocopy -> crimson-photocopy; acid, pop, brat, loud, green -> acid-duotone; trance, dreamy, cosmic, 90s -> cosmic-cobalt; psychedelic, ambient, glitch, thermal -> thermal-rings.
+- Match by the look's style tags and summary, not by the word the user used. For example: vintage, warm, letterpress, editorial -> newsprint or aged-broadsheet; techno, Berlin, Swiss, grid -> swiss-ivory or amber-crt; rave, club, flyer, punk, photocopy -> crimson-photocopy; acid, pop, brat, loud, green -> acid-duotone; trance, dreamy, cosmic, 90s -> cosmic-cobalt; psychedelic, ambient, glitch, thermal -> thermal-rings.
 - "reply" MUST name the look by its name and cite at least one concrete finish detail from it: the screen and its pitch or angle, the paper, the grain, or the overlay. Example: "Moved it onto Crimson photocopy: a 15.3 px square-dot screen with photocopy creases and toner grit."
 - A clarifying question must offer exactly two reference looks by name, and still set lookId to the closer one so the user sees it.
 - Keep colour and font overrides inside the active look's palette and font pair unless the user names a specific colour or font.
@@ -592,7 +592,7 @@ const COACH_TOOLS = [
           properties: {
             query: {
               type: "STRING",
-              description: "A short search phrase such as Swiss grid, jazz poster, or display type.",
+              description: "A short search phrase such as Swiss grid, halftone screen, or display type.",
             },
             kind: {
               type: "STRING",
