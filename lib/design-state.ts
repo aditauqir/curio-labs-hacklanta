@@ -1,8 +1,10 @@
 import type {
+  ChatCheckpoint,
   ChatMessage,
   DesignDirection,
   DesignState,
   PersistedStudioState,
+  PosterSize,
   Spacing,
   TextAlignment,
 } from "./design-types";
@@ -16,9 +18,11 @@ import {
   getPalette,
   initialDesign,
   initialPaletteId,
+  posterSizes,
   typographyFromPair,
 } from "./design-presets";
 import { sanitizePosterEdits, type PosterLayerEdit } from "./poster-editor";
+import { buildPoster, getDefaultLayerOrder, normalizeLayerOrder, sanitizeLayerOrder } from "./poster-layout";
 
 export type StudioState = PersistedStudioState;
 
@@ -35,6 +39,7 @@ export type ColorKey = "background" | "foreground" | "accent";
 
 export type StudioAction =
   | { type: "setDirection"; direction: DesignDirection }
+  | { type: "setPosterSize"; value: PosterSize }
   | { type: "setFontPair"; id: string }
   | { type: "setPalette"; id: string }
   | { type: "setColor"; key: ColorKey; value: string }
@@ -44,6 +49,7 @@ export type StudioAction =
   | { type: "setMood"; value: string }
   | { type: "addMessages"; messages: ChatMessage[] }
   | { type: "setPosterLayerEdit"; id: string; patch: Partial<PosterLayerEdit> }
+  | { type: "reorderLayer"; id: string; direction: "up" | "down" }
   | { type: "resetPosterEdits" }
   | { type: "restoreState"; state: StudioState }
   | { type: "resetDesign" }
@@ -52,6 +58,7 @@ export type StudioAction =
 export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const MAX_FIELD = 200;
 const MAX_MESSAGES = 60;
+const INITIAL_LAYER_ORDER = getDefaultLayerOrder(buildPoster(initialDesign));
 
 export function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -71,6 +78,12 @@ const seedMessages: ChatMessage[] = [
     content:
       "Let's narrow that down. Are you imagining a warm, textured 1970s jazz-poster aesthetic, or something more minimal and contemporary?",
     suggestions: [...directionOrder],
+    checkpoint: {
+      design: initialDesign,
+      selectedPaletteId: initialPaletteId,
+      posterEdits: {},
+      layerOrder: INITIAL_LAYER_ORDER,
+    },
   },
 ];
 
@@ -80,6 +93,7 @@ export function createDefaultState(): StudioState {
     messages: seedMessages,
     selectedPaletteId: initialPaletteId,
     posterEdits: {},
+    layerOrder: INITIAL_LAYER_ORDER,
   };
 }
 
@@ -93,6 +107,12 @@ export function studioReducer(
         ...state,
         design: applyDirection(state.design, action.direction),
         selectedPaletteId: directionConfigs[action.direction].paletteId,
+      };
+    case "setPosterSize":
+      if (!posterSizes.some((size) => size.id === action.value)) return state;
+      return {
+        ...state,
+        design: { ...state.design, posterSize: action.value },
       };
     case "setFontPair": {
       const pair = fontPairs.find((item) => item.id === action.id);
@@ -176,6 +196,15 @@ export function studioReducer(
         },
       };
     }
+    case "reorderLayer": {
+      const order = normalizeLayerOrder(buildPoster(state.design), state.layerOrder);
+      const index = order.indexOf(action.id);
+      const nextIndex = action.direction === "up" ? index - 1 : index + 1;
+      if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return state;
+      const nextOrder = [...order];
+      [nextOrder[index], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[index]];
+      return { ...state, layerOrder: nextOrder };
+    }
     case "resetPosterEdits":
       return { ...state, posterEdits: {} };
     case "restoreState":
@@ -185,6 +214,7 @@ export function studioReducer(
         ...state,
         design: initialDesign,
         selectedPaletteId: initialPaletteId,
+        layerOrder: INITIAL_LAYER_ORDER,
       };
     case "resetProject":
       return createDefaultState();
@@ -273,6 +303,7 @@ function sanitizeDesign(raw: unknown): DesignState {
     time: text(raw.time, initialDesign.time),
     footer: text(raw.footer, initialDesign.footer),
     direction,
+    posterSize: oneOf(raw.posterSize, posterSizes.map((size) => size.id), initialDesign.posterSize),
     styleLabel: text(raw.styleLabel, directionConfigs[direction].label, 60),
     mood: text(raw.mood, directionConfigs[direction].mood, 80),
     typography: typographyFromPair(pair),
@@ -342,10 +373,29 @@ function sanitizeMessages(raw: unknown): ChatMessage[] {
             }))
             .slice(0, 5)
         : undefined,
+      checkpoint: sanitizeCheckpoint(item.checkpoint),
     });
   }
 
   return messages.length > 0 ? messages.slice(-MAX_MESSAGES) : seedMessages;
+}
+
+function sanitizeCheckpoint(raw: unknown): ChatCheckpoint | undefined {
+  if (!isRecord(raw)) return undefined;
+
+  const paletteId =
+    typeof raw.selectedPaletteId === "string" &&
+    colorPalettes.some((palette) => palette.id === raw.selectedPaletteId)
+      ? raw.selectedPaletteId
+      : null;
+
+  const design = sanitizeDesign(raw.design);
+  return {
+    design,
+    selectedPaletteId: paletteId,
+    posterEdits: sanitizePosterEdits(raw.posterEdits),
+    layerOrder: sanitizeLayerOrder(buildPoster(design), raw.layerOrder),
+  };
 }
 
 /** Validates untrusted persisted data; returns null when nothing usable is found. */
@@ -364,5 +414,6 @@ export function sanitizeState(raw: unknown): StudioState | null {
     messages: sanitizeMessages(raw.messages),
     selectedPaletteId: paletteId,
     posterEdits: sanitizePosterEdits(raw.posterEdits),
+    layerOrder: sanitizeLayerOrder(buildPoster(design), raw.layerOrder),
   };
 }

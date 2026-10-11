@@ -1,9 +1,11 @@
 "use client";
 
 import type { Dispatch, ReactNode } from "react";
+import Image from "next/image";
 import type { DesignState } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
+import type { ImportedReference } from "@/lib/image-import-client";
 import { ColorPaletteSelector } from "./color-palette-selector";
 import { CreativeBrief } from "./creative-brief";
 import { TypographySelector } from "./typography-selector";
@@ -15,6 +17,12 @@ const THUMBNAIL_THEMES = [
   { background: "#E9E0F2", ink: "#1C1724", accent: "#7D45B7" },
   { background: "#D8E5EB", ink: "#10212A", accent: "#D44B3D" },
   { background: "#F0D8D2", ink: "#351D1B", accent: "#C52F54" },
+];
+
+const TEXTURE_STUDIES = [
+  { id: "paper", label: "Paper grain", className: "is-paper" },
+  { id: "ink", label: "Ink wash", className: "is-ink" },
+  { id: "signal", label: "Signal noise", className: "is-signal" },
 ];
 
 function ReferenceThumb({ index }: { index: number }) {
@@ -93,34 +101,77 @@ export function InspirationBoard({
   selectedPaletteId,
   dispatch,
   compact = false,
+  importedReference,
 }: {
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
   compact?: boolean;
+  importedReference?: ImportedReference | null;
 }) {
   const fontPair = getFontPair(design.typography.id);
 
   if (compact) {
     return (
       <section aria-label="Reference" className="studio-compact-reference">
+        {importedReference ? (
+          <div className="studio-compact-imported-reference">
+            <Image
+              src={importedReference.previewUrl}
+              alt={`Imported reference: ${importedReference.filename}`}
+              width={52}
+              height={52}
+              unoptimized
+            />
+            <div>
+              <span>Imported reference</span>
+              <p>{importedReference.summary}</p>
+            </div>
+          </div>
+        ) : null}
         <div className="studio-compact-reference-heading">
           <p>Reference</p>
           <span>{design.projectName || "Untitled poster"}</span>
         </div>
-        <div className="studio-compact-fonts" aria-label="Current fonts">
-          <span>{fontPair.heading}</span>
-          <span>{fontPair.body}</span>
+        <div className="studio-compact-reference-section" aria-labelledby="compact-fonts-heading">
+          <div className="studio-compact-reference-section-heading">
+            <span id="compact-fonts-heading">Fonts</span>
+            <span>Current pairing</span>
+          </div>
+          <div className="studio-compact-fonts" aria-label="Current fonts">
+            <span>{fontPair.heading}</span>
+            <span>{fontPair.body}</span>
+          </div>
         </div>
-        <ul className="studio-compact-reference-grid" aria-label="Reference studies">
-          {referenceCards.slice(0, 4).map((card) => (
-            <li key={card.id}>
-              <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
-                <span className="studio-compact-reference-placeholder" aria-hidden="true" />
-              </a>
-            </li>
-          ))}
-        </ul>
+        <div className="studio-compact-reference-section" aria-labelledby="compact-references-heading">
+          <div className="studio-compact-reference-section-heading">
+            <span id="compact-references-heading">References</span>
+            <span>Studies</span>
+          </div>
+          <ul className="studio-compact-reference-grid" aria-label="Reference studies">
+            {referenceCards.slice(0, 4).map((card) => (
+              <li key={card.id}>
+                <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
+                  <span className="studio-compact-reference-placeholder" aria-hidden="true" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="studio-compact-reference-section" aria-labelledby="compact-textures-heading">
+          <div className="studio-compact-reference-section-heading">
+            <span id="compact-textures-heading">Textures</span>
+            <span>Surface cues</span>
+          </div>
+          <ul className="studio-compact-texture-grid" aria-label="Texture studies">
+            {TEXTURE_STUDIES.map((texture) => (
+              <li key={texture.id}>
+                <span className={`studio-compact-texture-swatch ${texture.className}`} aria-hidden="true" />
+                <span>{texture.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
     );
   }

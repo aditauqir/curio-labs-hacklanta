@@ -6,6 +6,8 @@ import {
   POSTER_HEIGHT,
   POSTER_WIDTH,
   buildPoster,
+  getPosterDimensions,
+  normalizeLayerOrder,
   type PosterShape,
   type PosterText,
 } from "./poster-layout";
@@ -162,10 +164,11 @@ type PosterLayers = {
   typography: HTMLCanvasElement;
 };
 
-function createCanvas() {
+function createCanvas(design: DesignState) {
+  const { width, height } = getPosterDimensions(design);
   const canvas = document.createElement("canvas");
-  canvas.width = POSTER_WIDTH;
-  canvas.height = POSTER_HEIGHT;
+  canvas.width = width;
+  canvas.height = height;
   return canvas;
 }
 
@@ -188,11 +191,12 @@ function drawPosterLayers(
   headingStack: string,
   bodyStack: string,
   edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
 ): PosterLayers {
-  const composite = createCanvas();
-  const background = createCanvas();
-  const graphics = createCanvas();
-  const typography = createCanvas();
+  const composite = createCanvas(design);
+  const background = createCanvas(design);
+  const graphics = createCanvas(design);
+  const typography = createCanvas(design);
   const { shapes, texts } = buildPoster(design);
 
   const backgroundContext = background.getContext("2d");
@@ -203,25 +207,47 @@ function drawPosterLayers(
     throw new Error("Canvas export is not supported in this browser.");
   }
 
+  const { width, height } = getPosterDimensions(design);
+  const scaleX = width / POSTER_WIDTH;
+  const scaleY = height / POSTER_HEIGHT;
+  [backgroundContext, graphicsContext, typographyContext, compositeContext].forEach((context) => {
+    context.scale(scaleX, scaleY);
+  });
+
   const backgroundEdit = { ...createPosterLayerEdit(), ...(edits.background ?? {}) };
   if (backgroundEdit.visible) {
     backgroundContext.fillStyle = design.colors.background;
     backgroundContext.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
-    compositeContext.drawImage(background, 0, 0);
   }
 
-  shapes.forEach((shape) => {
-    const edit = { ...createPosterLayerEdit(), ...(edits[shape.id] ?? {}) };
-    if (!edit.visible) return;
-    drawShape(graphicsContext, shape, edit);
-    drawShape(compositeContext, shape, edit);
-  });
-  texts.forEach((item) => {
+  const shapeById = new Map(shapes.map((shape) => [shape.id, shape]));
+  const textById = new Map(texts.map((item) => [item.id, item]));
+  const orderedIds = [...normalizeLayerOrder({ shapes, texts }, layerOrder)].reverse();
+
+  for (const id of orderedIds) {
+    if (id === "background") {
+      if (backgroundEdit.visible) {
+        compositeContext.drawImage(background, 0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+      }
+      continue;
+    }
+
+    const shape = shapeById.get(id);
+    if (shape) {
+      const edit = { ...createPosterLayerEdit(), ...(edits[shape.id] ?? {}) };
+      if (!edit.visible) continue;
+      drawShape(graphicsContext, shape, edit);
+      drawShape(compositeContext, shape, edit);
+      continue;
+    }
+
+    const item = textById.get(id);
+    if (!item) continue;
     const edit = { ...createPosterLayerEdit(), ...(edits[item.id] ?? {}) };
-    if (!edit.visible) return;
+    if (!edit.visible) continue;
     drawText(typographyContext, item, headingStack, bodyStack, edit);
     drawText(compositeContext, item, headingStack, bodyStack, edit);
-  });
+  }
 
   return { composite, background, graphics, typography };
 }
@@ -231,9 +257,14 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
 }
 
 /** Renders the same poster model the screen uses and downloads a raster image. */
-export async function exportPosterAsImage(design: DesignState, format: "png" | "jpg", edits: PosterEdits = {}) {
+export async function exportPosterAsImage(
+  design: DesignState,
+  format: "png" | "jpg",
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+) {
   const { headingStack, bodyStack } = await prepareFonts(design);
-  const { composite } = drawPosterLayers(design, headingStack, bodyStack, edits);
+  const { composite } = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder);
   const mime = format === "jpg" ? "image/jpeg" : "image/png";
   const blob = await canvasBlob(composite, mime, format === "jpg" ? 0.92 : undefined);
   if (!blob) throw new Error(`Could not create a ${format.toUpperCase()} from the poster.`);
@@ -242,12 +273,17 @@ export async function exportPosterAsImage(design: DesignState, format: "png" | "
 }
 
 /** Renders a layered PSD that opens in Photoshop and other PSD-compatible editors. */
-export async function exportPosterAsPsd(design: DesignState, edits: PosterEdits = {}) {
+export async function exportPosterAsPsd(
+  design: DesignState,
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+) {
   const { headingStack, bodyStack } = await prepareFonts(design);
-  const layers = drawPosterLayers(design, headingStack, bodyStack, edits);
+  const layers = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder);
+  const { width, height } = getPosterDimensions(design);
   const buffer = writePsd({
-    width: POSTER_WIDTH,
-    height: POSTER_HEIGHT,
+    width,
+    height,
     canvas: layers.composite,
     children: [
       { name: "Typography", canvas: layers.typography },
@@ -262,23 +298,29 @@ export async function exportPosterAsPsd(design: DesignState, edits: PosterEdits 
   );
 }
 
-export async function exportPoster(design: DesignState, format: PosterExportFormat, edits: PosterEdits = {}) {
+export async function exportPoster(
+  design: DesignState,
+  format: PosterExportFormat,
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+) {
   if (format === "psd") {
-    await exportPosterAsPsd(design, edits);
+    await exportPosterAsPsd(design, edits, layerOrder);
     return;
   }
-  await exportPosterAsImage(design, format, edits);
+  await exportPosterAsImage(design, format, edits, layerOrder);
 }
 
 /** Backwards-compatible PNG export used by callers that do not need format selection. */
-export async function exportPosterAsPng(design: DesignState) {
-  await exportPosterAsImage(design, "png");
+export async function exportPosterAsPng(design: DesignState, layerOrder: readonly string[] = []) {
+  await exportPosterAsImage(design, "png", {}, layerOrder);
 }
 
 export function exportBriefAsJson(
   design: DesignState,
   selectedPaletteId: string | null,
   posterEdits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
 ) {
   const payload = {
     project: design.projectName,
@@ -286,6 +328,7 @@ export function exportBriefAsJson(
     brief: getBrief(design, selectedPaletteId),
     design,
     posterEdits,
+    layerOrder: normalizeLayerOrder(buildPoster(design), layerOrder),
   };
 
   downloadBlob(

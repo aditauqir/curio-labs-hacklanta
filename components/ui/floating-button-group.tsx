@@ -43,6 +43,7 @@ export function FloatingButtonGroup({
   size = "md",
   orientation = "horizontal",
   iconOnly = false,
+  showHighlight = true,
   tooltipSide,
   onAction,
   className,
@@ -54,6 +55,7 @@ export function FloatingButtonGroup({
   size?: "sm" | "md";
   orientation?: "horizontal" | "vertical";
   iconOnly?: boolean;
+  showHighlight?: boolean;
   tooltipSide?: "top" | "bottom" | "left" | "right";
   onAction?: (id: string) => void;
   className?: string;
@@ -63,10 +65,13 @@ export function FloatingButtonGroup({
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const actionItems = useMemo(() => items.filter(isAction), [items]);
   const [rovingId, setRovingId] = useState(actionItems[0]?.id ?? "");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<Highlight>(null);
   const activeRovingId = actionItems.some((item) => item.id === rovingId && !item.disabled)
     ? rovingId
     : actionItems.find((item) => !item.disabled)?.id ?? "";
+  const pressedId = actionItems.find((item) => item.pressed && !item.disabled)?.id ?? null;
+  const defaultHighlightId = pressedId ?? activeRovingId;
 
   const measure = useCallback((id: string) => {
     const tray = trayRef.current;
@@ -74,6 +79,7 @@ export function FloatingButtonGroup({
     if (!tray || !button) return;
     const trayRect = tray.getBoundingClientRect();
     const buttonRect = button.getBoundingClientRect();
+    setHighlightedId(id);
     setHighlight({
       x: buttonRect.left - trayRect.left,
       y: buttonRect.top - trayRect.top,
@@ -83,14 +89,21 @@ export function FloatingButtonGroup({
   }, []);
 
   useEffect(() => {
+    if (!showHighlight || !defaultHighlightId) return;
+    measure(defaultHighlightId);
+  }, [defaultHighlightId, measure, showHighlight]);
+
+  useEffect(() => {
+    if (!showHighlight || !defaultHighlightId) return;
     const tray = trayRef.current;
     if (!tray) return;
     const observer = new ResizeObserver(() => {
-      if (rovingId) measure(rovingId);
+      const targetId = highlightedId ?? defaultHighlightId;
+      if (targetId) measure(targetId);
     });
     observer.observe(tray);
     return () => observer.disconnect();
-  }, [measure, rovingId]);
+  }, [defaultHighlightId, highlightedId, measure, showHighlight]);
 
   function moveFocus(currentId: string, direction: -1 | 1) {
     const enabled = actionItems.filter((item) => !item.disabled);
@@ -99,7 +112,7 @@ export function FloatingButtonGroup({
     const next = enabled[(index + direction + enabled.length) % enabled.length];
     setRovingId(next.id);
     buttonRefs.current[next.id]?.focus();
-    measure(next.id);
+    if (showHighlight) measure(next.id);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, id: string) {
@@ -118,7 +131,7 @@ export function FloatingButtonGroup({
       if (target) {
         setRovingId(target.id);
         buttonRefs.current[target.id]?.focus();
-        measure(target.id);
+        if (showHighlight) measure(target.id);
       }
     }
   }
@@ -137,12 +150,20 @@ export function FloatingButtonGroup({
           `floating-button-group-${variant}`,
           `floating-button-group-${size}`,
           `floating-button-group-${orientation}`,
+          showHighlight && "has-highlight",
           className,
         )}
         style={style}
-        onPointerLeave={() => setHighlight(null)}
+        onPointerLeave={() => {
+          if (pressedId) {
+            measure(pressedId);
+          } else {
+            setHighlightedId(null);
+            setHighlight(null);
+          }
+        }}
       >
-        {highlight ? (
+        {showHighlight && highlight ? (
           <motion.span
             aria-hidden="true"
             className="floating-button-group-highlight"
@@ -171,13 +192,17 @@ export function FloatingButtonGroup({
                 displayIconOnly && "is-icon-only",
                 item.pressed && "is-pressed",
               )}
-              onPointerEnter={() => measure(item.id)}
+              onPointerEnter={() => {
+                if (showHighlight) measure(item.id);
+              }}
               onFocus={() => {
                 setRovingId(item.id);
-                measure(item.id);
+                if (showHighlight) measure(item.id);
               }}
               onKeyDown={(event) => handleKeyDown(event, item.id)}
               onClick={() => {
+                setRovingId(item.id);
+                if (showHighlight) measure(item.id);
                 item.onSelect?.();
                 onAction?.(item.id);
               }}

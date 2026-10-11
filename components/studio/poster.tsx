@@ -6,6 +6,7 @@ import {
   POSTER_HEIGHT,
   POSTER_WIDTH,
   buildPoster,
+  normalizeLayerOrder,
   type PosterShape,
   type PosterText,
 } from "@/lib/poster-layout";
@@ -13,8 +14,10 @@ import { createPosterLayerEdit, type PosterEdits, type PosterTool } from "@/lib/
 
 type Bounds = { x: number; y: number; width: number; height: number };
 type DragMode = "move" | "scale";
+type SelectionMode = "rectangle-select" | "lasso";
 
-type Interaction = {
+type LayerInteraction = {
+  kind: "layer";
   id: string;
   mode: DragMode;
   pointerId: number;
@@ -23,15 +26,44 @@ type Interaction = {
   bounds: Bounds;
 };
 
+type PanInteraction = {
+  kind: "pan";
+  pointerId: number;
+  start: { x: number; y: number };
+  scroll: { left: number; top: number };
+  stage: HTMLElement;
+};
+
+type SelectionInteraction = {
+  kind: "selection";
+  mode: SelectionMode;
+  pointerId: number;
+  start: { x: number; y: number };
+  current: { x: number; y: number };
+  points: { x: number; y: number }[];
+};
+
+type Interaction = LayerInteraction | PanInteraction | SelectionInteraction;
+
+type SelectionPreview = {
+  mode: SelectionMode;
+  start: { x: number; y: number };
+  current: { x: number; y: number };
+  points: { x: number; y: number }[];
+};
+
 type PosterProps = {
   design: DesignState;
   edits?: PosterEdits;
+  layerOrder?: string[];
   selectedLayerId?: string | null;
   activeTool?: PosterTool;
   onSelectLayer?: (id: string | null) => void;
   onChangeLayer?: (id: string, patch: Partial<ReturnType<typeof createPosterLayerEdit>>) => void;
   onEditText?: (id: string) => void;
   onDeleteLayer?: (id: string) => void;
+  onPickColor?: (value: string) => void;
+  onFill?: () => void;
 };
 
 function editFor(edits: PosterEdits | undefined, id: string) {
@@ -127,17 +159,25 @@ function renderShape(shape: PosterShape) {
 export function Poster({
   design,
   edits,
+  layerOrder = [],
   selectedLayerId = null,
   activeTool = "select",
   onSelectLayer,
   onChangeLayer,
   onEditText,
   onDeleteLayer,
+  onPickColor,
+  onFill,
 }: PosterProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const interaction = useRef<Interaction | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [selection, setSelection] = useState<SelectionPreview | null>(null);
   const { shapes, texts } = useMemo(() => buildPoster(design), [design]);
+  const orderedLayerIds = useMemo(
+    () => normalizeLayerOrder({ shapes, texts }, layerOrder),
+    [layerOrder, shapes, texts],
+  );
 
   const layerBounds = useMemo(() => {
     const result = new Map<string, Bounds>();
@@ -149,19 +189,128 @@ export function Poster({
 
   const selectedBounds = selectedLayerId ? layerBounds.get(selectedLayerId) : undefined;
   const selectedEdit = selectedLayerId ? editFor(edits, selectedLayerId) : null;
+  const layerColors = useMemo(() => {
+    const result = new Map<string, string>();
+    result.set("background", design.colors.background);
+    shapes.forEach((shape) => {
+      const color = shape.kind === "line" ? shape.stroke : shape.fill ?? shape.stroke;
+      if (color) result.set(shape.id, color);
+    });
+    texts.forEach((item) => result.set(item.id, item.color));
+    return result;
+  }, [design.colors.background, shapes, texts]);
+
+  function beginPan(event: ReactPointerEvent<SVGElement>) {
+    const svg = svgRef.current;
+    const stage = svg?.closest<HTMLElement>(".design-canvas-stage");
+    if (!svg || !stage) return;
+    event.preventDefault();
+    event.stopPropagation();
+    interaction.current = {
+      kind: "pan",
+      pointerId: event.pointerId,
+      start: { x: event.clientX, y: event.clientY },
+      scroll: { left: stage.scrollLeft, top: stage.scrollTop },
+      stage,
+    };
+    svg.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+  }
+
+  function beginSelection(event: ReactPointerEvent<SVGElement>, mode: SelectionMode) {
+    const svg = svgRef.current;
+    if (!svg) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = localPoint(svg, event);
+    interaction.current = {
+      kind: "selection",
+      mode,
+      pointerId: event.pointerId,
+      start: point,
+      current: point,
+      points: [point],
+    };
+    setSelection({ mode, start: point, current: point, points: [point] });
+    svg.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+  }
+
+  function transformedBounds(bounds: Bounds, edit: ReturnType<typeof createPosterLayerEdit>): Bounds {
+    const width = bounds.width * edit.scale;
+    const height = bounds.height * edit.scale;
+    const centerX = bounds.x + bounds.width / 2 + edit.x;
+    const centerY = bounds.y + bounds.height / 2 + edit.y;
+    return { x: centerX - width / 2, y: centerY - height / 2, width, height };
+  }
+
+  function selectionBounds(preview: SelectionPreview | SelectionInteraction): Bounds {
+    const points = preview.mode === "lasso" ? preview.points : [preview.start, preview.current];
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    return {
+      x,
+      y,
+      width: Math.max(1, Math.max(...xs) - x),
+      height: Math.max(1, Math.max(...ys) - y),
+    };
+  }
+
+  function intersects(first: Bounds, second: Bounds) {
+    return (
+      first.x <= second.x + second.width &&
+      first.x + first.width >= second.x &&
+      first.y <= second.y + second.height &&
+      first.y + first.height >= second.y
+    );
+  }
+
+  function commitSelection(current: SelectionInteraction) {
+    const marquee = selectionBounds(current);
+    const candidates = Array.from(layerBounds.entries()).filter(([id, bounds]) => {
+      if (id === "background") return false;
+      const edit = editFor(edits, id);
+      return edit.visible && intersects(marquee, transformedBounds(bounds, edit));
+    });
+    onSelectLayer?.(candidates.at(-1)?.[0] ?? null);
+  }
 
   function beginInteraction(
     event: ReactPointerEvent<SVGElement>,
     id: string,
     mode: DragMode = "move",
   ) {
+    if (activeTool === "hand") {
+      beginPan(event);
+      return;
+    }
+    if (activeTool === "rectangle-select" || activeTool === "lasso") {
+      beginSelection(event, activeTool);
+      return;
+    }
     event.stopPropagation();
     onSelectLayer?.(id);
+    if (activeTool === "eraser") {
+      if (id !== "background") onDeleteLayer?.(id);
+      return;
+    }
+    if (activeTool === "dropper") {
+      const sampled = layerColors.get(id);
+      if (sampled && /^#[0-9a-f]{6}$/i.test(sampled)) onPickColor?.(sampled);
+      return;
+    }
+    if (activeTool === "fill") {
+      onFill?.();
+      return;
+    }
     if (activeTool === "text" && id !== "background") {
       onEditText?.(id);
       return;
     }
-    if (activeTool !== "select" || !onChangeLayer) return;
+    if (activeTool !== "select" && activeTool !== "crop") return;
+    if (!onChangeLayer) return;
 
     const edit = editFor(edits, id);
     if (edit.locked || id === "background") return;
@@ -170,8 +319,9 @@ export function Poster({
     if (!bounds || !svg) return;
 
     interaction.current = {
+      kind: "layer",
       id,
-      mode,
+      mode: activeTool === "crop" ? "scale" : mode,
       pointerId: event.pointerId,
       start: localPoint(svg, event),
       original: edit,
@@ -184,8 +334,25 @@ export function Poster({
   function moveInteraction(event: ReactPointerEvent<SVGSVGElement>) {
     const current = interaction.current;
     const svg = svgRef.current;
-    if (!current || !svg || !onChangeLayer) return;
+    if (!current || !svg) return;
+    if (current.kind === "pan") {
+      current.stage.scrollLeft = current.scroll.left - (event.clientX - current.start.x);
+      current.stage.scrollTop = current.scroll.top - (event.clientY - current.start.y);
+      return;
+    }
     const point = localPoint(svg, event);
+    if (current.kind === "selection") {
+      current.current = point;
+      if (current.mode === "lasso") current.points = [...current.points, point];
+      setSelection({
+        mode: current.mode,
+        start: current.start,
+        current: point,
+        points: current.points,
+      });
+      return;
+    }
+    if (!onChangeLayer) return;
     const dx = point.x - current.start.x;
     const dy = point.y - current.start.y;
 
@@ -204,8 +371,11 @@ export function Poster({
   }
 
   function endInteraction(event: ReactPointerEvent<SVGSVGElement>) {
-    if (interaction.current?.pointerId === event.pointerId) {
+    const current = interaction.current;
+    if (current?.pointerId === event.pointerId) {
+      if (current.kind === "selection") commitSelection(current);
       interaction.current = null;
+      setSelection(null);
       setIsDragging(false);
       if (svgRef.current?.hasPointerCapture(event.pointerId)) {
         svgRef.current.releasePointerCapture(event.pointerId);
@@ -249,7 +419,15 @@ export function Poster({
                 : isDragging
                   ? "grabbing"
                   : "grab"
-              : "text",
+              : activeTool === "crop"
+                ? "nwse-resize"
+                : activeTool === "hand"
+                ? isDragging
+                  ? "grabbing"
+                  : "grab"
+                : activeTool === "text"
+                  ? "text"
+                  : "crosshair",
         }}
       >
         <text
@@ -291,13 +469,38 @@ export function Poster({
                 : isDragging
                   ? "grabbing"
                   : "grab"
-              : "crosshair",
+              : activeTool === "crop"
+                ? "nwse-resize"
+                : activeTool === "hand"
+                ? isDragging
+                  ? "grabbing"
+                  : "grab"
+                : "crosshair",
         }}
       >
         {renderShape(shape)}
       </g>
     );
   };
+
+  function renderLayer(id: string) {
+    if (id === "background") {
+      return (
+        <rect
+          key="background"
+          data-layer-id="background"
+          width={POSTER_WIDTH}
+          height={POSTER_HEIGHT}
+          fill={design.colors.background}
+          onPointerDown={(event) => beginInteraction(event, "background")}
+        />
+      );
+    }
+    const shape = shapes.find((item) => item.id === id);
+    if (shape) return renderGraphic(shape);
+    const text = texts.find((item) => item.id === id);
+    return text ? renderText(text) : null;
+  }
 
   return (
     <svg
@@ -309,22 +512,38 @@ export function Poster({
       className="block h-full w-full"
       tabIndex={0}
       onPointerDown={(event) => {
-        if (event.target === event.currentTarget) onSelectLayer?.(null);
+        if (activeTool === "hand") {
+          beginPan(event);
+        } else if (activeTool === "rectangle-select" || activeTool === "lasso") {
+          beginSelection(event, activeTool);
+        } else if (event.target === event.currentTarget) {
+          onSelectLayer?.(null);
+        }
       }}
       onPointerMove={moveInteraction}
       onPointerUp={endInteraction}
       onPointerCancel={endInteraction}
       onKeyDown={handleKeyDown}
     >
-      <rect
-        data-layer-id="background"
-        width={POSTER_WIDTH}
-        height={POSTER_HEIGHT}
-        fill={design.colors.background}
-        onPointerDown={(event) => beginInteraction(event, "background")}
-      />
-      {shapes.map(renderGraphic)}
-      {texts.map(renderText)}
+      {[...orderedLayerIds].reverse().map(renderLayer)}
+
+      {selection ? (
+        selection.mode === "lasso" ? (
+          <polyline
+            className="poster-marquee-selection"
+            points={selection.points.map((point) => `${point.x},${point.y}`).join(" ")}
+            fill="rgba(118, 167, 255, 0.08)"
+            pointerEvents="none"
+          />
+        ) : (
+          <rect
+            className="poster-marquee-selection"
+            {...selectionBounds(selection)}
+            fill="rgba(118, 167, 255, 0.08)"
+            pointerEvents="none"
+          />
+        )
+      ) : null}
 
       {selectedLayerId && selectedBounds && selectedEdit && selectedLayerId !== "background" ? (
         <g

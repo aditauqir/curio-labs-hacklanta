@@ -1,8 +1,13 @@
 import type { DesignState } from "./design-types";
-import { getFontPair } from "./design-presets";
+import { getFontPair, getPosterSize } from "./design-presets";
 
 export const POSTER_WIDTH = 1080;
 export const POSTER_HEIGHT = 1350;
+
+export function getPosterDimensions(design: DesignState) {
+  const size = getPosterSize(design.posterSize);
+  return { width: size.width, height: size.height };
+}
 const MARGIN = 96;
 
 export type PosterText = {
@@ -59,6 +64,34 @@ export type PosterModel = {
   texts: PosterText[];
   shapes: PosterShape[];
 };
+
+export function getDefaultLayerOrder(model: PosterModel) {
+  return [...model.texts.map((item) => item.id), ...model.shapes.map((shape) => shape.id), "background"];
+}
+
+/** Keeps saved layer orders valid as poster directions add or remove elements. */
+export function normalizeLayerOrder(model: PosterModel, layerOrder: readonly string[] = []) {
+  const validIds = new Set(getDefaultLayerOrder(model));
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const id of [...layerOrder, ...getDefaultLayerOrder(model)]) {
+    if (id === "background" || !validIds.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    normalized.push(id);
+  }
+
+  if (validIds.has("background")) normalized.push("background");
+
+  return normalized;
+}
+
+export function sanitizeLayerOrder(model: PosterModel, raw: unknown) {
+  return normalizeLayerOrder(
+    model,
+    Array.isArray(raw) ? raw.filter((value): value is string => typeof value === "string").slice(0, 200) : [],
+  );
+}
 
 const SPACING_FACTOR = { compact: 0.85, normal: 1, spacious: 1.15 } as const;
 

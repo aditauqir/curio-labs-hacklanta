@@ -20,10 +20,14 @@ export function ExportControls({
   design,
   selectedPaletteId,
   posterEdits = {},
+  layerOrder = [],
+  compact = false,
 }: {
   design: DesignState;
   selectedPaletteId: string | null;
   posterEdits?: PosterEdits;
+  layerOrder?: string[];
+  compact?: boolean;
 }) {
   const [status, setStatus] = useState<Status>({ tone: "idle", message: "" });
   const [format, setFormat] = useState<PosterExportFormat>("png");
@@ -31,7 +35,7 @@ export function ExportControls({
   async function exportSelectedFormat() {
     setStatus({ tone: "busy", message: `Rendering ${format.toUpperCase()}...` });
     try {
-      await exportPoster(design, format, posterEdits);
+      await exportPoster(design, format, posterEdits, layerOrder);
       setStatus({ tone: "ok", message: `${format.toUpperCase()} downloaded` });
     } catch (error) {
       setStatus({
@@ -43,7 +47,7 @@ export function ExportControls({
 
   function exportJson() {
     try {
-      exportBriefAsJson(design, selectedPaletteId, posterEdits);
+      exportBriefAsJson(design, selectedPaletteId, posterEdits, layerOrder);
       setStatus({ tone: "ok", message: "Brief downloaded" });
     } catch {
       setStatus({ tone: "error", message: "Brief export failed" });
@@ -54,16 +58,18 @@ export function ExportControls({
 
   return (
     <WarmTooltipGroup delay={420} warmWindow={300} travel={220}>
-      <div className="flex items-center gap-2">
-        <span
-          role="status"
-          aria-live="polite"
-          className={`hidden text-xs md:inline ${
-            status.tone === "error" ? "text-red-700" : "text-muted"
-          }`}
-        >
-          {status.message}
-        </span>
+      <div className={`flex items-center gap-2${compact ? " studio-export-compact" : ""}`}>
+        {!compact ? (
+          <span
+            role="status"
+            aria-live="polite"
+            className={`hidden text-xs md:inline ${
+              status.tone === "error" ? "text-red-700" : "text-muted"
+            }`}
+          >
+            {status.message}
+          </span>
+        ) : null}
         <GlideSelect
           options={FORMAT_OPTIONS}
           value={format}
@@ -79,28 +85,32 @@ export function ExportControls({
           menuWidth={150}
           disabled={busy}
         />
-        <WarmTooltip content="Download the editable brief" shortcut="JSON" side="bottom">
-          <button
-            type="button"
-            aria-label="Download brief JSON"
-            onClick={exportJson}
-            className="whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
-          >
-            Brief JSON
-          </button>
-        </WarmTooltip>
-        <WarmTooltip content={`Export ${format.toUpperCase()}`} shortcut="Enter" side="bottom">
-          <button
-            type="button"
-            onClick={() => void exportSelectedFormat()}
-            disabled={busy}
-            aria-label={`Export ${format.toUpperCase()}`}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-ink px-3 py-2 text-xs font-medium text-paper transition-opacity disabled:opacity-50"
-          >
-            <DownloadIcon />
-            Export {format.toUpperCase()}
-          </button>
-        </WarmTooltip>
+        {!compact ? (
+          <>
+            <WarmTooltip content="Download the editable brief" shortcut="JSON" side="bottom">
+              <button
+                type="button"
+                aria-label="Download brief JSON"
+                onClick={exportJson}
+                className="whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
+              >
+                Brief JSON
+              </button>
+            </WarmTooltip>
+            <WarmTooltip content={`Export ${format.toUpperCase()}`} shortcut="Enter" side="bottom">
+              <button
+                type="button"
+                onClick={() => void exportSelectedFormat()}
+                disabled={busy}
+                aria-label={`Export ${format.toUpperCase()}`}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-ink px-3 py-2 text-xs font-medium text-paper transition-opacity disabled:opacity-50"
+              >
+                <DownloadIcon />
+                Export {format.toUpperCase()}
+              </button>
+            </WarmTooltip>
+          </>
+        ) : null}
       </div>
     </WarmTooltipGroup>
   );

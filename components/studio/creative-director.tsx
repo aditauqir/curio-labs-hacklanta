@@ -7,20 +7,26 @@ import {
   type Dispatch,
   type FormEvent,
 } from "react";
-import { VoiceBeam } from "voice-glow";
+import { Wave } from "loading-dev";
 import type { AssetSuggestion, ChatMessage, DesignState } from "@/lib/design-types";
 import { describePatch, patchToActions } from "@/lib/ai-patch";
 import { directionConfigs } from "@/lib/design-presets";
 import { interpretRequest } from "@/lib/demo-director";
 import { askDirector, DirectorError } from "@/lib/director-client";
-import { makeId, type StudioAction } from "@/lib/design-state";
+import {
+  createDefaultState,
+  makeId,
+  studioReducer,
+  type StudioAction,
+  type StudioState,
+} from "@/lib/design-state";
 import type { PosterEdits } from "@/lib/poster-editor";
-import { MicIcon, MicOffIcon, SendIcon } from "./icons";
+import { ArrowBendDownRightIcon, MicIcon, MicOffIcon, SendIcon, StopIcon } from "./icons";
 import { StreamingText } from "./StreamingText";
-import { ThinkingState } from "./ThinkingState";
 import { useCapabilities } from "./use-capabilities";
 import { useVoice } from "./use-voice";
 import { VoiceKeyframes } from "./voice-keyframes";
+import { MessageActions } from "./message-actions";
 
 const MAX_MESSAGE = 500;
 
@@ -33,20 +39,28 @@ const SOURCE_LABEL: Record<NonNullable<ChatMessage["source"]>, string> = {
 const PROMPTS: Record<DesignState["direction"], string[]> = {
   vintage: [
     "Make it more minimal but keep the layout",
-    "Use a deep teal accent",
-    "Center everything",
   ],
   minimal: [
     "Make it warmer and more vintage, but keep the layout",
-    "Use a blue accent",
-    "Make it more spacious",
   ],
   experimental: [
     "Make it warmer and more vintage, but keep the layout",
-    "Use a pink accent",
-    "Align it left",
   ],
 };
+
+function ensureQuestion(reply: string, design: DesignState) {
+  const clean = reply.trim();
+  if (/[?？]$/.test(clean)) return clean;
+
+  const question =
+    design.direction === "vintage"
+      ? "Should we keep this warm direction, or push it somewhere sharper?"
+      : design.direction === "minimal"
+        ? "Should I keep this quiet and minimal, or push the contrast further?"
+        : "Should we keep this experimental tension, or make the hierarchy calmer?";
+
+  return `${clean} ${question}`;
+}
 
 type Outcome = {
   reply: string;
@@ -64,6 +78,7 @@ export function CreativeDirector({
   design,
   selectedPaletteId,
   posterEdits,
+  layerOrder,
   dispatch,
   initialPrompt,
 }: {
@@ -71,14 +86,16 @@ export function CreativeDirector({
   design: DesignState;
   selectedPaletteId: string | null;
   posterEdits: PosterEdits;
+  layerOrder: string[];
   dispatch: Dispatch<StudioAction>;
   initialPrompt?: string | null;
 }) {
   const capabilities = useCapabilities();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const [desktopVoiceBeam, setDesktopVoiceBeam] = useState(false);
+  const [startFromHereId, setStartFromHereId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(false);
   const initialPromptRef = useRef<string | null>(null);
   const sendRef = useRef<(text: string, spoken?: boolean) => void>(() => undefined);
@@ -90,21 +107,17 @@ export function CreativeDirector({
       sendRef.current(text, true);
     },
   });
-  const { speak } = voice;
+  const { speak, unlockAudio } = voice;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, pending]);
 
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    const update = () => setDesktopVoiceBeam(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
   async function interpret(content: string): Promise<Outcome> {
+    const anchorIndex = startFromHereId
+      ? messages.findIndex((message) => message.id === startFromHereId)
+      : -1;
+    const history = anchorIndex >= 0 ? messages.slice(0, anchorIndex + 1) : messages;
     const local = () => {
       const result = interpretRequest(content, design);
       return {
@@ -124,11 +137,22 @@ export function CreativeDirector({
         design,
         paletteId: selectedPaletteId,
         posterEdits,
-        history: messages,
+        history,
       });
+      const actions = patchToActions(ai.patch);
+      // Gemini can occasionally answer correctly in prose but omit the
+      // structured patch. Keep the interaction honest, but still make a
+      // recognizable request such as "make it more modern" change the poster.
+      const fallback = local();
+      if (actions.length === 0 && fallback.actions.length > 0) {
+        return {
+          ...fallback,
+          notice: "Curio is using a fallback for this change.",
+        };
+      }
       return {
         reply: ai.reply,
-        actions: patchToActions(ai.patch),
+        actions,
         // Chips list what was actually applied, not what the model claims it did.
         changes: describePatch(ai.patch),
         source: "gemini",
@@ -150,6 +174,7 @@ export function CreativeDirector({
     const content = raw.trim().slice(0, MAX_MESSAGE);
     if (!content || pendingRef.current) return;
 
+    unlockAudio();
     pendingRef.current = true;
     setPending(true);
     setDraft("");
@@ -160,6 +185,11 @@ export function CreativeDirector({
 
     try {
       const outcome = await interpret(content);
+      const reply = ensureQuestion(outcome.reply, design);
+      const appliedState = outcome.actions.reduce<StudioState>(
+        (next, action) => studioReducer(next, action),
+        { design, messages, selectedPaletteId, posterEdits, layerOrder },
+      );
       for (const action of outcome.actions) dispatch(action);
       dispatch({
         type: "addMessages",
@@ -168,19 +198,26 @@ export function CreativeDirector({
             id: makeId(),
             role: "assistant",
             source: outcome.source,
-            content: outcome.reply,
+            content: reply,
             changes: outcome.changes,
             suggestions: outcome.suggestions,
             skipped: outcome.skipped?.length ? outcome.skipped : undefined,
             notice: outcome.notice,
             assetSuggestions: outcome.assets,
+            checkpoint: {
+              design: appliedState.design,
+              selectedPaletteId: appliedState.selectedPaletteId,
+              posterEdits: appliedState.posterEdits,
+              layerOrder: appliedState.layerOrder,
+            },
           },
         ],
       });
-      if (spoken || voice.canSpeak) void speak(outcome.reply);
+      if (spoken || voice.canSpeak) void speak(reply);
     } finally {
       pendingRef.current = false;
       setPending(false);
+      setStartFromHereId(null);
     }
   }
 
@@ -197,6 +234,39 @@ export function CreativeDirector({
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void send(draft);
+  }
+
+  function rewindTo(messageId: string) {
+    if (pendingRef.current) return;
+
+    const messageIndex = messages.findIndex((message) => message.id === messageId);
+    if (messageIndex < 0) return;
+
+    const message = messages[messageIndex];
+    const fallback = createDefaultState();
+    const checkpoint =
+      message.checkpoint ??
+      (messageIndex === messages.length - 1
+        ? { design, selectedPaletteId, posterEdits, layerOrder }
+        : {
+            design: fallback.design,
+            selectedPaletteId: fallback.selectedPaletteId,
+            posterEdits: fallback.posterEdits,
+            layerOrder: fallback.layerOrder,
+          });
+
+    dispatch({
+      type: "restoreState",
+      state: {
+        design: checkpoint.design,
+        messages: messages.slice(0, messageIndex + 1),
+        selectedPaletteId: checkpoint.selectedPaletteId,
+        posterEdits: checkpoint.posterEdits,
+        layerOrder: checkpoint.layerOrder,
+      },
+    });
+    setStartFromHereId(messageId);
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   const lastId = messages[messages.length - 1]?.id;
@@ -226,13 +296,22 @@ export function CreativeDirector({
   if (listening) micLabel = "Stop recording and send";
   else if (voice.block) micLabel = "Voice input unavailable";
 
-  const beamProcessing = pending || voice.phase === "transcribing";
-  const beamActive = beamProcessing || voice.phase === "listening" || voice.phase === "speaking";
-  const beamLevel = beamProcessing || voice.phase === "speaking" ? 0.34 : 0;
+  const micTitle = voice.error
+    ? voice.error
+    : voice.block === "not-configured"
+      ? "Speech-to-text is not configured"
+      : voice.block === "insecure"
+        ? "Open this app on localhost or HTTPS to use voice input"
+        : voice.block === "unsupported"
+          ? "This browser does not provide microphone recording"
+          : listening
+            ? "Stop recording and transcribe"
+            : "Record a spoken design request";
+
   const chatComposer = (
     <form
       onSubmit={onSubmit}
-      aria-label="Chat with the creative director"
+      aria-label="Chat workspace"
       data-testid="editor-chat-box"
       className="director-chat-box flex items-center gap-2 rounded-2xl border border-line bg-paper p-1.5"
     >
@@ -241,28 +320,56 @@ export function CreativeDirector({
         disabled={micDisabled}
         aria-label={micLabel}
         aria-pressed={listening}
+        title={micTitle}
         onClick={() => (listening ? voice.stop() : void voice.start())}
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition-colors disabled:opacity-50 ${
           listening
-            ? "border-ink bg-ink text-paper"
+            ? "border-white bg-white text-black"
             : "border-line text-ink hover:border-ink"
         }`}
+        style={
+          listening
+            ? { borderColor: "#fff", background: "#fff", color: "#050505" }
+            : undefined
+        }
       >
         {voice.block ? (
           <MicOffIcon />
         ) : voice.phase === "speaking" ? (
-          <VoiceKeyframes active />
+          <Wave size={20} />
         ) : (
           <MicIcon />
         )}
       </button>
+      {listening ? (
+        <button
+          type="button"
+          aria-label="Cancel voice recording"
+          title="Cancel voice recording"
+          onClick={voice.cancel}
+          className="director-voice-cancel grid shrink-0 place-items-center rounded-full border transition-colors"
+          style={{
+            borderColor: "rgba(240, 117, 102, 0.46)",
+            background: "rgba(240, 117, 102, 0.12)",
+            color: "#f08a79",
+          }}
+        >
+          <StopIcon />
+        </button>
+      ) : null}
+      {pending ? (
+        <span className="director-composer-status" role="status" aria-label="Curio is thinking">
+          <Wave size={20} />
+        </span>
+      ) : null}
       <input
+        ref={inputRef}
         type="text"
         value={draft}
         maxLength={MAX_MESSAGE}
         onChange={(event) => setDraft(event.target.value)}
         placeholder="Describe a change or a direction"
-        aria-label="Message the creative director"
+        aria-label="Describe a change"
         className="h-10 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
       />
       <button
@@ -278,7 +385,7 @@ export function CreativeDirector({
 
   return (
     <section
-      aria-label="Creative director"
+      aria-label="Chat workspace"
       className="flex min-h-0 flex-1 flex-col bg-panel"
     >
       <div className="director-header border-b border-line px-5 py-4">
@@ -313,15 +420,15 @@ export function CreativeDirector({
         </ol>
       </div>
 
-      <div className="studio-chat-messages min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5" aria-live="polite">
+      <div className="studio-chat-messages min-h-0 flex-1 overflow-y-auto" aria-live="polite">
         {messages.map((message) => (
           <div
             key={message.id}
-            className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
+            className={`director-message-row ${message.role === "user" ? "is-user" : "is-assistant"}`}
           >
-            <div className="max-w-[92%]">
+            <div className="director-message">
               {message.role === "assistant" ? (
-                <p className="mb-1 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">
+                <p className="director-message-kicker mb-1 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">
                   Curio Labs
                   {message.source ? (
                     <span className="rounded border border-line px-1.5 py-0.5 normal-case tracking-normal">
@@ -331,29 +438,28 @@ export function CreativeDirector({
                 </p>
               ) : null}
               {message.role === "assistant" && message.id === lastId ? (
-                <div className="rounded-lg border border-line bg-paper px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+                <div className="director-message-bubble">
                   <StreamingText text={message.content} className="streaming-text" />
                 </div>
               ) : (
-                <p
-                  className={`rounded-lg px-3.5 py-2.5 text-sm leading-relaxed ${
-                    message.role === "user"
-                      ? "bg-ink text-paper"
-                      : "border border-line bg-paper text-ink"
-                  }`}
-                >
+                <p className="director-message-bubble">
                   {message.content}
                 </p>
               )}
+              {message.role === "assistant" ? (
+                <MessageActions
+                  onStartFromHere={() => rewindTo(message.id)}
+                />
+              ) : null}
               {message.notice ? (
                 <p className="mt-1.5 text-[11px] text-muted">{message.notice}</p>
               ) : null}
               {message.changes && message.changes.length > 0 ? (
-                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Changes applied">
+                <ul className="studio-chip-row mt-2 flex flex-wrap gap-1.5" aria-label="Changes applied">
                   {message.changes.map((change) => (
                     <li
                       key={change}
-                      className="rounded border border-line bg-paper px-2 py-1 text-[11px] text-muted"
+                      className="studio-change-chip"
                     >
                       {change}
                     </li>
@@ -371,14 +477,14 @@ export function CreativeDirector({
                 </p>
               ) : null}
               {message.id === lastId && message.suggestions?.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {message.suggestions.map((direction) => (
+                <div className="studio-chip-row mt-3 flex flex-wrap gap-2">
+                  {message.suggestions.slice(0, 1).map((direction) => (
                     <button
                       key={direction}
                       type="button"
                       disabled={pending}
                       onClick={() => void send(directionConfigs[direction].label)}
-                      className="rounded-full border border-ink px-3 py-1.5 text-xs font-medium transition-colors hover:bg-ink hover:text-paper disabled:opacity-40"
+                      className="studio-suggestion-chip rounded-full border border-ink px-3 py-1.5 text-xs font-medium transition-colors hover:bg-ink hover:text-paper disabled:opacity-40"
                     >
                       {directionConfigs[direction].label}
                     </button>
@@ -389,49 +495,35 @@ export function CreativeDirector({
           </div>
         ))}
 
-        {pending ? (
-          <p className="text-xs text-muted" role="status">
-            Curio is <ThinkingState />
-          </p>
-        ) : null}
         <div ref={endRef} />
       </div>
 
       <div className="studio-chat-footer border-t border-line px-5 pb-5 pt-4">
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <div className="director-prompt-row mb-3 flex flex-wrap gap-1.5">
           {PROMPTS[design.direction].map((prompt) => (
             <button
               key={prompt}
               type="button"
               disabled={pending}
               onClick={() => void send(prompt)}
-              className="rounded-md border border-line px-2.5 py-1.5 text-left text-[11px] leading-snug text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-40"
+              className="studio-prompt-chip rounded-md border border-line px-2.5 py-1.5 text-left text-[11px] leading-snug text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-40"
             >
+              <ArrowBendDownRightIcon className="studio-prompt-chip-icon" />
               {prompt}
             </button>
           ))}
         </div>
 
-        {desktopVoiceBeam ? (
-          <VoiceBeam
-            className="editor-voice-beam"
-            type="default"
-            stream={voice.stream}
-            level={beamLevel}
-            active={beamActive}
-            motion={beamProcessing ? { gather: 0.82, stretch: 0.18, heldLevel: 0.34, cornerFollow: 0.2 } : null}
-            theme="dark"
-            colorVariant="mono"
-            strength={0.6}
-            idle={0.05}
-          >
-            {chatComposer}
-          </VoiceBeam>
-        ) : (
-          chatComposer
-        )}
+        <div className="director-composer-shell">
+          {chatComposer}
+        </div>
 
         {voice.error ? <span className="sr-only" role="alert">{voice.error}</span> : null}
+        {startFromHereId ? (
+          <span className="sr-only" role="status">
+            The next request will start from this response.
+          </span>
+        ) : null}
       </div>
     </section>
   );
