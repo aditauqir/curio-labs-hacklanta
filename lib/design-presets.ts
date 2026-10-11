@@ -237,5 +237,5 @@ const baseDesign: DesignState = {
   layout: { alignment: "left", spacing: "normal", variant: "asymmetric-grid" },
 };
 
-export const initialDesign: DesignState = applyDirection(baseDesign, "minimal");
-export const initialPaletteId = directionConfigs.minimal.paletteId;
+export const initialDesign: DesignState = applyDirection(baseDesign, "vintage");
+export const initialPaletteId = directionConfigs.vintage.paletteId;
