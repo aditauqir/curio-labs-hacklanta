@@ -22,6 +22,7 @@ export function StudioInspector({
   onSelectLayer,
   onToggleLayerVisibility,
   onToggleLayerLock,
+  onDeleteLayer,
   onReorderLayer,
   onToggleReference,
   onToggleLayers,
@@ -38,6 +39,7 @@ export function StudioInspector({
   onSelectLayer: (id: string | null) => void;
   onToggleLayerVisibility: (id: string) => void;
   onToggleLayerLock: (id: string) => void;
+  onDeleteLayer: (id: string) => void;
   onReorderLayer: (id: string, direction: "up" | "down") => void;
   onToggleReference: () => void;
   onToggleLayers: () => void;
@@ -78,6 +80,7 @@ export function StudioInspector({
             onSelectLayer={onSelectLayer}
             onToggleLayerVisibility={onToggleLayerVisibility}
             onToggleLayerLock={onToggleLayerLock}
+            onDeleteLayer={onDeleteLayer}
             onReorderLayer={onReorderLayer}
           />
         </section>

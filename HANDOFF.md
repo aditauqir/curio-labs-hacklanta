@@ -34,6 +34,8 @@ Latest demo workflow: the home screen now opens a clearly labeled preloaded `Sig
 
 Latest image import behavior: imported references now remain visible on the poster canvas even when Gemini image analysis is unavailable; the Reference inspector clearly labels that analysis fallback while the local preview remains usable.
 
+Latest Layers behavior: the compact Layers inspector now has a dedicated Delete control for every non-background layer; deletion remains reversible through the row's Show control, and the layer rows use a tighter viewport-relative vertical rhythm.
+
 Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) contains the data-grounding/tuning scope, evaluation requirements, safety boundaries, and PR sign-off checklist for the next Gemini-quality pass.
 
 Gemini merge priority: conflicts in the intelligence/data layer must be resolved manually in favor of preserving the server-only Gemini path, structured patch validation, knowledge retrieval, and `data/gemini/*`; UI code should adapt around those contracts rather than deleting or bypassing them.

@@ -537,6 +537,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                     onSelectLayer={setSelectedLayerId}
                     onToggleLayerVisibility={toggleLayerVisibility}
                     onToggleLayerLock={toggleLayerLock}
+                    onDeleteLayer={deleteLayer}
                     onReorderLayer={(id, direction) => dispatch({ type: "reorderLayer", id, direction })}
                     onToggleReference={() => setReferenceOpen((open) => !open)}
                     onToggleLayers={() => setLayersOpen((open) => !open)}

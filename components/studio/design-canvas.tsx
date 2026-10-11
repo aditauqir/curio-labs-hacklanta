@@ -292,7 +292,7 @@ export function DesignCanvas({
         setCanvasStatus("Project reset");
       } else if (actionDialog === "delete-layer" && pendingLayerId) {
         onDeleteLayer(pendingLayerId);
-        setCanvasStatus("Layer hidden");
+        setCanvasStatus("Layer deleted");
       } else if (actionDialog === "save") {
         await onSaveProject();
         setCanvasStatus("Saved");
@@ -322,9 +322,9 @@ export function DesignCanvas({
           }
         : actionDialog === "delete-layer"
           ? {
-              title: "Hide layer?",
-              description: "The layer will leave the poster but remain in Layers so you can restore it later.",
-              confirm: "Hide layer",
+              title: "Delete layer?",
+              description: "The layer will leave the poster but remain in Layers, where you can restore it later.",
+              confirm: "Delete layer",
               variant: "destructive" as const,
             }
           : actionDialog === "save"
@@ -945,8 +945,8 @@ export function DesignCanvas({
             onSelect: () => void cutSelectedText(),
           },
           {
-            id: "hide-layer",
-            label: "Hide selected layer",
+            id: "delete-layer",
+            label: "Delete selected layer",
             icon: <TrashIcon />,
             iconOnly: true,
             disabled: !selectedLayerId || selectedLayerId === "background",

@@ -106,6 +106,23 @@ test.describe("studio workspace", () => {
     expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(1440);
   });
 
+  test("deletes and restores a layer from the compact Layers panel", async ({ page }) => {
+    await page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Layers" }).click();
+
+    const layerItem = page.locator('[aria-label="Poster layers"] > li').first();
+    const layerRow = layerItem.locator(".studio-layer-row");
+    const rowBox = await layerRow.boundingBox();
+    expect(rowBox).not.toBeNull();
+    expect(rowBox!.height).toBeLessThan(50);
+
+    await layerItem.getByRole("button", { name: "Delete Headline" }).click();
+    await expect(layerItem.getByRole("button", { name: "Show Headline" })).toBeVisible();
+    await expect(page.locator('[data-layer-id="headline-0"]')).toHaveCount(0);
+
+    await layerItem.getByRole("button", { name: "Show Headline" }).click();
+    await expect(page.locator('[data-layer-id="headline-0"]')).toHaveCount(1);
+  });
+
   test("explains canvas actions with tooltips", async ({ page }) => {
     await page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Export" }).hover();
     await expect(page.getByRole("tooltip")).toHaveText("Export");
