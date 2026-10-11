@@ -124,6 +124,7 @@ test.describe("studio workspace", () => {
   });
 
   test("explains canvas actions with tooltips", async ({ page }) => {
+    await expect(page.getByRole("button", { name: "Resize selected layer" })).toHaveCount(0);
     await page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Export" }).hover();
     await expect(page.getByRole("tooltip")).toHaveText("Export");
   });

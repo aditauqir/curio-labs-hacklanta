@@ -16,7 +16,6 @@ import {
 import { Poster, type BrushStroke } from "./poster";
 import {
   CopyIcon,
-  CropIcon,
   DropIcon,
   EraserIcon,
   ExportIcon,
@@ -538,17 +537,6 @@ export function DesignCanvas({
               onSelect: () => void checkLayout(),
             },
             { type: "separator", id: "canvas-select-divider" },
-            {
-              id: "crop",
-              label: "Resize selected layer",
-              icon: <CropIcon />,
-              pressed: activeTool === "crop",
-              onSelect: () => {
-                onToolChange("crop");
-                setPropertiesOpen(true);
-                setCanvasStatus("Resize selected layer");
-              },
-            },
             {
               id: "brush",
               label: "Brush options",
