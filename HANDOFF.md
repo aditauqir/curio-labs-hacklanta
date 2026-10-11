@@ -22,6 +22,8 @@ Latest composer refinement: the quick suggestion is centered with the curved arr
 
 Latest toolbar alignment behavior: the floating toolbar highlight is anchored to the tray origin before applying measured button coordinates, keeping the Layers and other pressed/hover states directly aligned with their icons.
 
+Latest CI verification: the desktop E2E suite now follows the canonical `/app` editor landmarks and current canvas action bar; local checks pass all 18 browser tests after the production workflow exposed stale selectors.
+
 Next contributor handoff: [Gemini workflow PR handoff](GEMINI_WORKFLOW_PR_HANDOFF.md) contains the data-grounding/tuning scope, evaluation requirements, safety boundaries, and PR sign-off checklist for the next Gemini-quality pass.
 
 Gemini merge priority: conflicts in the intelligence/data layer must be resolved manually in favor of preserving the server-only Gemini path, structured patch validation, knowledge retrieval, and `data/gemini/*`; UI code should adapt around those contracts rather than deleting or bypassing them.
