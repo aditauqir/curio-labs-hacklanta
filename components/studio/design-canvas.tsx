@@ -15,6 +15,7 @@ import {
 } from "@/lib/poster-editor";
 import { Poster } from "./poster";
 import {
+  CloseIcon,
   CopyIcon,
   CropIcon,
   DropIcon,
@@ -149,6 +150,10 @@ export function DesignCanvas({
   const [exporting, setExporting] = useState(false);
   const [canvasStatus, setCanvasStatus] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const closeProperties = useCallback(() => {
+    setPropertiesOpen(false);
+    onToolChange("select");
+  }, [onToolChange]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [actionDialog, setActionDialog] = useState<CanvasActionDialog | null>(null);
   const [pendingLayerId, setPendingLayerId] = useState<string | null>(null);
@@ -202,6 +207,10 @@ export function DesignCanvas({
       const editingField = target?.matches("input, textarea, select, [contenteditable='true']");
 
       if (event.key === "Escape") {
+        if (propertiesOpen) {
+          closeProperties();
+          return;
+        }
         onSelectLayer(null);
         setEditStatus("Nothing selected");
         return;
@@ -221,7 +230,7 @@ export function DesignCanvas({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [copySelectedText, cutSelectedText, onSelectLayer, selectedTextLayer]);
+  }, [closeProperties, copySelectedText, cutSelectedText, onSelectLayer, propertiesOpen, selectedTextLayer]);
 
   async function checkLayout() {
     setChecking(true);
@@ -956,13 +965,13 @@ export function DesignCanvas({
             </div>
             <button
               type="button"
-              className="studio-footer-button"
-              onClick={() => {
-                setPropertiesOpen(false);
-                onToolChange("select");
-              }}
+              className="studio-properties-close"
+              aria-label="Close poster properties"
+              title="Close (Esc)"
+              onClick={closeProperties}
             >
-              Done
+              <CloseIcon />
+              <span>Close</span>
             </button>
           </div>
 
