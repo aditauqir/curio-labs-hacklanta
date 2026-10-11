@@ -28,9 +28,20 @@ Python 3.12 or newer. Dependencies: NumPy, SciPy, Pillow, OpenCV (headless), fon
 | `typography/` | Font library read from the font files themselves, name matching with the confidence-then-category fallback chain, text rendering (tracking, leading, case, outline, rotation, wrap, align), auto-fit, microtype columns, text on a path, the legibility guard |
 | `style_schema/` | Versioned validators for presets and recipes, the directory loader with hot reload, preset resolving and tuning, explicit logged merging, three `fallback_*` test presets |
 | `styles/` | Where style JSON files are dropped (empty; the data is produced elsewhere) |
+| `docs/` | The **offline** style ingestion pipeline: the export contract for the analysis model (`MODEL_EXPORT_SPEC.md`) and how compiled styles reach TigerData. Not run by the website; see `docs/README.md` |
+| `compiler/` | Validates a style-analysis export and compiles it into presets, layouts and templates (see below) |
+| `layout/` | The layout schema (regions as fractions with tunable bounds) and the engine that places them in pixels, clamping tuning and dropping empty optional slots |
+| `store/` | Loads a compiled folder as one consistent set; a template whose preset, layout or overrides do not resolve is skipped and reported. `StyleSource` is the seam for a database later |
+| `render/` | The runner: template + content + photo to a poster and a **record** of every value, clamp, font fallback, legibility fix, licence and unsupported capability |
 
-Not built yet (steps 5 to 9): asset acquisition and the rights manifest, the pipeline
-runner, the creative director, the critique loop and export, scrapers.
+Not built yet: asset acquisition and the rights manifest, the creative director, the
+critique loop, scrapers.
+
+```bash
+python -m curio compile EXPORT_DIR compiled/
+python -m curio render compiled/ synth_newsprint__inset_window out/poster.png \
+  --photo photo.jpg --license CC0-1.0 --text headline="Night Shift" --text "tracklist=One|Two|Three"
+```
 
 ## Conventions
 

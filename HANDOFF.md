@@ -1,6 +1,6 @@
 # Curio Labs: Handoff
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 Read this first. It is the single source of truth for where the project stands and where to work next.
 If you create a branch, you must also log it in the [Branch log](#branch-log). See [Working agreement](#working-agreement).
@@ -37,7 +37,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Production microphone access is enabled over HTTPS. |
 | Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
 | Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
-| Raster engine (`curio/`, Python) | Build steps 1 to 4 done on `curio-raster-engine`: layer stack and renderer, 44 deterministic image ops with golden-image tests, font library and text rendering, versioned style loader with hot reload and fallback test presets. **No generative image models, by design.** A separate Python package, not yet connected to the Next.js app. Steps 5 to 9 (asset rights manifest, pipeline runner, director, critique and export, scrapers) are not built. See `curio/README.md` and `curio/OPEN_ITEMS.md`. |
+| Raster engine (`curio/`, Python) | On `curio-raster-engine`: layer stack and renderer, 44 deterministic image ops with golden-image tests, font library and text rendering (including hollow type), versioned style loader, a compiler from the style-analysis export to presets/layouts/templates, a layout engine, and an end-to-end runner (`python -m curio render`) that writes a poster plus a record of every value, fallback, legibility fix and licence. **No generative image models, by design.** A separate Python package, not yet connected to the Next.js app. Not built: asset rights manifest, director, critique loop, scrapers. See `curio/README.md` and `curio/OPEN_ITEMS.md`. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
@@ -88,6 +88,7 @@ lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.t
   director-client.ts    Browser fetch for the director with a timeout
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
 curio/                  Python raster engine (separate from the Next.js app): core/, ops/, typography/, style_schema/, styles/, tests/. See curio/README.md
+curio/docs/             Offline style ingestion pipeline: analysis-model export spec -> `curio compile` -> TigerData (publish step not built). Run by hand, never by the website or deploy. See curio/docs/README.md
 scripts/new-branch.mjs  Creates a branch and logs it here (see Working agreement)
 scripts/check-secrets.mjs  Fails if a credential-shaped string is in a committable file
 scripts/add-domain-ssl.sh  Server-side: add a domain to nginx and expand the Let's Encrypt certificate
@@ -261,5 +262,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
-| `curio-raster-engine` | 2026-10-10 | Python raster engine (curio/): layer stack, deterministic op registry, text and font library, versioned style loader. No generative image models | in progress | Steps 1 to 4 of the build brief done (core, ops, typography, style loader). Local only, not pushed |
+| `curio-raster-engine` | 2026-10-10 | Python raster engine (curio/): layer stack, deterministic op registry, text and font library, versioned style loader. No generative image models | in progress | Core, ops, typography, style loader, export compiler, layout engine, compiled-style store and poster runner done. Local only, not pushed |
 <!-- BRANCH-LOG-INSERT -->
