@@ -233,6 +233,51 @@ export function lookAssetUrl(assetId: string) {
   return `/looks/${assetId}${assetId.startsWith("ht_") ? ".png" : ".webp"}`;
 }
 
+const ASSET_KINDS: [string, string][] = [
+  ["ht_", "Halftone screen"],
+  ["paper_", "Paper"],
+  ["grain_", "Grain"],
+  ["overlay_", "Overlay"],
+  ["pattern_", "Pattern"],
+  ["vec_", "Vector"],
+];
+
+export type LookAssetReference = {
+  id: string;
+  label: string;
+  kind: string;
+  usedBy: string[];
+  url: string;
+  thumbnail: string;
+};
+
+/** Every image asset the looks use, once each: these are Curio's visual references. */
+export const lookAssetReferences: LookAssetReference[] = (() => {
+  const byId = new Map<string, LookAssetReference>();
+  for (const look of referenceLooks) {
+    const used = [
+      ...(look.screen ? [{ asset: look.screen.asset, label: look.screen.label }] : []),
+      ...look.textures.map((texture) => ({ asset: texture.asset, label: texture.label })),
+    ];
+    for (const { asset, label } of used) {
+      const existing = byId.get(asset);
+      if (existing) {
+        existing.usedBy.push(look.name);
+        continue;
+      }
+      byId.set(asset, {
+        id: asset,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        kind: ASSET_KINDS.find(([prefix]) => asset.startsWith(prefix))?.[1] ?? "Texture",
+        usedBy: [look.name],
+        url: lookAssetUrl(asset),
+        thumbnail: `/looks/thumbs/${asset}.webp`,
+      });
+    }
+  }
+  return [...byId.values()];
+})();
+
 /** One line per look for model prompts: everything the model needs to cite a look concretely. */
 export function describeLooksForPrompt() {
   return referenceLooks

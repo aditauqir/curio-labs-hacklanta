@@ -22,6 +22,7 @@ import numpy as np
 from PIL import Image
 
 W, H = 1080, 1350
+THUMB = 240
 
 # Keep in sync with the asset ids referenced in lib/reference-looks.ts.
 HALFTONES = [
@@ -87,6 +88,15 @@ def main():
         im, meta = bake(root, by_id, asset_id)
         im.save(out / f"{asset_id}.webp", quality=82, method=6)
         record.append({"id": asset_id, "file": f"{asset_id}.webp", "kind": meta["kind"], "license": meta.get("license", "CC0-1.0")})
+
+    # Reference thumbnails: a native-scale crop, so a halftone keeps its real dot pitch
+    # instead of averaging to grey as it would if the whole plate were downscaled.
+    thumbs = out / "thumbs"
+    thumbs.mkdir(exist_ok=True)
+    for item in record:
+        im = Image.open(out / item["file"])
+        x0, y0 = (W - THUMB) // 2, (H - THUMB) // 2
+        im.crop((x0, y0, x0 + THUMB, y0 + THUMB)).save(thumbs / f"{item['id']}.webp", quality=85, method=6)
 
     (out / "manifest.json").write_text(
         json.dumps(

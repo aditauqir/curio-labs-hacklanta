@@ -4881,8 +4881,16 @@ select {
 }
 
 .studio-compact-reference .studio-compact-reference-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0.35rem;
   margin-top: 0.7rem;
   max-width: none;
+}
+
+img.studio-compact-reference-placeholder {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
 }
 
 .studio-compact-texture-grid {

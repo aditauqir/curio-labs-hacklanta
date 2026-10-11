@@ -5,7 +5,7 @@ import type {
   Spacing,
   TextAlignment,
 } from "./design-types";
-import { NO_LOOK, getReferenceLook, lookAssetUrl, lookPaletteId, referenceLooks } from "./reference-looks";
+import { NO_LOOK, getReferenceLook, lookAssetReferences, lookPaletteId, referenceLooks } from "./reference-looks";
 
 export type PosterSizeConfig = {
   id: PosterSize;
@@ -51,6 +51,8 @@ export type ReferenceCard = {
   category: string;
   source: string;
   sourceUrl: string;
+  /** Native-scale crop of the image asset. */
+  thumbnail: string;
 };
 
 export const fontPairs: FontPair[] = [
@@ -98,15 +100,16 @@ export const colorPalettes: ColorPalette[] = referenceLooks.map((look) => ({
 }));
 
 /**
- * References are the analysed reference looks from curio/assets. Each card links to the
- * look's own screen or texture asset, so the source is something Curio actually ships.
+ * References are the image assets in curio/assets that the analysed looks are built from:
+ * halftone screens, paper, grain, overlays, patterns and vectors (CC0, baked to public/looks).
  */
-export const referenceCards: ReferenceCard[] = referenceLooks.map((look) => ({
-  id: look.id,
-  title: look.name,
-  category: look.styleTags.slice(0, 2).join(" · "),
-  source: "Curio engine analysis",
-  sourceUrl: lookAssetUrl(look.screen?.asset ?? look.textures[0].asset),
+export const referenceCards: ReferenceCard[] = lookAssetReferences.map((asset) => ({
+  id: asset.id,
+  title: asset.label,
+  category: `${asset.kind} · ${asset.usedBy.join(", ")}`,
+  source: "curio/assets (CC0)",
+  sourceUrl: asset.url,
+  thumbnail: asset.thumbnail,
 }));
 
 type DirectionConfig = {
