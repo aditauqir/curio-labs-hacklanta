@@ -344,4 +344,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `codex/e2e-ci-fix` | 2026-10-11 | Fix the stale desktop E2E editor setup after the merged UI release | merged | PR #21; apex-only workspace routing deployed as `d218585` |
 | `library-engine-texture-filter` | 2026-10-11 | Keep engine-texture rows out of the Gemini library context so the curio/assets textures can be published to curio_library_assets | in progress | Gemini context and coach search skip rows tagged `engine-texture`; `/api/assets` still lists them. Prerequisite for publishing `curio/assets` from `curio-raster-engine`. |
 | `reference-looks` | 2026-10-11 | Ground the web poster and Gemini prompts in the analysed reference looks (curio/assets textures, halftones, style tags) | PR open | Lint, typecheck, unit tests and secret scan pass; all 8 looks and the PNG export were checked in a real browser. Local E2E was limited by low RAM (dev server OOM, Chromium GPU crash), 10/11 studio tests passed |
+| `properties-panel-close` | 2026-10-11 | Give the Poster properties panel a visible close button and Escape-to-close | in progress | |
 <!-- BRANCH-LOG-INSERT -->
