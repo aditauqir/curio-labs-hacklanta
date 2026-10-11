@@ -61,6 +61,30 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Redaction 35";
+  src: url("/fonts/Redaction35-Regular.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Redaction 35";
+  src: url("/fonts/Redaction35-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Redaction 35";
+  src: url("/fonts/Redaction35-Italic.otf") format("opentype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --paper: #fbfbf9;
   --panel: #f6f5f1;
@@ -1484,36 +1508,35 @@ select {
   }
 }
 
-/* Wireframe-led start screen: the first decision stays light, open, and immediate. */
+/* Wireframe-led start screen: a full-bleed scene keeps the first decision immediate without becoming a landing page. */
 .onboarding-wireframe-shell {
   position: relative;
   isolation: isolate;
-  background: #fff;
-  color: #161616;
+  background: #263c4b;
+  color: #f8f5ee;
 }
 
 .onboarding-wireframe-shell::before,
 .onboarding-wireframe-shell::after {
   position: absolute;
-  z-index: -1;
+  z-index: -2;
   pointer-events: none;
   content: "";
 }
 
 .onboarding-wireframe-shell::before {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(56vw, 56rem);
-  background: url("/home-landscape.png") center right / cover no-repeat;
-  opacity: 0.3;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.22) 28%, #000 62%, #000 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.22) 28%, #000 62%, #000 100%);
+  inset: 0;
+  background: url("/home-landscape.png") center / cover no-repeat;
+  filter: saturate(0.78) contrast(0.92);
+  opacity: 0.96;
 }
 
 .onboarding-wireframe-shell::after {
+  z-index: -1;
   inset: 0;
-  background: linear-gradient(90deg, #fff 0%, rgba(255, 255, 255, 0.97) 23%, rgba(255, 255, 255, 0.45) 63%, rgba(255, 255, 255, 0) 100%);
+  background:
+    linear-gradient(180deg, rgba(24, 42, 53, 0.32) 0%, rgba(28, 48, 60, 0.12) 42%, rgba(5, 13, 19, 0.86) 100%),
+    linear-gradient(90deg, rgba(15, 32, 42, 0.42) 0%, rgba(15, 32, 42, 0.08) 52%, rgba(15, 32, 42, 0.34) 100%);
 }
 
 .onboarding-wireframe-shell .onboarding-topbar {
@@ -1521,10 +1544,9 @@ select {
   z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   border-bottom: 0;
-  padding-top: 1.25rem;
-  padding-bottom: 1.25rem;
+  padding: clamp(1.1rem, 3vw, 2rem) clamp(1.25rem, 4vw, 4rem);
 }
 
 .onboarding-wireframe-shell .brand-lockup {
@@ -1532,10 +1554,18 @@ select {
   font-size: clamp(0.95rem, 1.25vw, 1.2rem);
   font-weight: 700;
   letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.onboarding-wireframe-shell .brand-dot {
+  background: #fff;
 }
 
 .onboarding-wireframe-shell .onboarding-kicker {
-  display: none;
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
 }
 
 .onboarding-wireframe-shell .onboarding-content {
@@ -1545,21 +1575,21 @@ select {
   align-items: center;
   min-height: 0;
   flex: 1 1 auto;
-  width: min(calc(100% - 2rem), 78rem);
-  margin: 0 auto;
-  padding: clamp(1rem, 4dvh, 3.25rem) 0;
+  width: 100%;
+  margin: 0;
+  padding: clamp(1rem, 4dvh, 3.25rem) clamp(1.25rem, 5vw, 5rem) clamp(1rem, 3dvh, 1.75rem);
 }
 
 .onboarding-wireframe-card {
   width: 100%;
-  height: min(100%, 46rem);
+  height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.42fr);
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 0;
   border-radius: 0;
-  background: #fff;
+  background: transparent;
   box-shadow: none;
   animation: workflow-rise 700ms var(--curio-ease) both;
 }
@@ -1570,6 +1600,7 @@ select {
   align-items: center;
   justify-content: center;
   padding: clamp(1.5rem, 5dvh, 4.5rem) clamp(1.25rem, 6vw, 6.5rem);
+  color: #fff;
   text-align: center;
 }
 
@@ -1577,6 +1608,7 @@ select {
   width: clamp(7rem, 15vw, 11rem);
   height: clamp(7rem, 15vw, 11rem);
   margin-bottom: 1.25rem;
+  filter: brightness(0) invert(1);
 }
 
 .onboarding-wireframe-shell .onboarding-eyebrow {
@@ -1587,12 +1619,14 @@ select {
 
 .onboarding-wireframe-shell .gathering-main h1,
 .onboarding-wireframe-hero h1 {
-  max-width: 35rem;
+  max-width: 48rem;
   margin-top: 1rem;
-  font-size: clamp(2.7rem, 5.2vw, 4.8rem);
-  font-weight: 700;
-  letter-spacing: -0.085em;
-  line-height: 0.92;
+  font-family: "Redaction 35", Georgia, serif;
+  font-size: clamp(3.15rem, 7vw, 7rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.88;
+  text-shadow: 0 0.15rem 1.5rem rgba(7, 18, 24, 0.22);
 }
 
 .onboarding-wireframe-hero .onboarding-form {
@@ -1602,9 +1636,24 @@ select {
 
 .onboarding-wireframe-shell .onboarding-input-row {
   min-height: 3.5rem;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 999px;
-  background: #f1f0ee;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 1rem 2rem rgba(7, 18, 24, 0.12);
+  backdrop-filter: blur(1rem);
+}
+
+.onboarding-wireframe-shell .onboarding-input-row:focus-within {
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 0 0 0.22rem rgba(255, 255, 255, 0.12), 0 1rem 2rem rgba(7, 18, 24, 0.16);
+}
+
+.onboarding-wireframe-shell .onboarding-input-row input {
+  color: #fff;
+}
+
+.onboarding-wireframe-shell .onboarding-input-row input::placeholder {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .onboarding-mic-control {
@@ -1708,13 +1757,29 @@ select {
 .onboarding-wireframe-shell .starter-prompts button,
 .onboarding-wireframe-shell .onboarding-skip {
   border-radius: 0.15rem;
-  border-color: #dedbd4;
-  background: #fff;
-  color: #66635d;
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(0.75rem);
 }
 
 .onboarding-wireframe-shell .starter-prompts button {
   font-weight: 600;
+}
+
+.onboarding-wireframe-shell .starter-prompts button:hover,
+.onboarding-wireframe-shell .onboarding-skip:hover {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.onboarding-wireframe-shell .onboarding-voice-status {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.onboarding-wireframe-shell .onboarding-error {
+  color: #ffd2d2;
 }
 
 .onboarding-wireframe-shell .onboarding-skip {
@@ -1733,6 +1798,7 @@ select {
   gap: 0.35rem;
   border-left: 0;
   padding: clamp(1.25rem, 3vw, 2rem);
+  color: #fff;
 }
 
 .onboarding-projects-heading {
@@ -1740,7 +1806,7 @@ select {
   align-items: center;
   justify-content: space-between;
   margin-bottom: auto;
-  color: #88847c;
+  color: rgba(255, 255, 255, 0.64);
   font-family: var(--curio-heading-font);
   font-size: 0.68rem;
   letter-spacing: 0.18em;
@@ -1755,7 +1821,7 @@ select {
   min-height: 4.8rem;
   border-top: 0;
   padding: 0.8rem 0.15rem;
-  color: #161616;
+  color: #fff;
   text-align: left;
   transition: background-color 220ms ease, padding 220ms ease;
 }
@@ -1772,7 +1838,7 @@ select {
 }
 
 .onboarding-project-index {
-  color: #88847c;
+  color: rgba(255, 255, 255, 0.58);
   font-family: var(--curio-heading-font);
   font-size: 0.68rem;
   letter-spacing: 0.12em;
@@ -1794,7 +1860,7 @@ select {
 
 .onboarding-project-card small {
   margin-top: 0.2rem;
-  color: #88847c;
+  color: rgba(255, 255, 255, 0.62);
   font-family: var(--curio-body-font);
   font-size: 0.72rem;
 }
@@ -1805,7 +1871,9 @@ select {
   justify-content: space-between;
   margin-top: auto;
   border-radius: 0.15rem;
-  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(9, 20, 27, 0.52);
+  backdrop-filter: blur(0.75rem);
   padding: 0.8rem 0.9rem;
   color: #fff;
   font-size: 0.75rem;
@@ -1813,25 +1881,24 @@ select {
 
 @media (max-width: 720px) {
   .onboarding-wireframe-shell::before {
-    top: auto;
-    width: 100%;
-    height: 38%;
-    opacity: 0.2;
-    -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.18) 72%, transparent 100%);
-    mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.18) 72%, transparent 100%);
+    inset: 0;
+    background-position: 62% center;
+    opacity: 0.9;
   }
 
   .onboarding-wireframe-shell::after {
-    background: linear-gradient(0deg, rgba(255, 255, 255, 0.18) 0%, #fff 46%, #fff 100%);
+    background:
+      linear-gradient(180deg, rgba(24, 42, 53, 0.38) 0%, rgba(28, 48, 60, 0.14) 45%, rgba(5, 13, 19, 0.88) 100%),
+      linear-gradient(90deg, rgba(15, 32, 42, 0.28), rgba(15, 32, 42, 0.12));
   }
 
   .onboarding-wireframe-shell .onboarding-content {
     min-height: 0;
     flex: 1 1 auto;
-    width: min(calc(100% - 1rem), 42rem);
+    width: 100%;
     margin-top: 0;
     margin-bottom: 0;
-    padding: 0.5rem 0;
+    padding: 0.5rem 0.75rem 1rem;
   }
 
   .onboarding-wireframe-card {
@@ -1843,7 +1910,7 @@ select {
   .onboarding-wireframe-hero {
     min-height: 0;
     overflow: hidden;
-    padding: 1.25rem 1rem;
+    padding: 0.75rem 0.4rem 1rem;
   }
 
   .onboarding-wireframe-hero .mascot-frame {
@@ -1855,7 +1922,7 @@ select {
   .onboarding-wireframe-shell .gathering-main h1,
   .onboarding-wireframe-hero h1 {
     margin-top: 0.5rem;
-    font-size: clamp(2rem, 9vw, 3.25rem);
+    font-size: clamp(2.6rem, 12vw, 4.5rem);
   }
 
   .onboarding-wireframe-hero .onboarding-form {
@@ -1876,7 +1943,7 @@ select {
     gap: 0.15rem;
     border-top: 0;
     border-left: 0;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 0.55rem;
   }
 
   .onboarding-projects-heading {
