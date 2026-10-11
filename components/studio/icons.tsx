@@ -1,64 +1,230 @@
+import {
+  ArrowDown,
+  ArrowBendDownRight,
+  ArrowCounterClockwise,
+  ArrowClockwise,
+  ArrowUp,
+  ArrowsOutCardinal,
+  ArrowsClockwise,
+  Copy,
+  Crop,
+  DownloadSimple,
+  Drop,
+  Eraser,
+  Eye,
+  EyeSlash,
+  Export,
+  Eyedropper,
+  FilePlus,
+  FloppyDisk,
+  Hand,
+  House,
+  Lasso,
+  Lock,
+  LockOpen,
+  MagicWand,
+  MagnifyingGlass,
+  Microphone,
+  MicrophoneSlash,
+  PaintBrush,
+  PaintBucket,
+  Palette,
+  PaperPlaneTilt,
+  RectangleDashed,
+  Sidebar,
+  SidebarSimple,
+  Scissors,
+  Stamp,
+  SlidersHorizontal,
+  Sparkle,
+  SquaresFour,
+  Stack,
+  Stop,
+  Shuffle,
+  TextT,
+  Trash,
+} from "@phosphor-icons/react";
+
 type IconProps = { className?: string };
 
-const base = {
-  width: 16,
-  height: 16,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.8,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
+const phosphorProps = {
+  size: 16,
+  weight: "regular" as const,
   "aria-hidden": true,
 };
 
 export function MicIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-    </svg>
-  );
+  return <Microphone {...phosphorProps} className={className} />;
 }
 
 export function StopIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
-    </svg>
-  );
+  return <Stop {...phosphorProps} className={className} />;
 }
 
 export function MicOffIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 5.2 2" />
-      <path d="M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 11 5.7M12 18v3" />
-      <path d="M3 3l18 18" />
-    </svg>
-  );
+  return <MicrophoneSlash {...phosphorProps} className={className} />;
 }
 
 export function SendIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M5 12h14M13 6l6 6-6 6" />
-    </svg>
-  );
+  return <PaperPlaneTilt {...phosphorProps} className={className} />;
 }
 
 export function DownloadIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
-    </svg>
-  );
+  return <DownloadSimple {...phosphorProps} className={className} />;
 }
 
 export function ResetIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" />
-    </svg>
-  );
+  return <ArrowCounterClockwise {...phosphorProps} className={className} />;
+}
+
+export function ArrowUpIcon({ className }: IconProps) {
+  return <ArrowUp {...phosphorProps} className={className} />;
+}
+
+export function ArrowDownIcon({ className }: IconProps) {
+  return <ArrowDown {...phosphorProps} className={className} />;
+}
+
+export function ArrowBendDownRightIcon({ className }: IconProps) {
+  return <ArrowBendDownRight {...phosphorProps} className={className} />;
+}
+
+export function RedoIcon({ className }: IconProps) {
+  return <ArrowClockwise {...phosphorProps} className={className} />;
+}
+
+export function RestyleIcon({ className }: IconProps) {
+  return <ArrowsClockwise {...phosphorProps} className={className} />;
+}
+
+export function ShuffleIcon({ className }: IconProps) {
+  return <Shuffle {...phosphorProps} className={className} />;
+}
+
+export function ExportIcon({ className }: IconProps) {
+  return <Export {...phosphorProps} className={className} />;
+}
+
+export function SaveIcon({ className }: IconProps) {
+  return <FloppyDisk {...phosphorProps} className={className} />;
+}
+
+export function FilePlusIcon({ className }: IconProps) {
+  return <FilePlus {...phosphorProps} className={className} />;
+}
+
+export function HomeIcon({ className }: IconProps) {
+  return <House {...phosphorProps} className={className} />;
+}
+
+export function PanelLeftIcon({ className }: IconProps) {
+  return <SidebarSimple {...phosphorProps} className={className} />;
+}
+
+export function PanelRightIcon({ className }: IconProps) {
+  return <Sidebar {...phosphorProps} className={className} />;
+}
+
+export function SlidersIcon({ className }: IconProps) {
+  return <SlidersHorizontal {...phosphorProps} className={className} />;
+}
+
+export function SparkleIcon({ className }: IconProps) {
+  return <Sparkle {...phosphorProps} className={className} />;
+}
+
+export function GridIcon({ className }: IconProps) {
+  return <SquaresFour {...phosphorProps} className={className} />;
+}
+
+export function MoveIcon({ className }: IconProps) {
+  return <ArrowsOutCardinal {...phosphorProps} className={className} />;
+}
+
+export function RectangleSelectIcon({ className }: IconProps) {
+  return <RectangleDashed {...phosphorProps} className={className} />;
+}
+
+export function LassoIcon({ className }: IconProps) {
+  return <Lasso {...phosphorProps} className={className} />;
+}
+
+export function MagicWandIcon({ className }: IconProps) {
+  return <MagicWand {...phosphorProps} className={className} />;
+}
+
+export function CropIcon({ className }: IconProps) {
+  return <Crop {...phosphorProps} className={className} />;
+}
+
+export function PaintBrushIcon({ className }: IconProps) {
+  return <PaintBrush {...phosphorProps} className={className} />;
+}
+
+export function EraserIcon({ className }: IconProps) {
+  return <Eraser {...phosphorProps} className={className} />;
+}
+
+export function StampIcon({ className }: IconProps) {
+  return <Stamp {...phosphorProps} className={className} />;
+}
+
+export function DropIcon({ className }: IconProps) {
+  return <Drop {...phosphorProps} className={className} />;
+}
+
+export function PaintBucketIcon({ className }: IconProps) {
+  return <PaintBucket {...phosphorProps} className={className} />;
+}
+
+export function PaletteIcon({ className }: IconProps) {
+  return <Palette {...phosphorProps} className={className} />;
+}
+
+export function CopyIcon({ className }: IconProps) {
+  return <Copy {...phosphorProps} className={className} />;
+}
+
+export function ScissorsIcon({ className }: IconProps) {
+  return <Scissors {...phosphorProps} className={className} />;
+}
+
+export function TrashIcon({ className }: IconProps) {
+  return <Trash {...phosphorProps} className={className} />;
+}
+
+export function EyedropperIcon({ className }: IconProps) {
+  return <Eyedropper {...phosphorProps} className={className} />;
+}
+
+export function HandIcon({ className }: IconProps) {
+  return <Hand {...phosphorProps} className={className} />;
+}
+
+export function ZoomIcon({ className }: IconProps) {
+  return <MagnifyingGlass {...phosphorProps} className={className} />;
+}
+
+export function LayersIcon({ className }: IconProps) {
+  return <Stack {...phosphorProps} className={className} />;
+}
+
+export function EyeIcon({ className }: IconProps) {
+  return <Eye {...phosphorProps} className={className} />;
+}
+
+export function EyeOffIcon({ className }: IconProps) {
+  return <EyeSlash {...phosphorProps} className={className} />;
+}
+
+export function LockIcon({ className }: IconProps) {
+  return <Lock {...phosphorProps} className={className} />;
+}
+
+export function LockOpenIcon({ className }: IconProps) {
+  return <LockOpen {...phosphorProps} className={className} />;
+}
+
+export function TextIcon({ className }: IconProps) {
+  return <TextT {...phosphorProps} className={className} />;
 }

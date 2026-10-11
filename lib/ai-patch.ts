@@ -13,6 +13,19 @@ import {
   getPalette,
 } from "./design-presets";
 import { HEX_COLOR, type StudioAction } from "./design-state";
+import { buildPoster } from "./poster-layout";
+
+export type AiLayerEdit = {
+  /** Exact layer id from the canvas model. x/y are absolute transform offsets. */
+  id: string;
+  x?: number;
+  y?: number;
+  scale?: number;
+  rotation?: number;
+  opacity?: number;
+  visible?: boolean;
+  locked?: boolean;
+};
 
 /**
  * The only shape AI output is allowed to take. Every field is optional because
@@ -30,6 +43,7 @@ export type AiPatch = {
   headline?: string;
   subtitle?: string;
   mood?: string;
+  layerEdits?: AiLayerEdit[];
 };
 
 export const PATCH_KEYS = [
@@ -44,6 +58,7 @@ export const PATCH_KEYS = [
   "headline",
   "subtitle",
   "mood",
+  "layerEdits",
 ] as const satisfies readonly (keyof AiPatch)[];
 
 const ALIGNMENTS: readonly TextAlignment[] = ["left", "center", "right"];
@@ -141,6 +156,68 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
     else skipped.push(key);
   }
 
+  if (present("layerEdits")) {
+    const rawEdits = raw.layerEdits;
+    if (!Array.isArray(rawEdits)) {
+      skipped.push("layerEdits");
+    } else {
+      const edits: AiLayerEdit[] = [];
+      for (const rawEdit of rawEdits.slice(0, 4)) {
+        if (!isRecord(rawEdit) || typeof rawEdit.id !== "string") {
+          skipped.push("layerEdits");
+          continue;
+        }
+
+        const id = rawEdit.id.trim().slice(0, 80);
+        if (!/^[a-z0-9][a-z0-9._-]*$/i.test(id)) {
+          skipped.push(`layerEdits.${id || "unknown"}`);
+          continue;
+        }
+
+        const edit: AiLayerEdit = { id };
+        let hasValue = false;
+        let invalid = false;
+        for (const key of ["x", "y", "scale", "rotation", "opacity"] as const) {
+          if (rawEdit[key] === undefined) continue;
+          if (typeof rawEdit[key] !== "number" || !Number.isFinite(rawEdit[key])) {
+            invalid = true;
+            continue;
+          }
+          const ranges = {
+            x: [-4000, 4000],
+            y: [-4000, 4000],
+            scale: [0.05, 12],
+            rotation: [-360, 360],
+            opacity: [0, 1],
+          } as const;
+          const [min, max] = ranges[key];
+          if (rawEdit[key] < min || rawEdit[key] > max) {
+            invalid = true;
+            continue;
+          }
+          edit[key] = rawEdit[key];
+          hasValue = true;
+        }
+        for (const key of ["visible", "locked"] as const) {
+          if (rawEdit[key] === undefined) continue;
+          if (typeof rawEdit[key] !== "boolean") {
+            invalid = true;
+            continue;
+          }
+          edit[key] = rawEdit[key];
+          hasValue = true;
+        }
+
+        if (invalid || !hasValue) {
+          skipped.push(`layerEdits.${id}`);
+        } else {
+          edits.push(edit);
+        }
+      }
+      if (edits.length > 0) patch.layerEdits = edits;
+    }
+  }
+
   return { patch, skipped };
 }
 
@@ -169,6 +246,19 @@ export function reconcilePatch(
   message: string,
 ): AiPatch {
   const next: AiPatch = { ...patch };
+
+  if (next.layerEdits) {
+    const poster = buildPoster(design);
+    const validIds = new Set([
+      "background",
+      ...poster.shapes.map((shape) => shape.id),
+      ...poster.texts.map((text) => text.id),
+    ]);
+    next.layerEdits = next.layerEdits.filter(
+      (edit) => edit.id !== "background" && validIds.has(edit.id),
+    );
+    if (next.layerEdits.length === 0) delete next.layerEdits;
+  }
 
   if (wantsLayoutKept(message)) {
     if (next.direction) {
@@ -203,6 +293,14 @@ export function reconcilePatch(
     if (identical) delete next.paletteId;
   }
 
+  if (next.layerEdits) {
+    // An AI response must not write a no-op transform into the persisted state.
+    next.layerEdits = next.layerEdits.filter((edit) =>
+      Object.entries(edit).some(([key, value]) => key !== "id" && value !== undefined),
+    );
+    if (next.layerEdits.length === 0) delete next.layerEdits;
+  }
+
   return next;
 }
 
@@ -229,6 +327,10 @@ export function patchToActions(patch: AiPatch): StudioAction[] {
   if (patch.headline) actions.push({ type: "setCopy", key: "headline", value: patch.headline });
   if (patch.subtitle) actions.push({ type: "setCopy", key: "subtitle", value: patch.subtitle });
   if (patch.mood) actions.push({ type: "setMood", value: patch.mood });
+  for (const edit of patch.layerEdits ?? []) {
+    const { id, ...layerPatch } = edit;
+    actions.push({ type: "setPosterLayerEdit", id, patch: layerPatch });
+  }
 
   return actions;
 }
@@ -248,6 +350,9 @@ export function describePatch(patch: AiPatch): string[] {
   if (patch.headline) changes.push(`Headline: ${patch.headline.replace(/\n/g, " / ")}`);
   if (patch.subtitle) changes.push("Subtitle updated");
   if (patch.mood) changes.push(`Mood: ${patch.mood}`);
+  for (const edit of patch.layerEdits ?? []) {
+    changes.push(`Canvas: ${edit.id} adjusted`);
+  }
 
   return changes;
 }

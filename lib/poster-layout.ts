@@ -1,8 +1,13 @@
 import type { DesignState } from "./design-types";
-import { getFontPair } from "./design-presets";
+import { getFontPair, getPosterSize } from "./design-presets";
 
 export const POSTER_WIDTH = 1080;
 export const POSTER_HEIGHT = 1350;
+
+export function getPosterDimensions(design: DesignState) {
+  const size = getPosterSize(design.posterSize);
+  return { width: size.width, height: size.height };
+}
 const MARGIN = 96;
 
 export type PosterText = {
@@ -59,6 +64,34 @@ export type PosterModel = {
   texts: PosterText[];
   shapes: PosterShape[];
 };
+
+export function getDefaultLayerOrder(model: PosterModel) {
+  return [...model.texts.map((item) => item.id), ...model.shapes.map((shape) => shape.id), "background"];
+}
+
+/** Keeps saved layer orders valid as poster directions add or remove elements. */
+export function normalizeLayerOrder(model: PosterModel, layerOrder: readonly string[] = []) {
+  const validIds = new Set(getDefaultLayerOrder(model));
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const id of [...layerOrder, ...getDefaultLayerOrder(model)]) {
+    if (id === "background" || !validIds.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    normalized.push(id);
+  }
+
+  if (validIds.has("background")) normalized.push("background");
+
+  return normalized;
+}
+
+export function sanitizeLayerOrder(model: PosterModel, raw: unknown) {
+  return normalizeLayerOrder(
+    model,
+    Array.isArray(raw) ? raw.filter((value): value is string => typeof value === "string").slice(0, 200) : [],
+  );
+}
 
 const SPACING_FACTOR = { compact: 0.85, normal: 1, spacious: 1.15 } as const;
 
@@ -162,6 +195,8 @@ export function buildPoster(design: DesignState): PosterModel {
   addBody("footer", design.footer, 1236, 20, 600, accent, 8);
 
   if (isVintage) {
+    const panelX = align === "left" ? 690 : align === "right" ? 110 : 690;
+    const markerX = align === "left" ? 72 : align === "right" ? 994 : 72;
     shapes.push({
       id: "frame",
       kind: "rect",
@@ -171,7 +206,7 @@ export function buildPoster(design: DesignState): PosterModel {
       height: 1270,
       stroke: foreground,
       strokeWidth: 3,
-      opacity: 0.85,
+      opacity: 0.72,
     });
     shapes.push({
       id: "rule",
@@ -182,13 +217,49 @@ export function buildPoster(design: DesignState): PosterModel {
       y2: 190,
       stroke: foreground,
       strokeWidth: 2,
-      opacity: 0.4,
+      opacity: 0.5,
     });
-    const cx = align === "left" ? 820 : align === "right" ? 260 : 540;
     shapes.push(
-      { id: "ring-outer", kind: "circle", cx, cy: 860, r: 130, stroke: accent, strokeWidth: 8, opacity: 1 },
-      { id: "ring-inner", kind: "circle", cx, cy: 860, r: 92, stroke: accent, strokeWidth: 3, opacity: 0.8 },
-      { id: "ring-core", kind: "circle", cx, cy: 860, r: 30, fill: accent, strokeWidth: 0, opacity: 1 },
+      {
+        id: "warm-panel",
+        kind: "rect",
+        x: panelX,
+        y: 276,
+        width: 300,
+        height: 760,
+        fill: foreground,
+        strokeWidth: 0,
+        opacity: 0.075,
+      },
+      {
+        id: "warm-marker",
+        kind: "rect",
+        x: markerX,
+        y: 254,
+        width: 16,
+        height: 188,
+        fill: accent,
+        strokeWidth: 0,
+        opacity: 0.9,
+      },
+      {
+        id: "warm-panel-rule",
+        kind: "line",
+        x1: panelX,
+        y1: 276,
+        x2: panelX + 300,
+        y2: 276,
+        stroke: accent,
+        strokeWidth: 6,
+        opacity: 0.95,
+      },
+    );
+    const cx = align === "left" ? 840 : align === "right" ? 240 : 540;
+    shapes.push(
+      { id: "ring-field", kind: "circle", cx, cy: 922, r: 164, fill: accent, strokeWidth: 0, opacity: 0.06 },
+      { id: "ring-outer", kind: "circle", cx, cy: 922, r: 148, stroke: accent, strokeWidth: 10, opacity: 1 },
+      { id: "ring-inner", kind: "circle", cx, cy: 922, r: 106, stroke: foreground, strokeWidth: 3, opacity: 0.72 },
+      { id: "ring-core", kind: "circle", cx, cy: 922, r: 28, fill: accent, strokeWidth: 0, opacity: 1 },
     );
   }
 

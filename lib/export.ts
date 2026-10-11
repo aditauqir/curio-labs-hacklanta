@@ -1,9 +1,13 @@
+import { writePsd } from "ag-psd";
 import type { DesignState } from "./design-types";
 import { getBrief } from "./design-state";
+import { createPosterLayerEdit, type PosterEdits, type PosterLayerEdit } from "./poster-editor";
 import {
   POSTER_HEIGHT,
   POSTER_WIDTH,
   buildPoster,
+  getPosterDimensions,
+  normalizeLayerOrder,
   type PosterShape,
   type PosterText,
 } from "./poster-layout";
@@ -33,9 +37,43 @@ function resolveFontStack(stack: string) {
     .replace(/^[\s,]+/, "");
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, shape: PosterShape) {
+function boundsForShape(shape: PosterShape) {
+  if (shape.kind === "rect") return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+  if (shape.kind === "circle") {
+    return { x: shape.cx - shape.r, y: shape.cy - shape.r, width: shape.r * 2, height: shape.r * 2 };
+  }
+  return {
+    x: Math.min(shape.x1, shape.x2) - 8,
+    y: Math.min(shape.y1, shape.y2) - 8,
+    width: Math.abs(shape.x2 - shape.x1) + 16,
+    height: Math.abs(shape.y2 - shape.y1) + 16,
+  };
+}
+
+function boundsForText(item: PosterText) {
+  const width = Math.max(item.size * 0.8, item.text.length * item.size * 0.56 + item.tracking * item.text.length);
+  const x = item.anchor === "start" ? item.x : item.anchor === "middle" ? item.x - width / 2 : item.x - width;
+  return { x, y: item.y - item.size, width, height: item.size * 1.2 };
+}
+
+function withLayerTransform(
+  ctx: CanvasRenderingContext2D,
+  bounds: { x: number; y: number; width: number; height: number },
+  edit: PosterLayerEdit,
+) {
+  const cx = bounds.x + bounds.width / 2;
+  const cy = bounds.y + bounds.height / 2;
+  ctx.translate(edit.x + cx, edit.y + cy);
+  ctx.rotate((edit.rotation * Math.PI) / 180);
+  ctx.scale(edit.scale, edit.scale);
+  ctx.translate(-cx, -cy);
+  ctx.globalAlpha *= edit.opacity;
+}
+
+function drawShape(ctx: CanvasRenderingContext2D, shape: PosterShape, edit: PosterLayerEdit) {
   ctx.save();
-  ctx.globalAlpha = shape.opacity;
+  withLayerTransform(ctx, boundsForShape(shape), edit);
+  ctx.globalAlpha *= shape.opacity;
 
   if (shape.kind === "rect") {
     if (shape.fill) {
@@ -76,7 +114,10 @@ function drawText(
   item: PosterText,
   headingStack: string,
   bodyStack: string,
+  edit: PosterLayerEdit,
 ) {
+  ctx.save();
+  withLayerTransform(ctx, boundsForText(item), edit);
   const family = item.font === "heading" ? headingStack : bodyStack;
   ctx.font = `${item.italic ? "italic " : ""}${item.weight} ${item.size}px ${family}`;
   ctx.fillStyle = item.color;
@@ -102,6 +143,7 @@ function drawText(
   if (nativeSpacing) {
     ctx.fillText(item.text, startX, item.y);
     ctx.letterSpacing = "0px";
+    ctx.restore();
     return;
   }
 
@@ -110,10 +152,27 @@ function drawText(
     ctx.fillText(char, cursor, item.y);
     cursor += ctx.measureText(char).width + item.tracking;
   }
+  ctx.restore();
 }
 
-/** Renders the same poster model the screen uses and downloads it as a PNG. */
-export async function exportPosterAsPng(design: DesignState) {
+export type PosterExportFormat = "png" | "jpg" | "psd";
+
+type PosterLayers = {
+  composite: HTMLCanvasElement;
+  background: HTMLCanvasElement;
+  graphics: HTMLCanvasElement;
+  typography: HTMLCanvasElement;
+};
+
+function createCanvas(design: DesignState) {
+  const { width, height } = getPosterDimensions(design);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+async function prepareFonts(design: DesignState) {
   const headingStack = resolveFontStack(design.typography.headingFont);
   const bodyStack = resolveFontStack(design.typography.bodyFont);
 
@@ -124,36 +183,152 @@ export async function exportPosterAsPng(design: DesignState) {
     document.fonts.load(`600 24px ${bodyStack}`),
   ]).catch(() => undefined);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = POSTER_WIDTH;
-  canvas.height = POSTER_HEIGHT;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas export is not supported in this browser.");
+  return { headingStack, bodyStack };
+}
 
-  ctx.fillStyle = design.colors.background;
-  ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
-
+function drawPosterLayers(
+  design: DesignState,
+  headingStack: string,
+  bodyStack: string,
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+): PosterLayers {
+  const composite = createCanvas(design);
+  const background = createCanvas(design);
+  const graphics = createCanvas(design);
+  const typography = createCanvas(design);
   const { shapes, texts } = buildPoster(design);
-  shapes.forEach((shape) => drawShape(ctx, shape));
-  texts.forEach((item) => drawText(ctx, item, headingStack, bodyStack));
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/png"),
+  const backgroundContext = background.getContext("2d");
+  const graphicsContext = graphics.getContext("2d");
+  const typographyContext = typography.getContext("2d");
+  const compositeContext = composite.getContext("2d");
+  if (!backgroundContext || !graphicsContext || !typographyContext || !compositeContext) {
+    throw new Error("Canvas export is not supported in this browser.");
+  }
+
+  const { width, height } = getPosterDimensions(design);
+  const scaleX = width / POSTER_WIDTH;
+  const scaleY = height / POSTER_HEIGHT;
+  [backgroundContext, graphicsContext, typographyContext, compositeContext].forEach((context) => {
+    context.scale(scaleX, scaleY);
+  });
+
+  const backgroundEdit = { ...createPosterLayerEdit(), ...(edits.background ?? {}) };
+  if (backgroundEdit.visible) {
+    backgroundContext.fillStyle = design.colors.background;
+    backgroundContext.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+  }
+
+  const shapeById = new Map(shapes.map((shape) => [shape.id, shape]));
+  const textById = new Map(texts.map((item) => [item.id, item]));
+  const orderedIds = [...normalizeLayerOrder({ shapes, texts }, layerOrder)].reverse();
+
+  for (const id of orderedIds) {
+    if (id === "background") {
+      if (backgroundEdit.visible) {
+        compositeContext.drawImage(background, 0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+      }
+      continue;
+    }
+
+    const shape = shapeById.get(id);
+    if (shape) {
+      const edit = { ...createPosterLayerEdit(), ...(edits[shape.id] ?? {}) };
+      if (!edit.visible) continue;
+      drawShape(graphicsContext, shape, edit);
+      drawShape(compositeContext, shape, edit);
+      continue;
+    }
+
+    const item = textById.get(id);
+    if (!item) continue;
+    const edit = { ...createPosterLayerEdit(), ...(edits[item.id] ?? {}) };
+    if (!edit.visible) continue;
+    drawText(typographyContext, item, headingStack, bodyStack, edit);
+    drawText(compositeContext, item, headingStack, bodyStack, edit);
+  }
+
+  return { composite, background, graphics, typography };
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+/** Renders the same poster model the screen uses and downloads a raster image. */
+export async function exportPosterAsImage(
+  design: DesignState,
+  format: "png" | "jpg",
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+) {
+  const { headingStack, bodyStack } = await prepareFonts(design);
+  const { composite } = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder);
+  const mime = format === "jpg" ? "image/jpeg" : "image/png";
+  const blob = await canvasBlob(composite, mime, format === "jpg" ? 0.92 : undefined);
+  if (!blob) throw new Error(`Could not create a ${format.toUpperCase()} from the poster.`);
+
+  downloadBlob(blob, `${slug(design.projectName)}-poster.${format}`);
+}
+
+/** Renders a layered PSD that opens in Photoshop and other PSD-compatible editors. */
+export async function exportPosterAsPsd(
+  design: DesignState,
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+) {
+  const { headingStack, bodyStack } = await prepareFonts(design);
+  const layers = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder);
+  const { width, height } = getPosterDimensions(design);
+  const buffer = writePsd({
+    width,
+    height,
+    canvas: layers.composite,
+    children: [
+      { name: "Typography", canvas: layers.typography },
+      { name: "Graphics", canvas: layers.graphics },
+      { name: "Background", canvas: layers.background }
+    ]
+  });
+
+  downloadBlob(
+    new Blob([buffer], { type: "image/vnd.adobe.photoshop" }),
+    `${slug(design.projectName)}-poster.psd`,
   );
-  if (!blob) throw new Error("Could not create a PNG from the poster.");
+}
 
-  downloadBlob(blob, `${slug(design.projectName)}-poster.png`);
+export async function exportPoster(
+  design: DesignState,
+  format: PosterExportFormat,
+  edits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
+) {
+  if (format === "psd") {
+    await exportPosterAsPsd(design, edits, layerOrder);
+    return;
+  }
+  await exportPosterAsImage(design, format, edits, layerOrder);
+}
+
+/** Backwards-compatible PNG export used by callers that do not need format selection. */
+export async function exportPosterAsPng(design: DesignState, layerOrder: readonly string[] = []) {
+  await exportPosterAsImage(design, "png", {}, layerOrder);
 }
 
 export function exportBriefAsJson(
   design: DesignState,
   selectedPaletteId: string | null,
+  posterEdits: PosterEdits = {},
+  layerOrder: readonly string[] = [],
 ) {
   const payload = {
     project: design.projectName,
     exportedAt: new Date().toISOString(),
     brief: getBrief(design, selectedPaletteId),
     design,
+    posterEdits,
+    layerOrder: normalizeLayerOrder(buildPoster(design), layerOrder),
   };
 
   downloadBlob(

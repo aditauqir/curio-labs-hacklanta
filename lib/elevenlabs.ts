@@ -2,8 +2,8 @@
 import { VoiceError } from "./voice-error";
 
 const API_BASE = "https://api.elevenlabs.io/v1";
-// Sarah, a premade voice available to every key. Override with ELEVENLABS_VOICE_ID.
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+// Curio's default voice. Override with ELEVENLABS_VOICE_ID when needed.
+const DEFAULT_VOICE_ID = "ZoiZ8fuDWInAcwPXaVeq";
 const DEFAULT_STT_MODEL = "scribe_v1";
 const TTS_MODEL = "eleven_flash_v2_5";
 

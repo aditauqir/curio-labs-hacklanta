@@ -1,29 +1,94 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
-import { createDefaultState, sanitizeState, studioReducer } from "@/lib/design-state";
+import { useCallback, useEffect, useState, type Dispatch, type WheelEvent as ReactWheelEvent } from "react";
+import {
+  createDefaultState,
+  sanitizeState,
+  studioReducer,
+  type StudioAction,
+  type StudioState,
+} from "@/lib/design-state";
 import { loadStudioSnapshot, loadStudioState, markStudioStateSynced, saveStudioState } from "@/lib/storage";
 import { CreativeDirector } from "./creative-director";
 import { DesignCanvas } from "./design-canvas";
+import { OnboardingStudio } from "./onboarding-studio";
+import { StudioInspector } from "./studio-inspector";
 import { ExportControls } from "./export-controls";
-import { InspirationBoard } from "./inspiration-board";
-import { AccountControl } from "./account-control";
+import { ImageImportControl } from "./image-import";
+import { getWorkspaceHostUrl } from "@/lib/host-routing";
+import { posterSizes } from "@/lib/design-presets";
+import type { PosterLayerEdit, PosterTool } from "@/lib/poster-editor";
+import { HomeIcon } from "./icons";
+import { analyzeImage, ImageImportError, type ImportedReference } from "@/lib/image-import-client";
+import { SegmentedControl } from "./ui";
 
-type Tab = "chat" | "canvas" | "inspiration";
+export type StudioView = "start" | "editor";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "chat", label: "Director" },
-  { id: "canvas", label: "Canvas" },
-  { id: "inspiration", label: "Inspiration" },
-];
+const VIEW_ROUTES: Record<StudioView, string> = {
+  start: "/home",
+  editor: "/app",
+};
 
-export default function StudioWorkspace() {
-  const [state, dispatch] = useReducer(
-    studioReducer,
-    undefined,
-    createDefaultState,
-  );
-  const [tab, setTab] = useState<Tab>("canvas");
+const ONBOARDING_KEY = "curio-onboarding-complete-v1";
+
+type StudioHistory = {
+  past: StudioState[];
+  present: StudioState;
+  future: StudioState[];
+};
+
+function viewForPathname(pathname: string): StudioView {
+  if (pathname === "/editor") return "editor";
+  if (pathname === VIEW_ROUTES.editor) {
+    return window.history.state?.curioView === "editor" ? "editor" : "start";
+  }
+  return "start";
+}
+
+function preventEditorPageZoom(event: ReactWheelEvent<HTMLDivElement>) {
+  if (!event.ctrlKey) return;
+  const target = event.target;
+  if (target instanceof Element && target.closest(".design-canvas-stage")) return;
+  event.preventDefault();
+}
+
+export default function StudioWorkspace({ initialView }: { initialView: StudioView }) {
+  const [history, setHistory] = useState<StudioHistory>(() => ({
+    past: [],
+    present: createDefaultState(),
+    future: [],
+  }));
+  const state = history.present;
+  const dispatch: Dispatch<StudioAction> = (action) => {
+    setHistory((current) => {
+      const next = studioReducer(current.present, action);
+      if (next === current.present) return current;
+      return {
+        past: [...current.past, current.present].slice(-50),
+        present: next,
+        future: [],
+      };
+    });
+  };
+  const [view, setView] = useState<StudioView>(() => {
+    if (
+      initialView === "start" &&
+      typeof window !== "undefined" &&
+      window.location.pathname === VIEW_ROUTES.editor &&
+      window.history.state?.curioView === "editor"
+    ) {
+      return "editor";
+    }
+    return initialView;
+  });
+  const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const [referenceOpen, setReferenceOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [importedReference, setImportedReference] = useState<ImportedReference | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>("headline-0");
+  const [activeTool, setActiveTool] = useState<PosterTool>("select");
   const [persistence, setPersistence] = useState<{
     ready: boolean;
     instanceId: string | null;
@@ -66,6 +131,69 @@ export default function StudioWorkspace() {
     };
   }, []);
 
+  const importImage = useCallback(async (file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    setImportError(null);
+    try {
+      const analysis = await analyzeImage(file);
+      const imported: ImportedReference = {
+        ...analysis,
+        filename: file.name || "reference-image",
+        previewUrl,
+      };
+      setImportedReference((previous) => {
+        if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl);
+        return imported;
+      });
+      setInitialPrompt(analysis.prompt);
+      return imported;
+    } catch (error) {
+      URL.revokeObjectURL(previewUrl);
+      throw error;
+    }
+  }, []);
+
+  useEffect(() => {
+    function fileFromDrop(event: DragEvent) {
+      return event.dataTransfer?.files?.[0] ?? null;
+    }
+
+    function handleDragOver(event: DragEvent) {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      setDropActive(true);
+    }
+
+    function handleDragLeave(event: DragEvent) {
+      if (event.relatedTarget === null) setDropActive(false);
+    }
+
+    function handleDrop(event: DragEvent) {
+      const file = fileFromDrop(event);
+      if (!file) return;
+      event.preventDefault();
+      setDropActive(false);
+      void importImage(file).catch((error: unknown) => {
+        setImportError(
+          error instanceof ImageImportError && error.code === "not_configured"
+            ? "Image analysis is not configured yet."
+            : error instanceof ImageImportError && error.code === "too_large"
+              ? "Choose an image smaller than 8 MB."
+              : "Image analysis failed. Try again.",
+        );
+      });
+    }
+
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("dragleave", handleDragLeave);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("dragleave", handleDragLeave);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, [importImage]);
+
   useEffect(() => {
     if (!persistence.ready) return;
     saveStudioState(state, persistence.instanceId ?? undefined);
@@ -101,101 +229,291 @@ export default function StudioWorkspace() {
     };
   }, [persistence, state]);
 
-  const { design, messages, selectedPaletteId } = state;
-  const show = (target: Tab) => (tab === target ? "flex" : "hidden");
+  useEffect(() => {
+    function handlePopState() {
+      const nextView = viewForPathname(window.location.pathname);
+      setInitialPrompt(null);
+      setView(nextView);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const { design, messages, selectedPaletteId, posterEdits, layerOrder } = state;
+
+  function changeLayer(id: string, patch: Partial<PosterLayerEdit>) {
+    dispatch({ type: "setPosterLayerEdit", id, patch });
+  }
+
+  function deleteLayer(id: string) {
+    if (id === "background") return;
+    changeLayer(id, { visible: false });
+    setSelectedLayerId(null);
+  }
+
+  function toggleLayerVisibility(id: string) {
+    changeLayer(id, { visible: !(posterEdits[id]?.visible ?? true) });
+  }
+
+  function toggleLayerLock(id: string) {
+    changeLayer(id, { locked: !(posterEdits[id]?.locked ?? false) });
+  }
 
   function resetProject() {
-    if (window.confirm("Reset the whole project, including the conversation?")) {
-      dispatch({ type: "resetProject" });
+    dispatch({ type: "resetProject" });
+  }
+
+  async function saveProject() {
+    const savedAt = Date.now();
+    saveStudioState(state, persistence.instanceId ?? undefined, savedAt);
+    if (!persistence.ready || !persistence.persistent || !persistence.instanceId) return;
+
+    try {
+      const response = await fetch("/api/workspace", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state }),
+      });
+      if (response.ok) {
+        const json = (await response.json().catch(() => null)) as { updatedAt?: unknown } | null;
+        if (typeof json?.updatedAt === "string") {
+          markStudioStateSynced(state, persistence.instanceId, json.updatedAt);
+        }
+      }
+    } catch {
+      // LocalStorage remains the source for the next refresh when the server is unavailable.
     }
   }
 
+  function undo() {
+    setHistory((current) => {
+      const previous = current.past.at(-1);
+      if (!previous) return current;
+      return {
+        past: current.past.slice(0, -1),
+        present: previous,
+        future: [current.present, ...current.future],
+      };
+    });
+  }
+
+  function redo() {
+    setHistory((current) => {
+      const next = current.future[0];
+      if (!next) return current;
+      return {
+        past: [...current.past, current.present].slice(-50),
+        present: next,
+        future: current.future.slice(1),
+      };
+    });
+  }
+
+  useEffect(() => {
+    function handleUndoRedo(event: KeyboardEvent) {
+      if (view !== "editor" || event.defaultPrevented || (!event.metaKey && !event.ctrlKey)) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        redo();
+      } else if (key === "z") {
+        event.preventDefault();
+        undo();
+      } else if (key === "y") {
+        event.preventDefault();
+        redo();
+      }
+    }
+
+    window.addEventListener("keydown", handleUndoRedo);
+    return () => window.removeEventListener("keydown", handleUndoRedo);
+  }, [view]);
+
+  function navigateTo(nextView: StudioView) {
+    const nextPath = VIEW_ROUTES[nextView];
+    const hostUrl = getWorkspaceHostUrl(nextPath);
+    if (hostUrl) {
+      window.location.assign(hostUrl);
+      return;
+    }
+
+    const nextHistoryState = {
+      ...(window.history.state && typeof window.history.state === "object" ? window.history.state : {}),
+      curioView: nextView,
+    };
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(nextHistoryState, "", nextPath);
+    } else {
+      window.history.replaceState(nextHistoryState, "", nextPath);
+    }
+    setView(nextView);
+  }
+
+  function startStudio(prompt?: string) {
+    window.localStorage.setItem(ONBOARDING_KEY, "true");
+    setInitialPrompt(prompt?.trim() || importedReference?.prompt || null);
+    navigateTo("editor");
+  }
+
+  function openStart() {
+    window.localStorage.removeItem(ONBOARDING_KEY);
+    setInitialPrompt(null);
+    navigateTo("start");
+  }
+
+  if (view === "start") {
+    return (
+      <>
+        <OnboardingStudio
+          onStart={startStudio}
+          onImportImage={importImage}
+          importedReference={importedReference}
+          projectName={design.projectName}
+        />
+        {dropActive ? <div className="studio-drop-overlay">Drop image to import</div> : null}
+        {importError ? <p className="studio-global-import-error" role="alert">{importError}</p> : null}
+      </>
+    );
+  }
+
   return (
-    <div className="flex h-dvh flex-col bg-paper text-ink">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 items-baseline gap-4">
-          <h1 className="font-display whitespace-nowrap text-lg font-bold tracking-[0.18em] sm:text-xl">
-            CURIO LABS
-          </h1>
-          <p className="hidden text-xs text-muted xl:block">
-            From vague ideas to visual direction.
-          </p>
-        </div>
-
-        <div className="order-3 flex w-full min-w-0 items-center justify-between gap-3 sm:order-2 sm:w-auto sm:justify-start">
-          <label className="flex min-w-0 items-center gap-2 text-xs text-muted">
-            <span>Project</span>
-            <input
-              type="text"
-              aria-label="Project name"
-              value={design.projectName}
-              maxLength={60}
-              onChange={(event) =>
-                dispatch({ type: "setCopy", key: "projectName", value: event.target.value })
-              }
-              className="w-40 min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm font-medium text-ink hover:border-line focus:border-line sm:w-48"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={resetProject}
-            className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
-          >
-            Reset project
-          </button>
-        </div>
-
-        <div className="order-2 sm:order-3">
-          <div className="flex items-center gap-2">
-            <AccountControl />
-            <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
-          </div>
-        </div>
-      </header>
-
+    <>
       <div
-        role="tablist"
-        aria-label="Workspace panels"
-        className="grid grid-cols-3 border-b border-line bg-panel lg:hidden"
+        className="studio-editor-shell flex h-dvh flex-col bg-[#101113] text-white"
+        data-testid="editor-screen"
+        style={{
+          width: "100vw",
+          height: "100dvh",
+          maxWidth: "100vw",
+          maxHeight: "100dvh",
+          overflow: "hidden",
+          overscrollBehavior: "none",
+          touchAction: "pan-y",
+        }}
+        onWheelCapture={preventEditorPageZoom}
       >
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`py-3 text-xs font-medium uppercase tracking-[0.14em] transition-colors ${
-              tab === item.id ? "border-b-2 border-ink text-ink" : "text-muted"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <main className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)_380px]">
-        <div className={`${show("chat")} min-h-0 flex-col border-line lg:flex lg:border-r`}>
+      <div className="studio-editor-body">
+        <aside className="studio-editor-chat" style={{ borderRadius: 0 }}>
           <CreativeDirector
             messages={messages}
             design={design}
             selectedPaletteId={selectedPaletteId}
+            posterEdits={posterEdits}
+            layerOrder={layerOrder}
             dispatch={dispatch}
+            initialPrompt={initialPrompt}
           />
+        </aside>
+
+        <div className="studio-editor-workspace">
+          <header className="studio-editor-header">
+            <button type="button" className="studio-editor-home" aria-label="Home" onClick={openStart}>
+              <HomeIcon />
+            </button>
+            <ImageImportControl
+              compact
+              className="studio-editor-import"
+              onImport={importImage}
+              result={importedReference}
+            />
+            <div className="studio-editor-size-control">
+              <SegmentedControl
+                label="Poster size"
+                value={design.posterSize}
+                options={posterSizes.map((size) => ({ value: size.id, label: size.label }))}
+                onChange={(value) => dispatch({ type: "setPosterSize", value })}
+                tone="dark"
+              />
+            </div>
+            <label className="studio-project-field">
+              <span>Project</span>
+              <input
+                type="text"
+                aria-label="Project name"
+                value={design.projectName}
+                maxLength={60}
+                onChange={(event) =>
+                  dispatch({ type: "setCopy", key: "projectName", value: event.target.value })
+                }
+              />
+            </label>
+            <div className="studio-editor-export">
+              <ExportControls
+                compact
+                design={design}
+                selectedPaletteId={selectedPaletteId}
+                posterEdits={posterEdits}
+                layerOrder={layerOrder}
+              />
+            </div>
+          </header>
+
+          <main className="studio-editor-grid min-h-0 flex-1">
+            <section className="studio-editor-surface">
+              <div className="studio-editor-canvas">
+                <DesignCanvas
+                  design={design}
+                  selectedPaletteId={selectedPaletteId}
+                  dispatch={dispatch}
+                  posterEdits={posterEdits}
+                  layerOrder={layerOrder}
+                  selectedLayerId={selectedLayerId}
+                  activeTool={activeTool}
+                  onToolChange={setActiveTool}
+                  onSelectLayer={setSelectedLayerId}
+                  onChangeLayer={changeLayer}
+                  onDeleteLayer={deleteLayer}
+                  onResetProject={resetProject}
+                  onSaveProject={saveProject}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canUndo={history.past.length > 0}
+                  canRedo={history.future.length > 0}
+                  referenceOpen={referenceOpen}
+                  layersOpen={layersOpen}
+                  onToggleInspector={(nextTab = "reference") => {
+                    if (nextTab === "layers") setLayersOpen((open) => !open);
+                    else setReferenceOpen((open) => !open);
+                  }}
+                />
+              </div>
+              {referenceOpen || layersOpen ? (
+                <aside className="studio-editor-inspector">
+                  <StudioInspector
+                    referenceOpen={referenceOpen}
+                    layersOpen={layersOpen}
+                    importedReference={importedReference}
+                    design={design}
+                    selectedPaletteId={selectedPaletteId}
+                    dispatch={dispatch}
+                    posterEdits={posterEdits}
+                    layerOrder={layerOrder}
+                    selectedLayerId={selectedLayerId}
+                    onSelectLayer={setSelectedLayerId}
+                    onToggleLayerVisibility={toggleLayerVisibility}
+                    onToggleLayerLock={toggleLayerLock}
+                    onReorderLayer={(id, direction) => dispatch({ type: "reorderLayer", id, direction })}
+                    onToggleReference={() => setReferenceOpen((open) => !open)}
+                    onToggleLayers={() => setLayersOpen((open) => !open)}
+                  />
+                </aside>
+              ) : null}
+            </section>
+          </main>
         </div>
-        <div className={`${show("canvas")} min-h-0 min-w-0 flex-col lg:flex`}>
-          <DesignCanvas design={design} dispatch={dispatch} />
-        </div>
-        <div
-          className={`${show("inspiration")} min-h-0 flex-col border-line lg:flex lg:border-l`}
-        >
-          <InspirationBoard
-            design={design}
-            selectedPaletteId={selectedPaletteId}
-            dispatch={dispatch}
-          />
-        </div>
-      </main>
-    </div>
+      </div>
+      </div>
+      {dropActive ? <div className="studio-drop-overlay">Drop image to import</div> : null}
+      {importError ? <p className="studio-global-import-error" role="alert">{importError}</p> : null}
+    </>
   );
 }
