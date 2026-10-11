@@ -91,6 +91,9 @@ class RenderRequest:
 class RenderResult:
     image: Image  # RGB float
     record: dict[str, Any]
+    #: The layers before flattening, and what each one is (see ``curio.render.pack``).
+    stack: LayerStack | None = None
+    elements: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def warnings(self) -> list[str]:
@@ -227,6 +230,7 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
     record_fonts: dict[str, Any] = {}
     record_legibility: dict[str, Any] = {}
     record_type: dict[str, Any] = {}
+    elements: dict[str, dict[str, Any]] = {}  # layer name -> what it is, for the asset pack
 
     # Global textures, directly above the ground.
     for i, rule in enumerate((preset.data.get("texture_rules") or {}).get("layers") or []):
@@ -246,6 +250,7 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
         blend = rule.get("blend", "normal")
         image = resolve_texture(source, (width, height), derive_seed(request.seed, "texture", i, kind))
         stack.add(Layer(f"texture:{i}:{kind}", image, blend=blend, opacity=opacity))
+        elements[f"texture:{i}:{kind}"] = {"kind": "global_texture", "texture": kind}
         record_textures.append({"type": kind, "applied": True, "source": source, "blend": blend, "opacity": opacity})
 
     for placed in placement.regions:  # already in z order
@@ -258,10 +263,12 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
                 warnings.append(f"solid region {region.id!r}: {region.content!r} is neither a colour nor a palette role; skipped")
                 continue
             stack.add(Layer(f"solid:{region.id}", _solid(w, h, color), transform=Transform(x, y)))
+            elements[f"solid:{region.id}"] = {"kind": "rect", "role": "solid", "region": region.id, "box": [x, y, w, h], "fill": color}
 
         elif region.role == "rule":
             color = region.content.upper() if is_hex(region.content) else ink
             stack.add(Layer(f"rule:{region.id}", _solid(w, h, color), transform=Transform(x, y)))
+            elements[f"rule:{region.id}"] = {"kind": "rect", "role": "rule", "region": region.id, "box": [x, y, w, h], "fill": color}
 
         elif region.role == "texture":
             source = PROCEDURAL_TEXTURES.get(region.content)
@@ -270,6 +277,7 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
                 continue
             image = resolve_texture(source, (w, h), derive_seed(request.seed, "region", region.id))
             stack.add(Layer(f"texture:{region.id}", image, blend="multiply", transform=Transform(x, y)))
+            elements[f"texture:{region.id}"] = {"kind": "image", "role": "texture", "region": region.id, "texture": region.content}
 
         elif region.role in ("photo", "frame"):
             if region.role == "photo":
@@ -280,11 +288,17 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
                     warnings.append(f"the treatment changed the photo size to {pixels.shape[1]}x{pixels.shape[0]}; fitted back to the box")
                     pixels = apply_op("resize", pixels, {"width": w, "height": h, "fit": "cover"})
                 stack.add(Layer(f"photo:{region.id}", pixels, transform=Transform(x, y)))
+                elements[f"photo:{region.id}"] = {
+                    "kind": "image", "role": "photo", "region": region.id,
+                    "treatment": [{"id": c.id, "op": c.op, "params": c.params} for c in calls],
+                    "source": request.photo.source, "license": request.photo.license,
+                }
             frame = region.frame or ({} if region.role == "frame" else None)
             if frame is not None:
                 stroke = max(int(round(float(frame.get("stroke_frac_short_edge", 0.004)) * min(width, height))), 1)
                 color = frame["color"].upper() if is_hex(frame.get("color")) else ink
                 stack.add(Layer(f"frame:{region.id}", _ring(w, h, stroke, color), transform=Transform(x, y)))
+                elements[f"frame:{region.id}"] = {"kind": "rect", "role": "frame", "region": region.id, "box": [x, y, w, h], "stroke": color, "stroke_px": stroke}
 
         elif region.role == "type":
             slot = region.content
@@ -365,6 +379,10 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
                     x0, y0 = max(int(xs.min()) - pad, 0), max(int(ys.min()) - pad, 0)
                     x1, y1 = min(int(xs.max()) + pad + 1, width), min(int(ys.max()) + pad + 1, height)
                     stack.add(Layer(f"plate:{region.id}", _solid(x1 - x0, y1 - y0, fix.plate_color or "#000000"), opacity=fix.plate_opacity, transform=Transform(x0, y0)))
+                    elements[f"plate:{region.id}"] = {
+                        "kind": "rect", "role": "plate", "region": region.id, "box": [x0, y0, x1 - x0, y1 - y0],
+                        "fill": fix.plate_color or "#000000", "opacity": fix.plate_opacity, "linked_to": f"type:{region.id}",
+                    }
             elif fix.kind == "unfixable":
                 warnings.append(f"slot {slot!r}: {fix.note} (contrast {fix.ratio_after:.2f}, needs {required:g})")
             record_legibility[region.id] = {
@@ -378,6 +396,21 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
             }
             record_type[region.id] = {"slot": slot, "size_px": size, "columns": columns, "fits": fits, "align": align, "hollow": hollow}
             stack.add(Layer(f"type:{region.id}", typeset.render.image, transform=typeset.transform))
+            # Hollow type is a ring in the text colour; otherwise only the legibility fix adds an outline.
+            if hollow:
+                text_outline = {"px": round(outline_px, 3), "color": fix.text_color}
+            elif fix.kind == "outline":
+                text_outline = {"px": round(float(fix.outline_px), 3), "color": fix.outline_color or "#000000"}
+            else:
+                text_outline = None
+            elements[f"type:{region.id}"] = {
+                "kind": "text", "role": "type", "region": region.id, "slot": slot, "box": [x, y, w, h],
+                "text": lines if microtype else text, "case": case, "columns": columns,
+                "font": {"family": face.family, "style": face.style, "weight": face.weight, "italic": face.italic, "file": face.path.name, "license": face.license},
+                "size_px": size, "tracking_em": tracking, "leading": 1.3 if microtype else 1.1, "align": align,
+                "color": fix.text_color, "hollow": hollow, "rotation_deg": rotation, "outline": text_outline,
+                "fits": fits,
+            }
 
     image = render(stack, width, height, background=ground, seed=request.seed)
 
@@ -413,4 +446,4 @@ def render_poster(request: RenderRequest, styles: CompiledStyles, fonts: FontLib
         "unsupported_by_engine": list(template.get("unsupported_by_engine", [])),
         "warnings": warnings,
     }
-    return RenderResult(image, record)
+    return RenderResult(image, record, stack, elements)

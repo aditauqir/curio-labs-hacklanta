@@ -5,7 +5,8 @@ compile  EXPORT_DIR OUT_DIR  validate, then write presets, layouts and templates
 report   EXPORT_DIR OUT_DIR  write the markdown report for each cluster
 render   STYLES TEMPLATE OUT.png --photo P --text slot=value ...
                              render a compiled template; writes OUT.png and OUT.json (the record).
-                             STYLES is a compiled folder, or db (newest release) or db:N
+                             STYLES is a compiled folder, or db (newest release) or db:N.
+                             --pack DIR also writes the poster as separate elements for an editor
 publish  COMPILED_DIR        upload a compiled folder to TigerData as a new release
 pull     OUT_DIR             download a release (default: newest) as a compiled folder
 releases                     list published releases, newest first
@@ -88,6 +89,10 @@ def cmd_render(args: argparse.Namespace) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     save_image(result.image, out)
     out.with_suffix(".json").write_text(json.dumps(result.record, indent=2, sort_keys=True), encoding="utf-8")
+    if args.pack:
+        from curio.render import write_pack
+
+        print(f"wrote the asset pack {write_pack(result, args.pack)}")
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
     print(f"wrote {out} ({result.record['canvas'][0]}x{result.record['canvas'][1]}) and {out.with_suffix('.json')}")
@@ -219,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--aspect", help="for example 4:5; default: the template's first seen aspect")
     r.add_argument("--short-edge", type=int, default=1080)
     r.add_argument("--seed", type=int, default=0)
+    r.add_argument("--pack", metavar="DIR", help="also write an asset pack (separate movable elements) to DIR")
     r.set_defaults(fn=cmd_render)
     pub = sub.add_parser("publish", help="upload a compiled folder to TigerData as a new release")
     pub.add_argument("compiled", help="compiled styles folder (output of compile)")

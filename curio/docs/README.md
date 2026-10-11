@@ -8,6 +8,7 @@ run on the production server or in the deploy pipeline.
 | File | What it is |
 | --- | --- |
 | `MODEL_EXPORT_SPEC.md` | The contract for the analysis and clustering model: exactly which JSON files it emits (`recipes/`, `clusters/`, `manifest.json`, `vocab.json`, `fonts.json`) and the rules they must follow |
+| `ASSET_PACK_SPEC.md` | The other end: the format the engine writes when it renders a poster as separate movable elements (`render --pack`), for the freeform editor. Written for frontend developers |
 
 ## Where it sits
 
