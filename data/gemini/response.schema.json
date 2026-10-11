@@ -13,6 +13,11 @@
       "type": "string",
       "enum": ["vintage", "minimal", "experimental"]
     },
+    "lookId": {
+      "type": "string",
+      "enum": ["aged-broadsheet", "swiss-ivory", "acid-duotone", "newsprint", "crimson-photocopy", "amber-crt", "cosmic-cobalt", "thermal-rings", "none"],
+      "description": "Closest analysed reference look. Required for any style, mood, genre or finish request."
+    },
     "paletteId": { "type": "string" },
     "fontPairId": { "type": "string" },
     "assetIds": {

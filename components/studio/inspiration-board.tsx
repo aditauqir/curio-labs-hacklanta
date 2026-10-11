@@ -6,6 +6,7 @@ import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
 import type { ImportedReference } from "@/lib/image-import-client";
+import { referenceLooks, type ReferenceLook } from "@/lib/reference-looks";
 import { ColorPaletteSelector } from "./color-palette-selector";
 import { CreativeBrief } from "./creative-brief";
 import { TypographySelector } from "./typography-selector";
@@ -17,12 +18,6 @@ const THUMBNAIL_THEMES = [
   { background: "#E9E0F2", ink: "#1C1724", accent: "#7D45B7" },
   { background: "#D8E5EB", ink: "#10212A", accent: "#D44B3D" },
   { background: "#F0D8D2", ink: "#351D1B", accent: "#C52F54" },
-];
-
-const TEXTURE_STUDIES = [
-  { id: "paper", label: "Paper grain", className: "is-paper" },
-  { id: "ink", label: "Ink wash", className: "is-ink" },
-  { id: "signal", label: "Signal noise", className: "is-signal" },
 ];
 
 type LoadedLibraryAsset = {
@@ -123,7 +118,7 @@ function referenceCardsFromLibrary(assets: LoadedLibraryAsset[]): DisplayReferen
       category: asset.description || fallback?.category || "Curio library reference",
       source: fallback?.source || "Curio library",
       sourceUrl: asset.sourceUrl || fallback?.sourceUrl || "",
-      imageUrl: imageUrlForAsset(asset),
+      imageUrl: imageUrlForAsset(asset) ?? fallback?.thumbnail ?? null,
     };
   });
 }
@@ -185,6 +180,18 @@ function ReferenceThumb({ index, imageUrl, title }: { index: number; imageUrl?: 
       ) : null}
     </svg>
   );
+}
+
+/** A CSS preview of a look: its screen as a dot or line field, or its gradient map. */
+function lookSwatchStyle(look: ReferenceLook) {
+  const { background, foreground, accent } = look.palette;
+  if (!look.screen) {
+    return { background: `radial-gradient(circle at 68% 62%, ${foreground} 0 12%, ${accent} 30%, ${background} 62%)` };
+  }
+  const field = look.screen.asset.includes("line")
+    ? `repeating-linear-gradient(0deg, ${foreground} 0 1px, transparent 1px 4px)`
+    : `radial-gradient(circle, ${foreground} 0 32%, transparent 36%) 0 0 / 5px 5px`;
+  return { background: `${field}, ${background}` };
 }
 
 function Section({
@@ -280,12 +287,11 @@ export function InspirationBoard({
     ...card,
     assetId: `reference:${card.id}`,
     kind: "reference",
-    imageUrl: null,
+    imageUrl: card.thumbnail,
   }));
   const imageReferenceCards = libraryReferences.filter((card) => card.kind === "image");
-  const visibleReferenceCards = libraryReferences.length > 0
-    ? libraryReferences.filter((card) => card.kind !== "image")
-    : localReferenceCards;
+  const libraryImageReferences = libraryReferences.filter((card) => card.kind !== "image" && card.imageUrl);
+  const visibleReferenceCards = libraryImageReferences.length > 0 ? libraryImageReferences : localReferenceCards;
   const loadedFonts = libraryAssets.filter((asset) => asset.kind === "font");
   const loadedPalettes = libraryAssets.filter((asset) => asset.kind === "palette");
   const loadedReferences = libraryAssets.filter(
@@ -365,10 +371,10 @@ export function InspirationBoard({
         <div className="studio-compact-reference-section" aria-labelledby="compact-references-heading">
           <div className="studio-compact-reference-section-heading">
             <span id="compact-references-heading">References</span>
-            <span>Studies</span>
+            <span>Image assets</span>
           </div>
-          <ul className="studio-compact-reference-grid" aria-label="Reference studies">
-            {visibleReferenceCards.slice(0, 4).map((card) => (
+          <ul className="studio-compact-reference-grid" aria-label="Reference image assets">
+            {visibleReferenceCards.map((card) => (
               <li key={card.id}>
                 {card.imageUrl && onSelectReference ? (
                   <button
@@ -418,34 +424,51 @@ export function InspirationBoard({
         ) : null}
         <div className="studio-compact-reference-section" aria-labelledby="compact-textures-heading">
           <div className="studio-compact-reference-section-heading">
-            <span id="compact-textures-heading">Textures</span>
-            <span>Surface cues</span>
+            <span id="compact-textures-heading">Looks</span>
+            <span>Screen, paper, grain</span>
           </div>
-          <ul className="studio-compact-texture-grid" aria-label="Texture studies">
-            {loadedTextureCards.length > 0
-              ? loadedTextureCards.slice(0, 6).map(({ asset, imageUrl }) => (
-                  <li key={asset.id}>
-                    <button
-                      type="button"
-                      className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-45"
-                      disabled={!importedReference}
-                      aria-pressed={referenceTreatment?.textureAssetId === asset.id}
-                      title={importedReference ? `Apply ${asset.name} to the active reference` : "Select a reference first"}
-                      onClick={() => onSelectTexture?.(asset.id)}
-                    >
-                      <Image src={imageUrl} alt="" width={160} height={110} unoptimized className="block h-auto w-full rounded" />
-                      <span>{asset.name}</span>
-                    </button>
-                  </li>
-                ))
-              : TEXTURE_STUDIES.map((texture) => (
-                  <li key={texture.id}>
-                    <span className={`studio-compact-texture-swatch ${texture.className}`} aria-hidden="true" />
-                    <span>{texture.label}</span>
-                  </li>
-                ))}
+          <ul className="studio-compact-texture-grid" aria-label="Reference looks">
+            {referenceLooks.map((look) => (
+              <li key={look.id}>
+                <button
+                  type="button"
+                  className="studio-compact-look"
+                  aria-pressed={design.lookId === look.id}
+                  title={look.summary}
+                  onClick={() => dispatch({ type: "setLook", id: look.id })}
+                >
+                  <span className="studio-compact-texture-swatch" style={lookSwatchStyle(look)} aria-hidden="true" />
+                  <span>{look.name}</span>
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
+        {loadedTextureCards.length > 0 ? (
+          <div className="studio-compact-reference-section" aria-labelledby="compact-reference-textures-heading">
+            <div className="studio-compact-reference-section-heading">
+              <span id="compact-reference-textures-heading">Textures</span>
+              <span>For the active reference</span>
+            </div>
+            <ul className="studio-compact-texture-grid" aria-label="Texture studies">
+              {loadedTextureCards.slice(0, 6).map(({ asset, imageUrl }) => (
+                <li key={asset.id}>
+                  <button
+                    type="button"
+                    className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={!importedReference}
+                    aria-pressed={referenceTreatment?.textureAssetId === asset.id}
+                    title={importedReference ? `Apply ${asset.name} to the active reference` : "Select a reference first"}
+                    onClick={() => onSelectTexture?.(asset.id)}
+                  >
+                    <Image src={imageUrl} alt="" width={160} height={110} unoptimized className="block h-auto w-full rounded" />
+                    <span>{asset.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -487,7 +510,7 @@ export function InspirationBoard({
       <Section
         id="references-heading"
         title="Visual references"
-        note={`${visibleReferenceCards.length} ${libraryStatus === "ready" ? "references loaded from Curio" : "curated local references"}. Select an image to place it on the canvas.`}
+        note={`${visibleReferenceCards.length} image assets from curio/assets that the reference looks are built from${libraryStatus === "ready" ? ", plus library images" : ""}. Select an image to place it on the canvas.`}
       >
         <ul className="grid gap-3">
           {visibleReferenceCards.map((card, index) => (

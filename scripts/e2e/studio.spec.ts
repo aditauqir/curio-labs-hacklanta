@@ -76,8 +76,8 @@ test.describe("studio workspace", () => {
     await page.getByLabel("Describe a change").fill("make it look more modern");
     await page.getByRole("button", { name: "Send message" }).click();
 
-    await expect(page.getByText("Direction: Modern Minimal")).toBeVisible();
-    await expect(page.getByLabel("Cedar & Salt poster, Modern Minimal direction")).toBeVisible();
+    await expect(page.getByText("Direction: Berlin Swiss ivory")).toBeVisible();
+    await expect(page.getByLabel("Half Tone poster, Berlin Swiss ivory direction")).toBeVisible();
   });
 
   test("starts a fresh restaurant poster from an onboarding idea", async ({ page }) => {
@@ -94,7 +94,7 @@ test.describe("studio workspace", () => {
     await page.getByLabel("Describe a change").fill("Make it have like Charli XCX vibes");
     await page.getByRole("button", { name: "Send message" }).click();
 
-    await expect(page.getByText("Direction: Experimental Editorial")).toBeVisible();
+    await expect(page.getByText("Direction: Acid green duotone")).toBeVisible();
     await expect(page.getByText("Accent: electric pink")).toBeVisible();
     await expect(page.getByText("Mood: electric club-pop energy")).toBeVisible();
   });

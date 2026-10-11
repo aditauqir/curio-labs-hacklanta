@@ -11,7 +11,7 @@ import { useVoice } from "./use-voice";
 import { VoiceMascot } from "./voice-keyframes";
 
 const FALLBACK_STARTER_PROMPTS = [
-  "Start a poster brief for a neighborhood restaurant",
+  "A newsprint poster for a photography exhibition",
   "Build a visual identity for a Sunday market",
   "Make an editorial launch poster for a new album",
 ];
@@ -99,7 +99,7 @@ export function OnboardingStudio({
   onStart,
   onImportImage,
   importedReference,
-  projectName = "Cedar & Salt",
+  projectName = "Half Tone",
 }: {
   onStart: (prompt?: string) => void;
   onImportImage: (file: File) => Promise<ImportedReference>;
@@ -249,7 +249,7 @@ export function OnboardingStudio({
               onClick={() => onStart()}
             >
               <span>
-                <strong>{projectName || PROJECT_EXAMPLES[0].title}</strong>
+                <strong>{projectName || "Half Tone"}</strong>
                 <small>Continue your current workspace</small>
               </span>
               <span aria-hidden="true">↗</span>

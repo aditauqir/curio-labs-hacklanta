@@ -2,6 +2,7 @@ import type { DesignDirection, DesignState } from "./design-types";
 import { directionConfigs, directionOrder } from "./design-presets";
 import type { StudioAction } from "./design-state";
 import { wantsLayoutKept } from "./ai-patch";
+import { getReferenceLook } from "./reference-looks";
 
 export type DirectorResult = {
   reply: string;
@@ -21,6 +22,19 @@ const ACCENT_COLORS: Record<string, string> = {
   lime: "#C9F05D",
   black: "#171717",
 };
+
+// Named reference looks. Checked before the broad direction words so "newsprint" or
+// "photocopy" land on that exact look instead of a whole direction preset.
+const LOOK_KEYWORDS: [RegExp, string][] = [
+  [/\b(newsprint|newspaper|broadsheet|line screen)\b/, "newsprint"],
+  [/\b(photocopy|photocopied|xerox|crimson|zine|club flyer|flyer)\b/, "crimson-photocopy"],
+  [/\b(crt|scanlines?|hud|amber|y2k|cyberpunk)\b/, "amber-crt"],
+  [/\b(cosmic|cobalt|trance|airbrush|ethereal)\b/, "cosmic-cobalt"],
+  [/\b(thermal|psychedelic|moire|moiré|solari[sz]ed)\b/, "thermal-rings"],
+  [/\b(brat|acid|halftone|duotone)\b/, "acid-duotone"],
+  [/\b(berlin|techno|ivory)\b/, "swiss-ivory"],
+  [/\b(aged|letterpress|old paper)\b/, "aged-broadsheet"],
+];
 
 const VINTAGE = /\b(warm|warmer|vintage|retro|cozy|1970s|70s|smoky)\b/;
 const MINIMAL = /\b(minimal|minimalist|swiss|clean|cleaner|simple|modern|contemporary|sleek)\b/;
@@ -48,7 +62,12 @@ export function interpretRequest(input: string, design: DesignState): DirectorRe
   const actions: StudioAction[] = [];
   const changes: string[] = [];
 
-  const family = clubPop
+  const lookId = LOOK_KEYWORDS.find(([pattern]) => pattern.test(text))?.[1];
+  const look = getReferenceLook(lookId);
+
+  const family = look
+    ? null
+    : clubPop
     ? "experimental"
     : VINTAGE.test(text)
     ? "vintage"
@@ -57,6 +76,11 @@ export function interpretRequest(input: string, design: DesignState): DirectorRe
       : MINIMAL.test(text)
         ? "minimal"
         : null;
+
+  if (look) {
+    actions.push({ type: "setLook", id: look.id });
+    changes.push(`Look: ${look.name}`);
+  }
 
   if (family && keepLayout) {
     const config = directionConfigs[family];
@@ -124,7 +148,7 @@ export function interpretRequest(input: string, design: DesignState): DirectorRe
 
   if (actions.length === 0) {
     return {
-      reply: `I can't tell which direction you want from that yet. Pick one of these, or describe a change like "warmer", "centered", "orange accent", or "headline: Late Night Sessions". Currently using ${design.styleLabel}.`,
+      reply: `I can't tell which direction you want from that yet. Pick one of these, or name a look like "newsprint", "photocopy" or "CRT", or describe a change like "warmer", "centered", "orange accent", or "headline: Late Night Sessions". Currently using ${design.styleLabel}.`,
       actions,
       changes,
       suggestions: [...directionOrder],

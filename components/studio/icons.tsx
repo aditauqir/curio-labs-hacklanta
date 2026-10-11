@@ -45,6 +45,7 @@ import {
   Shuffle,
   TextT,
   Trash,
+  X,
 } from "@phosphor-icons/react";
 
 type IconProps = { className?: string };
@@ -237,4 +238,8 @@ export function LockOpenIcon({ className }: IconProps) {
 
 export function TextIcon({ className }: IconProps) {
   return <TextT {...phosphorProps} className={className} />;
+}
+
+export function CloseIcon({ className }: IconProps) {
+  return <X {...phosphorProps} className={className} />;
 }

@@ -12,6 +12,8 @@ import {
   type PosterText,
 } from "@/lib/poster-layout";
 import { createPosterLayerEdit, type PosterEdits, type PosterTool } from "@/lib/poster-editor";
+import { getReferenceLook, lookAssetUrl, visibleLookTextures } from "@/lib/reference-looks";
+import { useLookPlate } from "./use-look-plate";
 
 type Bounds = { x: number; y: number; width: number; height: number };
 type DragMode = "move" | "scale";
@@ -223,6 +225,8 @@ export function Poster({
   const [isDragging, setIsDragging] = useState(false);
   const [selection, setSelection] = useState<SelectionPreview | null>(null);
   const { shapes, texts } = useMemo(() => buildPoster(design), [design]);
+  const look = getReferenceLook(design.lookId);
+  const plateUrl = useLookPlate(design);
   const orderedLayerIds = useMemo(
     () => normalizeLayerOrder({ shapes, texts }, layerOrder),
     [layerOrder, shapes, texts],
@@ -573,14 +577,17 @@ export function Poster({
   function renderLayer(id: string) {
     if (id === "background") {
       return (
-        <g key="background">
-          <rect
-            data-layer-id="background"
-            width={POSTER_WIDTH}
-            height={POSTER_HEIGHT}
-            fill={design.colors.background}
-            onPointerDown={(event) => beginInteraction(event, "background")}
-          />
+        <g key="background" data-layer-id="background" onPointerDown={(event) => beginInteraction(event, "background")}>
+          <rect width={POSTER_WIDTH} height={POSTER_HEIGHT} fill={design.colors.background} />
+          {plateUrl ? (
+            <image
+              className="poster-look-plate"
+              href={plateUrl}
+              width={POSTER_WIDTH}
+              height={POSTER_HEIGHT}
+              preserveAspectRatio="none"
+            />
+          ) : null}
           {referenceImage ? (
             <image
               href={referenceImage.previewUrl}
@@ -688,6 +695,21 @@ export function Poster({
           pointerEvents="none"
         />
       ))}
+      {look ? (
+        <g className="poster-look-finish" pointerEvents="none" aria-hidden="true">
+          {visibleLookTextures(look, design.hiddenTextures).map((texture) => (
+            <image
+              key={texture.asset}
+              href={lookAssetUrl(texture.asset)}
+              width={POSTER_WIDTH}
+              height={POSTER_HEIGHT}
+              preserveAspectRatio="none"
+              opacity={texture.opacity}
+              style={{ mixBlendMode: texture.blend }}
+            />
+          ))}
+        </g>
+      ) : null}
 
       {selection ? (
         <rect

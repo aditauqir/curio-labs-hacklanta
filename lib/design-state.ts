@@ -15,6 +15,7 @@ import type {
 } from "./design-types";
 import {
   applyDirection,
+  applyLook,
   colorPalettes,
   directionConfigs,
   directionOrder,
@@ -26,6 +27,7 @@ import {
   posterSizes,
   typographyFromPair,
 } from "./design-presets";
+import { NO_LOOK, getReferenceLook, lookPaletteId, referenceLookIds } from "./reference-looks";
 import { createPosterLayerEdit, sanitizePosterEdits, type PosterLayerEdit } from "./poster-editor";
 import { buildPoster, getDefaultLayerOrder, normalizeLayerOrder, sanitizeLayerOrder } from "./poster-layout";
 
@@ -53,6 +55,8 @@ export const DEFAULT_REFERENCE_TREATMENT: ReferenceTreatment = {
 
 export type StudioAction =
   | { type: "setDirection"; direction: DesignDirection }
+  | { type: "setLook"; id: string }
+  | { type: "toggleTexture"; asset: string }
   | { type: "setPosterSize"; value: PosterSize }
   | { type: "setFontPair"; id: string }
   | { type: "setPalette"; id: string }
@@ -94,14 +98,14 @@ const seedMessages: ChatMessage[] = [
     id: "seed-user",
     role: "user",
     content:
-      "I need a poster for my neighborhood restaurant's seasonal dinner series. Something warm but modern.",
+      "I need a poster for a print and photography exhibition opening. Something printed and tactile, not glossy.",
   },
   {
     id: "seed-assistant",
     role: "assistant",
     source: "example",
     content:
-      "Let's narrow that down. Are you imagining a tactile, welcoming dining-room feel, or something more minimal and contemporary?",
+      "Let's narrow that down. Should it feel like a newsprint broadsheet with a line screen and silver grain, or a cleaner Berlin Swiss grid on ivory stock?",
     suggestions: [...directionOrder],
     checkpoint: {
       design: initialDesign,
@@ -237,6 +241,29 @@ export function studioReducer(
         design: applyDirection(state.design, action.direction),
         selectedPaletteId: directionConfigs[action.direction].paletteId,
       };
+    case "setLook": {
+      const look = getReferenceLook(action.id);
+      if (!look && action.id !== NO_LOOK) return state;
+      return {
+        ...state,
+        design: applyLook(state.design, action.id),
+        selectedPaletteId: look ? lookPaletteId(look) : state.selectedPaletteId,
+      };
+    }
+    case "toggleTexture": {
+      const look = getReferenceLook(state.design.lookId);
+      if (!look?.textures.some((texture) => texture.asset === action.asset)) return state;
+      const hidden = state.design.hiddenTextures ?? [];
+      return {
+        ...state,
+        design: {
+          ...state.design,
+          hiddenTextures: hidden.includes(action.asset)
+            ? hidden.filter((asset) => asset !== action.asset)
+            : [...hidden, action.asset],
+        },
+      };
+    }
     case "setPosterSize":
       if (!posterSizes.some((size) => size.id === action.value)) return state;
       return {
@@ -383,7 +410,13 @@ export function getBrief(
   const palette = selectedPaletteId ? getPalette(selectedPaletteId) : undefined;
 
   return [
-    { id: "style", label: "Style", value: design.styleLabel },
+    {
+      id: "style",
+      label: "Style",
+      value: getReferenceLook(design.lookId)
+        ? `${design.styleLabel} · ${getReferenceLook(design.lookId)?.name}`
+        : design.styleLabel,
+    },
     {
       id: "typography",
       label: "Typography",
@@ -453,6 +486,9 @@ function sanitizeDesign(raw: unknown): DesignState {
   const colors = isRecord(raw.colors) ? raw.colors : {};
   const layout = isRecord(raw.layout) ? raw.layout : {};
   const pair = getFontPair(text(typography.id, initialDesign.typography.id, 60));
+  // Stored designs from before looks existed keep their flat colours.
+  const lookId = oneOf(raw.lookId, [...referenceLookIds, NO_LOOK], NO_LOOK);
+  const look = getReferenceLook(lookId);
 
   return {
     projectName: text(raw.projectName, initialDesign.projectName),
@@ -463,6 +499,13 @@ function sanitizeDesign(raw: unknown): DesignState {
     time: text(raw.time, initialDesign.time),
     footer: text(raw.footer, initialDesign.footer),
     direction,
+    lookId,
+    hiddenTextures: Array.isArray(raw.hiddenTextures)
+      ? raw.hiddenTextures.filter(
+          (asset): asset is string =>
+            typeof asset === "string" && Boolean(look?.textures.some((texture) => texture.asset === asset)),
+        )
+      : [],
     posterSize: oneOf(raw.posterSize, posterSizes.map((size) => size.id), initialDesign.posterSize),
     styleLabel: text(raw.styleLabel, directionConfigs[direction].label, 60),
     mood: text(raw.mood, directionConfigs[direction].mood, 80),
