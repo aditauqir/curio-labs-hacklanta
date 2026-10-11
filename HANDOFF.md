@@ -375,5 +375,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `handoff-deploy-verified` | 2026-10-11 | Record the green production deployment and public endpoint verification | merged | PR #18 records the green final production run; apex redirects to `/home`, and `/app` returns 200 over HTTPS |
 | `ui-and-feature` | 2026-10-11 | UI and feature work after the production editor deployment | in progress | |
 | `codex/e2e-ci-fix` | 2026-10-11 | Fix the stale desktop E2E editor setup after the merged UI release | merged | PR #21; apex-only workspace routing deployed as `d218585` |
-| `codex/tool-options-palette` | 2026-10-11 | Replace the full-screen brush properties surface with compact toolbar options | in progress | |
+| `codex/tool-options-palette` | 2026-10-11 | Ship the editable canvas workflow, grounded Gemini research path, asset routing, and two focused demo briefs | PR open | PR #25; local typecheck, lint, unit tests, and Gemini pipeline smoke test pass |
 <!-- BRANCH-LOG-INSERT -->
