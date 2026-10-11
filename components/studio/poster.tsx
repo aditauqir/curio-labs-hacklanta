@@ -14,7 +14,7 @@ import { createPosterLayerEdit, type PosterEdits, type PosterTool } from "@/lib/
 
 type Bounds = { x: number; y: number; width: number; height: number };
 type DragMode = "move" | "scale";
-type SelectionMode = "rectangle-select" | "lasso";
+type SelectionMode = "rectangle-select";
 
 type LayerInteraction = {
   kind: "layer";
@@ -245,7 +245,7 @@ export function Poster({
   }
 
   function selectionBounds(preview: SelectionPreview | SelectionInteraction): Bounds {
-    const points = preview.mode === "lasso" ? preview.points : [preview.start, preview.current];
+    const points = [preview.start, preview.current];
     const xs = points.map((point) => point.x);
     const ys = points.map((point) => point.y);
     const x = Math.min(...xs);
@@ -286,7 +286,7 @@ export function Poster({
       beginPan(event);
       return;
     }
-    if (activeTool === "rectangle-select" || activeTool === "lasso") {
+    if (activeTool === "rectangle-select") {
       beginSelection(event, activeTool);
       return;
     }
@@ -343,7 +343,6 @@ export function Poster({
     const point = localPoint(svg, event);
     if (current.kind === "selection") {
       current.current = point;
-      if (current.mode === "lasso") current.points = [...current.points, point];
       setSelection({
         mode: current.mode,
         start: current.start,
@@ -514,8 +513,8 @@ export function Poster({
       onPointerDown={(event) => {
         if (activeTool === "hand") {
           beginPan(event);
-        } else if (activeTool === "rectangle-select" || activeTool === "lasso") {
-          beginSelection(event, activeTool);
+      } else if (activeTool === "rectangle-select") {
+        beginSelection(event, activeTool);
         } else if (event.target === event.currentTarget) {
           onSelectLayer?.(null);
         }
@@ -528,21 +527,12 @@ export function Poster({
       {[...orderedLayerIds].reverse().map(renderLayer)}
 
       {selection ? (
-        selection.mode === "lasso" ? (
-          <polyline
-            className="poster-marquee-selection"
-            points={selection.points.map((point) => `${point.x},${point.y}`).join(" ")}
-            fill="rgba(118, 167, 255, 0.08)"
-            pointerEvents="none"
-          />
-        ) : (
-          <rect
-            className="poster-marquee-selection"
-            {...selectionBounds(selection)}
-            fill="rgba(118, 167, 255, 0.08)"
-            pointerEvents="none"
-          />
-        )
+        <rect
+          className="poster-marquee-selection"
+          {...selectionBounds(selection)}
+          fill="rgba(118, 167, 255, 0.08)"
+          pointerEvents="none"
+        />
       ) : null}
 
       {selectedLayerId && selectedBounds && selectedEdit && selectedLayerId !== "background" ? (

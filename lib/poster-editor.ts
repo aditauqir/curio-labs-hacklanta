@@ -6,7 +6,6 @@
 export type PosterTool =
   | "select"
   | "rectangle-select"
-  | "lasso"
   | "text"
   | "crop"
   | "brush"

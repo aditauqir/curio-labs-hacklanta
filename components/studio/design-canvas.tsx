@@ -19,18 +19,18 @@ import {
   CropIcon,
   DropIcon,
   EraserIcon,
-  EyedropperIcon,
   ExportIcon,
   HandIcon,
-  LassoIcon,
   LayersIcon,
   MagicWandIcon,
+  MinusIcon,
   MoveIcon,
   PanelLeftIcon,
   PanelRightIcon,
   PaintBrushIcon,
   PaintBucketIcon,
   PaletteIcon,
+  PlusIcon,
   RectangleSelectIcon,
   ResetIcon,
   RedoIcon,
@@ -43,7 +43,6 @@ import {
   ShuffleIcon,
   TextIcon,
   TrashIcon,
-  ZoomIcon,
 } from "./icons";
 import { ColorField, Field, SegmentedControl, inputClass } from "./ui";
 import { Button } from "@/components/ui/button";
@@ -60,6 +59,7 @@ import { FloatingButtonGroup } from "@/components/ui/floating-button-group";
 
 type InspectorTab = "layers" | "reference";
 type CanvasActionDialog = "reset-design" | "reset-project" | "delete-layer" | "save";
+type ToolOptions = "brush" | "fill" | "colors" | "palette" | null;
 
 const MIN_CANVAS_SCALE = 0.5;
 const MAX_CANVAS_SCALE = 3;
@@ -149,12 +149,14 @@ export function DesignCanvas({
   const [exporting, setExporting] = useState(false);
   const [canvasStatus, setCanvasStatus] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [toolOptions, setToolOptions] = useState<ToolOptions>(null);
   const [actionDialog, setActionDialog] = useState<CanvasActionDialog | null>(null);
   const [pendingLayerId, setPendingLayerId] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [editStatus, setEditStatus] = useState("Nothing selected");
   const [canvasScale, setCanvasScale] = useState(1);
+  const [brushSize, setBrushSize] = useState(24);
+  const [brushOpacity, setBrushOpacity] = useState(1);
   const touchPointers = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
 
@@ -259,7 +261,7 @@ export function DesignCanvas({
     const palette = colorPalettes.find((item) => item.id === id);
     if (!palette) return;
     dispatch({ type: "setPalette", id });
-    setPaletteOpen(false);
+    setToolOptions(null);
     setCanvasStatus(`Palette: ${palette.name}`);
   }
 
@@ -328,15 +330,14 @@ export function DesignCanvas({
               }
             : null;
 
-  function zoomCanvas() {
-    const nextScale = canvasScale >= 1.35 ? 1 : canvasScale + 0.15;
-    applyCanvasScale(nextScale, true);
-  }
-
   function applyCanvasScale(value: number, announce = false) {
     const nextScale = Number(Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, value)).toFixed(2));
     setCanvasScale(nextScale);
     if (announce) setCanvasStatus(`Canvas zoom ${Math.round(nextScale * 100)}%`);
+  }
+
+  function adjustCanvasScale(delta: number) {
+    applyCanvasScale(canvasScale + delta, true);
   }
 
   function handleCanvasWheel(event: ReactWheelEvent<HTMLDivElement>) {
@@ -523,16 +524,6 @@ export function DesignCanvas({
               },
             },
             {
-              id: "lasso",
-              label: "Lasso select",
-              icon: <LassoIcon />,
-              pressed: activeTool === "lasso",
-              onSelect: () => {
-                onToolChange("lasso");
-                setCanvasStatus("Lasso select");
-              },
-            },
-            {
               id: "magic-wand",
               label: "Review layout",
               icon: <MagicWandIcon />,
@@ -554,12 +545,14 @@ export function DesignCanvas({
             },
             {
               id: "brush",
-              label: "Edit selected layer",
+              label: "Brush options",
               icon: <PaintBrushIcon />,
-              disabled: !selectedLayerId,
+              pressed: activeTool === "brush" || toolOptions === "brush",
               onSelect: () => {
-                onToolChange("select");
-                setPropertiesOpen(true);
+                setPropertiesOpen(false);
+                setToolOptions((current) => (current === "brush" ? null : "brush"));
+                onToolChange("brush");
+                setCanvasStatus("Brush options");
               },
             },
             {
@@ -585,17 +578,32 @@ export function DesignCanvas({
             },
             {
               id: "fill",
-              label: "Fill background",
+              label: "Fill options",
               icon: <PaintBucketIcon />,
-              pressed: activeTool === "fill",
-              onSelect: () => onToolChange("fill"),
+              pressed: activeTool === "fill" || toolOptions === "fill",
+              onSelect: () => {
+                setPropertiesOpen(false);
+                setToolOptions((current) => (current === "fill" ? null : "fill"));
+                onToolChange("fill");
+                setCanvasStatus("Fill options");
+              },
             },
             {
               id: "palette",
               label: "Color palettes",
               icon: <PaletteIcon />,
-              pressed: paletteOpen,
-              onSelect: () => setPaletteOpen((open) => !open),
+              pressed: toolOptions === "palette",
+              onSelect: () => setToolOptions((current) => (current === "palette" ? null : "palette")),
+            },
+            {
+              id: "color-properties",
+              label: "Open color properties",
+              icon: <PaletteIcon />,
+              pressed: propertiesOpen,
+              onSelect: () => {
+                setToolOptions(null);
+                setPropertiesOpen(true);
+              },
             },
             {
               id: "copy",
@@ -611,13 +619,6 @@ export function DesignCanvas({
               pressed: activeTool === "text",
               onSelect: () => onToolChange("text"),
             },
-            {
-              id: "eyedropper",
-              label: "Open color properties",
-              icon: <EyedropperIcon />,
-              pressed: propertiesOpen,
-              onSelect: () => setPropertiesOpen(true),
-            },
             { type: "separator", id: "canvas-navigation-divider" },
             {
               id: "hand",
@@ -627,10 +628,24 @@ export function DesignCanvas({
               onSelect: () => onToolChange("hand"),
             },
             {
-              id: "zoom",
-              label: canvasScale >= 1.35 ? "Reset canvas zoom" : "Zoom canvas",
-              icon: <ZoomIcon />,
-              onSelect: zoomCanvas,
+              id: "zoom-out",
+              label: "Zoom out",
+              icon: <MinusIcon />,
+              disabled: canvasScale <= MIN_CANVAS_SCALE,
+              onSelect: () => adjustCanvasScale(-0.1),
+            },
+            {
+              id: "zoom-level",
+              label: `Canvas zoom ${Math.round(canvasScale * 100)}% — reset to 100%`,
+              icon: <span className="studio-zoom-level">{Math.round(canvasScale * 100)}%</span>,
+              onSelect: () => applyCanvasScale(1, true),
+            },
+            {
+              id: "zoom-in",
+              label: "Zoom in",
+              icon: <PlusIcon />,
+              disabled: canvasScale >= MAX_CANVAS_SCALE,
+              onSelect: () => adjustCanvasScale(0.1),
             },
             {
               id: "reset",
@@ -642,24 +657,182 @@ export function DesignCanvas({
             },
           ]}
           />
-          {paletteOpen ? (
-            <div className="studio-palette-popover" role="dialog" aria-label="Color palettes">
-              {colorPalettes.map((palette) => (
+          <div className="studio-color-control" aria-label="Current colors">
+            <button
+              type="button"
+              className="studio-color-stack studio-color-stack-foreground"
+              aria-label={`Foreground color ${design.colors.accent}`}
+              aria-pressed={toolOptions === "colors"}
+              style={{ backgroundColor: design.colors.accent }}
+              onClick={() => setToolOptions((current) => (current === "colors" ? null : "colors"))}
+            />
+            <button
+              type="button"
+              className="studio-color-stack studio-color-stack-background"
+              aria-label={`Background color ${design.colors.background}`}
+              aria-pressed={toolOptions === "colors"}
+              style={{ backgroundColor: design.colors.background }}
+              onClick={() => setToolOptions((current) => (current === "colors" ? null : "colors"))}
+            />
+            <button
+              type="button"
+              className="studio-color-swap"
+              aria-label="Swap foreground and background colors"
+              onClick={() => {
+                dispatch({ type: "setColor", key: "accent", value: design.colors.background });
+                dispatch({ type: "setColor", key: "background", value: design.colors.accent });
+                setCanvasStatus("Swapped colors");
+              }}
+            >
+              <RestyleIcon />
+            </button>
+          </div>
+
+          {toolOptions ? (
+            <section
+              className="studio-tool-options"
+              role="dialog"
+              aria-label={`${toolOptions[0].toUpperCase()}${toolOptions.slice(1)} options`}
+            >
+              <div className="studio-tool-options-heading">
+                <div>
+                  <span className="studio-tool-options-kicker">Tool options</span>
+                  <strong>
+                    {toolOptions === "brush"
+                      ? "Brush"
+                      : toolOptions === "fill"
+                        ? "Paint bucket"
+                        : toolOptions === "colors"
+                          ? "Colors"
+                          : "Palettes"}
+                  </strong>
+                </div>
                 <button
-                  key={palette.id}
                   type="button"
-                  className={`studio-palette-option ${selectedPaletteId === palette.id ? "is-selected" : ""}`}
-                  aria-label={`Use ${palette.name} palette`}
-                  aria-pressed={selectedPaletteId === palette.id}
-                  title={`${palette.name}: ${palette.note}`}
-                  onClick={() => applyPalette(palette.id)}
+                  className="studio-tool-options-close"
+                  aria-label="Close tool options"
+                  onClick={() => setToolOptions(null)}
                 >
-                  {Object.values(palette.colors).map((color) => (
-                    <span key={color} className="studio-palette-swatch" style={{ backgroundColor: color }} />
-                  ))}
+                  ×
                 </button>
-              ))}
-            </div>
+              </div>
+
+              {toolOptions === "brush" ? (
+                <div className="studio-tool-options-content">
+                  <label className="studio-tool-slider">
+                    <span>Size <strong>{brushSize}px</strong></span>
+                    <input
+                      type="range"
+                      min="2"
+                      max="96"
+                      step="1"
+                      value={brushSize}
+                      onChange={(event) => setBrushSize(Number(event.target.value))}
+                    />
+                  </label>
+                  <label className="studio-tool-slider">
+                    <span>Opacity <strong>{Math.round(brushOpacity * 100)}%</strong></span>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1"
+                      step="0.05"
+                      value={brushOpacity}
+                      onChange={(event) => setBrushOpacity(Number(event.target.value))}
+                    />
+                  </label>
+                  <label className="studio-tool-color-field">
+                    <span>Brush color</span>
+                    <span>
+                      <input
+                        type="color"
+                        value={design.colors.accent}
+                        aria-label="Brush color"
+                        onChange={(event) => dispatch({ type: "setColor", key: "accent", value: event.target.value })}
+                      />
+                      <code>{design.colors.accent.toUpperCase()}</code>
+                    </span>
+                  </label>
+                </div>
+              ) : null}
+
+              {toolOptions === "fill" ? (
+                <div className="studio-tool-options-content">
+                  <label className="studio-tool-color-field">
+                    <span>Fill color</span>
+                    <span>
+                      <input
+                        type="color"
+                        value={design.colors.accent}
+                        aria-label="Fill color"
+                        onChange={(event) => dispatch({ type: "setColor", key: "accent", value: event.target.value })}
+                      />
+                      <code>{design.colors.accent.toUpperCase()}</code>
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    className="studio-tool-option-action"
+                    onClick={() => {
+                      dispatch({ type: "setColor", key: "background", value: design.colors.accent });
+                      setCanvasStatus(`Background set to ${design.colors.accent}`);
+                    }}
+                  >
+                    Set poster background
+                  </button>
+                  <span className="studio-tool-option-hint">Choose a color, then click the poster to apply it.</span>
+                </div>
+              ) : null}
+
+              {toolOptions === "colors" ? (
+                <div className="studio-tool-options-content">
+                  {(["accent", "background"] as const).map((key) => (
+                    <label className="studio-tool-color-field" key={key}>
+                      <span>{key === "accent" ? "Foreground" : "Background"}</span>
+                      <span>
+                        <input
+                          type="color"
+                          value={design.colors[key]}
+                          aria-label={`${key === "accent" ? "Foreground" : "Background"} color`}
+                          onChange={(event) => dispatch({ type: "setColor", key, value: event.target.value })}
+                        />
+                        <code>{design.colors[key].toUpperCase()}</code>
+                      </span>
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    className="studio-tool-option-action"
+                    onClick={() => {
+                      dispatch({ type: "setColor", key: "accent", value: design.colors.background });
+                      dispatch({ type: "setColor", key: "background", value: design.colors.accent });
+                    }}
+                  >
+                    Swap colors
+                  </button>
+                </div>
+              ) : null}
+
+              {toolOptions === "palette" ? (
+                <div className="studio-tool-options-palette-grid">
+                  {colorPalettes.map((palette) => (
+                    <button
+                      key={palette.id}
+                      type="button"
+                      className={`studio-palette-option ${selectedPaletteId === palette.id ? "is-selected" : ""}`}
+                      aria-label={`Use ${palette.name} palette`}
+                      aria-pressed={selectedPaletteId === palette.id}
+                      title={`${palette.name}: ${palette.note}`}
+                      onClick={() => applyPalette(palette.id)}
+                    >
+                      {Object.values(palette.colors).map((color, index) => (
+                        <span key={`${palette.id}-${index}-${color}`} className="studio-palette-swatch" style={{ backgroundColor: color }} />
+                      ))}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           ) : null}
         </div>
 
