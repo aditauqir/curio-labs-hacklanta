@@ -341,4 +341,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `ui-and-feature` | 2026-10-11 | UI and feature work after the production editor deployment | in progress | |
 | `codex/e2e-ci-fix` | 2026-10-11 | Fix the stale desktop E2E editor setup after the merged UI release | merged | PR #21; apex-only workspace routing deployed as `d218585` |
 | `library-engine-texture-filter` | 2026-10-11 | Keep engine-texture rows out of the Gemini library context so the curio/assets textures can be published to curio_library_assets | in progress | Gemini context and coach search skip rows tagged `engine-texture`; `/api/assets` still lists them. Prerequisite for publishing `curio/assets` from `curio-raster-engine`. |
+| `reference-looks` | 2026-10-11 | Ground the web poster and Gemini prompts in the analysed reference looks (curio/assets textures, halftones, style tags) | in progress | |
 <!-- BRANCH-LOG-INSERT -->
