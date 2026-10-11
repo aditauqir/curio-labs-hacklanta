@@ -325,5 +325,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `canonical-healthcheck` | 2026-10-11 | Verify production through the canonical HTTPS domain after deployment | merged | PR #17 merged; final workflow passed 17 E2E tests, Vultr deployment, and the canonical public endpoint check |
 | `handoff-deploy-verified` | 2026-10-11 | Record the green production deployment and public endpoint verification | merged | PR #18 records the green final production run; apex redirects to `/home`, and `/app` returns 200 over HTTPS |
 | `ui-and-feature` | 2026-10-11 | UI and feature work after the production editor deployment | in progress | |
-| `library-engine-texture-filter` | 2026-10-11 | Keep engine-texture rows out of the Gemini library context so the curio/assets textures can be published to curio_library_assets | in progress | |
+| `library-engine-texture-filter` | 2026-10-11 | Keep engine-texture rows out of the Gemini library context so the curio/assets textures can be published to curio_library_assets | in progress | Gemini context and coach search skip rows tagged `engine-texture`; `/api/assets` still lists them. Prerequisite for publishing `curio/assets` from `curio-raster-engine`. Blocked like every PR by the stale E2E heading check from #19 |
 <!-- BRANCH-LOG-INSERT -->

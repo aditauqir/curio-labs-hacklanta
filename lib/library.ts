@@ -59,11 +59,24 @@ function summary(asset: LibraryRow): AssetSuggestion {
   };
 }
 
-export async function listLibraryAssets(kind?: LibraryKind, limit = 60, ownerInstanceId?: string): Promise<LibraryAsset[]> {
+/**
+ * Rows published by the Python engine (`python -m curio publish-library`) carry this tag.
+ * They are halftone maps, grain and paper for the renderer, not design suggestions, so
+ * the Gemini context and coach search leave them out. `/api/assets` still lists them.
+ */
+export const ENGINE_TEXTURE_TAG = "engine-texture";
+
+export async function listLibraryAssets(
+  kind?: LibraryKind,
+  limit = 60,
+  ownerInstanceId?: string,
+  options: { excludeTag?: string } = {},
+): Promise<LibraryAsset[]> {
   const sql = await getDatabase();
+  const tagFilter = options.excludeTag ? sql`AND NOT (${options.excludeTag} = ANY(tags))` : sql``;
   const ownerFilter = ownerInstanceId
-    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${ownerInstanceId}::uuid)`
-    : sql`AND owner_instance_id IS NULL`;
+    ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${ownerInstanceId}::uuid) ${tagFilter}`
+    : sql`AND owner_instance_id IS NULL ${tagFilter}`;
   const rows = kind
     ? await sql<LibraryRow[]>`
         SELECT id, kind, name, description, tags, metadata,
@@ -89,13 +102,14 @@ export async function listLibraryAssets(kind?: LibraryKind, limit = 60, ownerIns
 /** Search the TigerData-backed library for the small set of references a coach needs. */
 export async function searchLibraryAssets(
   query: string,
-  options: { kind?: LibraryKind; limit?: number; ownerInstanceId?: string } = {},
+  options: { kind?: LibraryKind; limit?: number; ownerInstanceId?: string; excludeTag?: string } = {},
 ): Promise<LibraryAsset[]> {
   const sql = await getDatabase();
   const ownerFilter = options.ownerInstanceId
     ? sql`AND (owner_instance_id IS NULL OR owner_instance_id = ${options.ownerInstanceId}::uuid)`
     : sql`AND owner_instance_id IS NULL`;
   const kindFilter = options.kind ? sql`AND kind = ${options.kind}` : sql``;
+  const tagFilter = options.excludeTag ? sql`AND NOT (${options.excludeTag} = ANY(tags))` : sql``;
   const needle = `%${query.trim().slice(0, 80)}%`;
   const limit = Math.max(1, Math.min(options.limit ?? 6, 12));
   const rows = await sql<LibraryRow[]>`
@@ -109,6 +123,7 @@ export async function searchLibraryAssets(
       OR array_to_string(tags, ' ') ILIKE ${needle}
     )
     ${kindFilter}
+    ${tagFilter}
     ${ownerFilter}
     ORDER BY updated_at DESC, name ASC
     LIMIT ${limit}
@@ -126,7 +141,7 @@ export async function searchLibraryAssets(
 /** Context sent to Gemini. Failure is intentionally non-fatal: the poster still works. */
 export async function libraryContext(ownerInstanceId?: string) {
   try {
-    return await listLibraryAssets(undefined, 60, ownerInstanceId);
+    return await listLibraryAssets(undefined, 60, ownerInstanceId, { excludeTag: ENGINE_TEXTURE_TAG });
   } catch {
     return [];
   }
