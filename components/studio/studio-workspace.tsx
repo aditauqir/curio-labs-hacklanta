@@ -60,17 +60,28 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     future: [],
   }));
   const state = history.present;
-  const dispatch: Dispatch<StudioAction> = (action) => {
+  const dispatchActions = useCallback((actions: StudioAction[]) => {
     setHistory((current) => {
-      const next = studioReducer(current.present, action);
+      const next = actions.reduce(studioReducer, current.present);
       if (next === current.present) return current;
+
+      // Chat messages are context, not canvas edits. Keep them visible without
+      // spending an undo step so Undo returns to the last visual state.
+      if (actions.every((action) => action.type === "addMessages")) {
+        return { ...current, present: next };
+      }
+
       return {
         past: [...current.past, current.present].slice(-50),
         present: next,
         future: [],
       };
     });
-  };
+  }, []);
+  const dispatch: Dispatch<StudioAction> = useCallback(
+    (action) => dispatchActions([action]),
+    [dispatchActions],
+  );
   const [view, setView] = useState<StudioView>(() => {
     if (
       initialView === "start" &&
@@ -133,7 +144,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       active = false;
       controller.abort();
     };
-  }, []);
+  }, [dispatch]);
 
   const importImage = useCallback(async (file: File) => {
     const previewUrl = URL.createObjectURL(file);
@@ -445,6 +456,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
             posterEdits={posterEdits}
             layerOrder={layerOrder}
             dispatch={dispatch}
+            dispatchBatch={dispatchActions}
             initialPrompt={initialPrompt}
           />
         </aside>
@@ -499,6 +511,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                   design={design}
                   selectedPaletteId={selectedPaletteId}
                   dispatch={dispatch}
+                  dispatchBatch={dispatchActions}
                   posterEdits={posterEdits}
                   layerOrder={layerOrder}
                   selectedLayerId={selectedLayerId}

@@ -56,6 +56,22 @@ test.describe("studio workspace", () => {
     await expect(page.getByRole("region", { name: "Reference" })).toBeVisible();
   });
 
+  test("undoes a chat design change as one transaction", async ({ page }) => {
+    await page.getByRole("button", { name: "Open color properties" }).click();
+    const accent = page.getByRole("textbox", { name: /^Accent color/ });
+    const originalAccent = await accent.inputValue();
+
+    await page.getByLabel("Describe a change").fill("Use a blue accent");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByText("Accent: blue")).toBeVisible();
+    await expect(accent).not.toHaveValue(originalAccent);
+
+    const undo = page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Undo" });
+    await expect(undo).toBeEnabled();
+    await undo.click();
+    await expect(accent).toHaveValue(originalAccent);
+  });
+
   test("applies a natural-language modern request to the canvas", async ({ page }) => {
     await page.getByLabel("Describe a change").fill("make it look more modern");
     await page.getByRole("button", { name: "Send message" }).click();

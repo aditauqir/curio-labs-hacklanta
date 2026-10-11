@@ -8,7 +8,7 @@ Latest editor behavior: the Layers inspector now supports persistent up/down reo
 
 Latest zoom behavior: pinch/trackpad zoom is scoped to the grid stage; the editor shell prevents browser page zoom outside that stage and remains locked to the viewport height.
 
-Latest editing behavior: Meta/Ctrl Z, Meta/Ctrl Shift Z, and Ctrl Y now use the editor's bounded history, and the left canvas rail includes a reducer-backed color palette picker with four swatch sets.
+Latest editing behavior: Meta/Ctrl Z, Meta/Ctrl Shift Z, and Ctrl Y use the editor's bounded history; AI design requests and multi-property palette swaps commit as one undoable transaction, while chat-only messages do not consume undo steps; the left canvas rail includes a reducer-backed color palette picker with four swatch sets.
 
 Latest action behavior: Reset design, project Reset, selected-layer Hide, and Save now open the shared shadcn Dialog surface with action-specific copy, Cancel, and confirm buttons; destructive actions remain reversible where the editor already preserves the layer/project state.
 

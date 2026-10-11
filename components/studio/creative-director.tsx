@@ -80,6 +80,7 @@ export function CreativeDirector({
   posterEdits,
   layerOrder,
   dispatch,
+  dispatchBatch,
   initialPrompt,
 }: {
   messages: ChatMessage[];
@@ -88,6 +89,7 @@ export function CreativeDirector({
   posterEdits: PosterEdits;
   layerOrder: string[];
   dispatch: Dispatch<StudioAction>;
+  dispatchBatch: (actions: StudioAction[]) => void;
   initialPrompt?: string | null;
 }) {
   const capabilities = useCapabilities();
@@ -190,7 +192,7 @@ export function CreativeDirector({
         (next, action) => studioReducer(next, action),
         { design, messages, selectedPaletteId, posterEdits, layerOrder },
       );
-      for (const action of outcome.actions) dispatch(action);
+      dispatchBatch(outcome.actions);
       dispatch({
         type: "addMessages",
         messages: [

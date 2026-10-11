@@ -104,6 +104,7 @@ export function DesignCanvas({
   design,
   selectedPaletteId,
   dispatch,
+  dispatchBatch,
   posterEdits,
   layerOrder,
   selectedLayerId,
@@ -126,6 +127,7 @@ export function DesignCanvas({
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
+  dispatchBatch: (actions: StudioAction[]) => void;
   posterEdits: PosterEdits;
   layerOrder: string[];
   selectedLayerId: string | null;
@@ -673,8 +675,10 @@ export function DesignCanvas({
               className="studio-color-swap"
               aria-label="Swap foreground and background colors"
               onClick={() => {
-                dispatch({ type: "setColor", key: "accent", value: design.colors.background });
-                dispatch({ type: "setColor", key: "background", value: design.colors.accent });
+                dispatchBatch([
+                  { type: "setColor", key: "accent", value: design.colors.background },
+                  { type: "setColor", key: "background", value: design.colors.accent },
+                ]);
                 setCanvasStatus("Swapped colors");
               }}
             >
@@ -798,8 +802,10 @@ export function DesignCanvas({
                     type="button"
                     className="studio-tool-option-action"
                     onClick={() => {
-                      dispatch({ type: "setColor", key: "accent", value: design.colors.background });
-                      dispatch({ type: "setColor", key: "background", value: design.colors.accent });
+                      dispatchBatch([
+                        { type: "setColor", key: "accent", value: design.colors.background },
+                        { type: "setColor", key: "background", value: design.colors.accent },
+                      ]);
                     }}
                   >
                     Swap colors
