@@ -82,6 +82,43 @@ def check_template(raw: Any, name: str, presets: dict[str, Preset], layouts: dic
     return issues
 
 
+def add_layout(styles: CompiledStyles, name: str, text: str) -> None:
+    """Parses one layout document into ``styles``, or records why it was skipped."""
+    try:
+        layout = parse_layout(json.loads(text))
+    except (ValueError, LayoutError) as error:
+        styles.issues.append(Issue(name, "", str(error)))
+        return
+    if layout.layout_id in styles.layouts:
+        styles.issues.append(Issue(name, "layout_id", f"duplicate layout id {layout.layout_id!r}"))
+        return
+    styles.layouts[layout.layout_id] = layout
+
+
+def add_template(styles: CompiledStyles, name: str, text: str) -> None:
+    """Checks one template against the presets and layouts already in ``styles``."""
+    try:
+        raw = json.loads(text)
+    except ValueError as error:
+        styles.issues.append(Issue(name, "", f"cannot read: {error}"))
+        return
+    problems = check_template(raw, name, styles.presets, styles.layouts)
+    if problems:
+        styles.issues.extend(problems)
+    elif raw["template_id"] in styles.templates:
+        styles.issues.append(Issue(name, "template_id", f"duplicate template id {raw['template_id']!r}"))
+    else:
+        styles.templates[raw["template_id"]] = raw
+
+
+def _read(path: Path, name: str, styles: CompiledStyles) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as error:
+        styles.issues.append(Issue(name, "", f"cannot read: {error}"))
+        return None
+
+
 class DirectorySource:
     """Reads ``presets/``, ``layouts/`` and ``templates/`` from a compiled folder."""
 
@@ -94,30 +131,11 @@ class DirectorySource:
         styles.issues.extend(library.load().issues)
         styles.presets = library.presets
 
-        for path in sorted((self.root / "layouts").glob("*.json")) if (self.root / "layouts").is_dir() else []:
-            name = f"layouts/{path.name}"
-            try:
-                layout = parse_layout(json.loads(path.read_text(encoding="utf-8")))
-            except (OSError, ValueError, LayoutError) as error:
-                styles.issues.append(Issue(name, "", str(error)))
-                continue
-            if layout.layout_id in styles.layouts:
-                styles.issues.append(Issue(name, "layout_id", f"duplicate layout id {layout.layout_id!r}"))
-                continue
-            styles.layouts[layout.layout_id] = layout
-
-        for path in sorted((self.root / "templates").glob("*.json")) if (self.root / "templates").is_dir() else []:
-            name = f"templates/{path.name}"
-            try:
-                raw = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError) as error:
-                styles.issues.append(Issue(name, "", f"cannot read: {error}"))
-                continue
-            problems = check_template(raw, name, styles.presets, styles.layouts)
-            if problems:
-                styles.issues.extend(problems)
-            elif raw["template_id"] in styles.templates:
-                styles.issues.append(Issue(name, "template_id", f"duplicate template id {raw['template_id']!r}"))
-            else:
-                styles.templates[raw["template_id"]] = raw
+        for folder, add in (("layouts", add_layout), ("templates", add_template)):
+            directory = self.root / folder
+            for path in sorted(directory.glob("*.json")) if directory.is_dir() else []:
+                name = f"{folder}/{path.name}"
+                text = _read(path, name, styles)
+                if text is not None:
+                    add(styles, name, text)
         return styles

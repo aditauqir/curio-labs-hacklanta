@@ -13,6 +13,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# Publishing to and loading from TigerData (PostgreSQL). Offline use only.
+db = ["psycopg[binary]>=3.2"]
 
 [build-system]
 requires = ["setuptools>=68"]

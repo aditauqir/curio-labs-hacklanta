@@ -31,7 +31,7 @@ Python 3.12 or newer. Dependencies: NumPy, SciPy, Pillow, OpenCV (headless), fon
 | `docs/` | The **offline** style ingestion pipeline: the export contract for the analysis model (`MODEL_EXPORT_SPEC.md`) and how compiled styles reach TigerData. Not run by the website; see `docs/README.md` |
 | `compiler/` | Validates a style-analysis export and compiles it into presets, layouts and templates (see below) |
 | `layout/` | The layout schema (regions as fractions with tunable bounds) and the engine that places them in pixels, clamping tuning and dropping empty optional slots |
-| `store/` | Loads a compiled folder as one consistent set; a template whose preset, layout or overrides do not resolve is skipped and reported. `StyleSource` is the seam for a database later |
+| `store/` | Loads compiled styles as one consistent set, from a folder (`DirectorySource`) or a published TigerData release (`DatabaseSource`); a template whose preset, layout or overrides do not resolve is skipped and reported. Also the publisher (`publish`, `pull`, `releases`); see `docs/README.md` |
 | `render/` | The runner: template + content + photo to a poster and a **record** of every value, clamp, font fallback, legibility fix, licence and unsupported capability |
 
 Not built yet: asset acquisition and the rights manifest, the creative director, the
@@ -41,6 +41,10 @@ critique loop, scrapers.
 python -m curio compile EXPORT_DIR compiled/
 python -m curio render compiled/ synth_newsprint__inset_window out/poster.png \
   --photo photo.jpg --license CC0-1.0 --text headline="Night Shift" --text "tracklist=One|Two|Three"
+
+# Offline, needs pip install -e ".[db]" and CURIO_DATABASE_URL (or DATABASE_URL)
+python -m curio publish compiled/ --note "first families"
+python -m curio render db synth_newsprint__inset_window out/poster.png ...
 ```
 
 ## Conventions

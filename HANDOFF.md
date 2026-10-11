@@ -37,7 +37,7 @@ Live verification on 2026-10-10: Gemini and ElevenLabs returned successful respo
 | Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Production microphone access is enabled over HTTPS. |
 | Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
 | Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
-| Raster engine (`curio/`, Python) | On `curio-raster-engine`: layer stack and renderer, 44 deterministic image ops with golden-image tests, font library and text rendering (including hollow type), versioned style loader, a compiler from the style-analysis export to presets/layouts/templates, a layout engine, and an end-to-end runner (`python -m curio render`) that writes a poster plus a record of every value, fallback, legibility fix and licence. **No generative image models, by design.** A separate Python package, not yet connected to the Next.js app. Not built: asset rights manifest, director, critique loop, scrapers. See `curio/README.md` and `curio/OPEN_ITEMS.md`. |
+| Raster engine (`curio/`, Python) | On `curio-raster-engine`: layer stack and renderer, 44 deterministic image ops with golden-image tests, font library and text rendering (including hollow type), versioned style loader, a compiler from the style-analysis export to presets/layouts/templates, a layout engine, an offline publisher that uploads compiled styles to TigerData as immutable releases and loads them back (`python -m curio publish` / `pull` / `render db`), and an end-to-end runner (`python -m curio render`) that writes a poster plus a record of every value, fallback, legibility fix and licence. **No generative image models, by design.** A separate Python package, not yet connected to the Next.js app. Not built: asset rights manifest, director, critique loop, scrapers. See `curio/README.md` and `curio/OPEN_ITEMS.md`. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
@@ -88,7 +88,7 @@ lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.t
   director-client.ts    Browser fetch for the director with a timeout
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
 curio/                  Python raster engine (separate from the Next.js app): core/, ops/, typography/, style_schema/, styles/, tests/. See curio/README.md
-curio/docs/             Offline style ingestion pipeline: analysis-model export spec -> `curio compile` -> TigerData (publish step not built). Run by hand, never by the website or deploy. See curio/docs/README.md
+curio/docs/             Offline style ingestion pipeline: analysis-model export spec -> `curio compile` -> `curio publish` to TigerData (tables curio_style_releases, curio_style_documents). Run by hand, never by the website or deploy. See curio/docs/README.md
 scripts/new-branch.mjs  Creates a branch and logs it here (see Working agreement)
 scripts/check-secrets.mjs  Fails if a credential-shaped string is in a committable file
 scripts/add-domain-ssl.sh  Server-side: add a domain to nginx and expand the Let's Encrypt certificate
@@ -159,6 +159,8 @@ nginx's default `client_max_body_size` is 1 MB. Voice clips are capped at 30 sec
 | `ELEVENLABS_API_KEY` | Spoken replies, and backup speech-to-text | same as above |
 | `WHISPER_URL`, `WHISPER_ENABLED` | Optional local Whisper URL and opt-out switch; defaults to `http://127.0.0.1:8178` and enabled | same as above |
 | `DATABASE_URL` | TigerData/Timescale PostgreSQL connection string for anonymous instances, workspace state, chat, files, and the shared asset library | same as above |
+| `CURIO_DATABASE_URL` | Optional. Connection string for the offline Python style publisher (`curio/`); falls back to `DATABASE_URL`. Only needed on the machine that runs `python -m curio publish`, not on the server | shell environment of that machine |
+| `CURIO_TEST_DATABASE_URL` | Optional. Enables the Postgres round-trip test in `curio/tests/test_database.py`; it works in a throwaway schema and drops it | shell environment |
 | `LIBRARY_WRITE_TOKEN` | Optional server-only token required to upload shared font/media assets; reads remain available without it | same as above |
 | `GEMINI_MODEL`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_STT_MODEL` | Optional model and voice overrides | same as above |
 | GitHub Actions secrets | `VULTR_HOST`, `VULTR_USER`, `VULTR_SSH_KEY`, `VULTR_KNOWN_HOSTS` | GitHub repo settings. App keys are intentionally **not** here |
@@ -262,5 +264,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
-| `curio-raster-engine` | 2026-10-10 | Python raster engine (curio/): layer stack, deterministic op registry, text and font library, versioned style loader. No generative image models | in progress | Core, ops, typography, style loader, export compiler, layout engine, compiled-style store and poster runner done. Local only, not pushed |
+| `curio-raster-engine` | 2026-10-10 | Python raster engine (curio/): layer stack, deterministic op registry, text and font library, versioned style loader. No generative image models | in progress | Core, ops, typography, style loader, export compiler, layout engine, compiled-style store, poster runner and TigerData style publisher/loader done (round trip verified against TigerData in a scratch schema; nothing published to the real tables yet). Local only, not pushed |
 <!-- BRANCH-LOG-INSERT -->

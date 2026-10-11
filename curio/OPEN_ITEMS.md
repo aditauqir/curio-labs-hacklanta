@@ -36,6 +36,7 @@ confined to one place in the code so it is a local edit to change.
 | A15 | A role's **`size_rel` is the largest size**; type shrinks to fit its box (minimum 9 px at the 1080 reference). Tracklists and credits take the column count (1 to 4) that allows the largest size. Type sits at the top of its box. | `curio/render/poster.py` |
 | A16 | With no `aspect` in the request, the runner uses the **first of the template's `aspects_seen`** (sorted), else 4:5. | `curio/render/poster.py` `render_poster()` |
 | A17 | A **`cutout` step is skipped with a warning** at render time (no matte, open item 1), rather than failing the whole poster. | `curio/render/poster.py` `treatment_calls()` |
+| A18 | **The newest release is the current one.** There is no separate "active release" pointer; rolling back means republishing an older release's content. A folder is published only if it loads with no errors. | `curio/store/database.py` `publish()`, `collect_documents()` |
 
 ## Known gaps in what exists
 

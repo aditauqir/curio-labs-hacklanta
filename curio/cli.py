@@ -3,9 +3,16 @@
 validate EXPORT_DIR          check a model export; print each problem as file: field: message
 compile  EXPORT_DIR OUT_DIR  validate, then write presets, layouts and templates
 report   EXPORT_DIR OUT_DIR  write the markdown report for each cluster
-render   STYLES_DIR TEMPLATE OUT.png --photo P --text slot=value ...
-                             render a compiled template; writes OUT.png and OUT.json (the record)
+render   STYLES TEMPLATE OUT.png --photo P --text slot=value ...
+                             render a compiled template; writes OUT.png and OUT.json (the record).
+                             STYLES is a compiled folder, or db (newest release) or db:N
+publish  COMPILED_DIR        upload a compiled folder to TigerData as a new release
+pull     OUT_DIR             download a release (default: newest) as a compiled folder
+releases                     list published releases, newest first
 ops                          list the engine's operations
+
+publish, pull, releases and db styles read the connection string from
+CURIO_DATABASE_URL, else DATABASE_URL. They are offline tools, not run by the website.
 
 Exit status: 0 when nothing was skipped and there were no errors, 1 otherwise.
 """
@@ -61,10 +68,9 @@ def cmd_render(args: argparse.Namespace) -> int:
 
     from curio.core.image import load_image, save_image
     from curio.render import Photo, RenderRequest, render_poster
-    from curio.store import DirectorySource
     from curio.typography import FontLibrary
 
-    styles = DirectorySource(args.styles).load()
+    styles = _style_source(args.styles).load()
     _print_issues(styles.issues, sys.stderr)
     content: dict[str, object] = {}
     for item in args.text:
@@ -85,6 +91,97 @@ def cmd_render(args: argparse.Namespace) -> int:
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
     print(f"wrote {out} ({result.record['canvas'][0]}x{result.record['canvas'][1]}) and {out.with_suffix('.json')}")
+    return 0
+
+
+def _style_source(spec: str):
+    from curio.store import DatabaseSource, DirectorySource
+
+    if spec == "db":
+        return DatabaseSource()
+    if spec.startswith("db:"):
+        return DatabaseSource(int(spec[3:]))
+    return DirectorySource(spec)
+
+
+def _db_command(fn):
+    """Runs a database command, reporting failures without the connection string."""
+
+    def run(args: argparse.Namespace) -> int:
+        from curio.store.database import DatabaseNotConfigured
+
+        try:
+            import psycopg
+        except ImportError:
+            print('psycopg is not installed: pip install -e ".[db]"', file=sys.stderr)
+            return 1
+        try:
+            return fn(args)
+        except DatabaseNotConfigured as error:
+            print(error, file=sys.stderr)
+        except psycopg.OperationalError:
+            # The driver's message can echo connection details; keep them out of logs.
+            print("cannot reach the database; check CURIO_DATABASE_URL / DATABASE_URL and the network", file=sys.stderr)
+        except psycopg.Error as error:
+            print(f"database error: {type(error).__name__}: {error}", file=sys.stderr)
+        return 1
+
+    return run
+
+
+def _describe(release) -> str:
+    counts = ", ".join(f"{n} {kind}(s)" for kind, n in release.counts.items())
+    note = f"  {release.note}" if release.note else ""
+    return f"release {release.id}  {release.created_at:%Y-%m-%d %H:%M}  {counts}  {release.set_hash[:12]}{note}"
+
+
+@_db_command
+def cmd_publish(args: argparse.Namespace) -> int:
+    from curio.store.database import PublishRefused, collect_documents, connect, publish
+
+    try:
+        docs = collect_documents(args.compiled)
+    except PublishRefused as refused:
+        _print_issues(refused.issues, sys.stderr)
+        print(f"\nnot published: {len(refused.issues)} problem(s). Fix them and compile again.", file=sys.stderr)
+        return 1
+    if args.dry_run:
+        print(f"would publish {len(docs)} document(s) from {args.compiled}; nothing written (--dry-run).")
+        return 0
+    with connect() as conn:
+        result = publish(conn, docs, args.note)
+    verb = "published" if result.created else "unchanged; the newest release already matches:"
+    print(f"{verb} {_describe(result.release)}")
+    return 0
+
+
+@_db_command
+def cmd_pull(args: argparse.Namespace) -> int:
+    from curio.store import DatabaseSource
+    from curio.store.database import styles_from_documents, write_documents
+
+    source = DatabaseSource(args.release)
+    docs = source.documents()
+    if source.release is None:
+        print("no such release has been published" if args.release else "nothing has been published yet", file=sys.stderr)
+        return 1
+    styles = styles_from_documents(docs)
+    _print_issues(styles.issues, sys.stderr)
+    written = write_documents(docs, args.out)
+    print(f"pulled {_describe(source.release)}\nwrote {len(written)} file(s) to {args.out}")
+    return 0 if not styles.errors else 1
+
+
+@_db_command
+def cmd_releases(args: argparse.Namespace) -> int:
+    from curio.store.database import tables_exist, connect, list_releases
+
+    with connect() as conn:
+        releases = list_releases(conn, args.limit) if tables_exist(conn) else []
+    for release in releases:
+        print(_describe(release))
+    if not releases:
+        print("nothing has been published yet")
     return 0
 
 
@@ -110,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("out", help="output folder")
         p.set_defaults(fn=fn)
     r = sub.add_parser("render", help="render a compiled template to a PNG and its record")
-    r.add_argument("styles", help="compiled styles folder (presets/, layouts/, templates/)")
+    r.add_argument("styles", help="compiled styles folder (presets/, layouts/, templates/), or db / db:N for a published release")
     r.add_argument("template", help="template id")
     r.add_argument("out", help="output PNG path; the record is written next to it as .json")
     r.add_argument("--photo", help="photo file")
@@ -123,9 +220,23 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--short-edge", type=int, default=1080)
     r.add_argument("--seed", type=int, default=0)
     r.set_defaults(fn=cmd_render)
+    pub = sub.add_parser("publish", help="upload a compiled folder to TigerData as a new release")
+    pub.add_argument("compiled", help="compiled styles folder (output of compile)")
+    pub.add_argument("--note", help="a short note stored with the release")
+    pub.add_argument("--dry-run", action="store_true", help="check the folder without connecting")
+    pub.set_defaults(fn=cmd_publish)
+    pull = sub.add_parser("pull", help="download a published release as a compiled folder")
+    pull.add_argument("out", help="output folder")
+    pull.add_argument("--release", type=int, help="release id (default: newest)")
+    pull.set_defaults(fn=cmd_pull)
+    rel = sub.add_parser("releases", help="list published releases, newest first")
+    rel.add_argument("--limit", type=int, default=20)
+    rel.set_defaults(fn=cmd_releases)
     ops = sub.add_parser("ops", help="list engine operations")
     ops.set_defaults(fn=cmd_ops)
     args = parser.parse_args(argv)
+    if args.fn is cmd_render and args.styles.partition(":")[0] == "db":
+        return _db_command(cmd_render)(args)
     return args.fn(args)
 
 
