@@ -3,6 +3,8 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { VoiceBeam } from "voice-glow";
 import { Card } from "@/components/ui/card";
+import type { ImportedReference } from "@/lib/image-import-client";
+import { ImageImportControl } from "./image-import";
 import { MicIcon, SendIcon } from "./icons";
 import { useCapabilities } from "./use-capabilities";
 import { useVoice } from "./use-voice";
@@ -78,13 +80,15 @@ function VoiceActivityOrb({ active, level, processing }: { active: boolean; leve
   );
 }
 
-export type StartDestination = "chat" | "editor";
-
 export function OnboardingStudio({
   onStart,
+  onImportImage,
+  importedReference,
   projectName = "Midnight Jazz",
 }: {
-  onStart: (prompt?: string, destination?: StartDestination) => void;
+  onStart: (prompt?: string) => void;
+  onImportImage: (file: File) => Promise<ImportedReference>;
+  importedReference: ImportedReference | null;
   projectName?: string;
 }) {
   const capabilities = useCapabilities();
@@ -93,7 +97,7 @@ export function OnboardingStudio({
   const voice = useVoice({
     canListen: capabilities.listen,
     canSpeak: false,
-    onTranscript: (text) => onStart(text, "chat"),
+    onTranscript: (text) => onStart(text),
   });
   const voiceLevel = useVoiceLevel(voice.stream, voice.phase === "listening");
 
@@ -119,7 +123,7 @@ export function OnboardingStudio({
   function submit(event: FormEvent) {
     event.preventDefault();
     const prompt = draft.trim();
-    if (prompt) onStart(prompt, "chat");
+    if (prompt) onStart(prompt);
   }
 
   const listening = voice.phase === "listening";
@@ -143,6 +147,13 @@ export function OnboardingStudio({
               <VoiceMascot />
             </div>
             <h1 id="onboarding-title">What are you thinking of?</h1>
+
+            <ImageImportControl
+              onImport={onImportImage}
+              result={importedReference}
+              showSuggestions
+              onUseSuggestion={onStart}
+            />
 
             <form onSubmit={submit} className="onboarding-form">
               <VoiceBeam
@@ -204,7 +215,7 @@ export function OnboardingStudio({
 
             <div className="starter-prompts" aria-label="Starter ideas">
               {starterPrompts.map((prompt) => (
-                <button key={prompt} type="button" onClick={() => onStart(prompt, "chat")}>
+              <button key={prompt} type="button" onClick={() => onStart(prompt)}>
                   {prompt}
                 </button>
               ))}
@@ -220,7 +231,7 @@ export function OnboardingStudio({
             <button
               type="button"
               className="onboarding-project-card is-current"
-              onClick={() => onStart(undefined, "editor")}
+              onClick={() => onStart()}
             >
               <span className="onboarding-project-index">01</span>
               <span>
@@ -232,7 +243,7 @@ export function OnboardingStudio({
             <button
               type="button"
               className="onboarding-project-card"
-              onClick={() => onStart(starterPrompts[1], "chat")}
+              onClick={() => onStart(starterPrompts[1])}
             >
               <span className="onboarding-project-index">02</span>
               <span>
@@ -244,7 +255,7 @@ export function OnboardingStudio({
             <button
               type="button"
               className="onboarding-project-card"
-              onClick={() => onStart(starterPrompts[2], "chat")}
+              onClick={() => onStart(starterPrompts[2])}
             >
               <span className="onboarding-project-index">03</span>
               <span>

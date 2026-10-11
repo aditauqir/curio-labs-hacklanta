@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type Dispatch } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { askCoach, CoachError, type CoachReply } from "@/lib/coach-client";
 import type { DesignState } from "@/lib/design-types";
 import type { CopyKey, StudioAction } from "@/lib/design-state";
 import { colorPalettes, directionConfigs, directionOrder, fontPairs } from "@/lib/design-presets";
 import { exportPoster } from "@/lib/export";
+import { getPosterDimensions } from "@/lib/poster-layout";
 import {
   createPosterLayerEdit,
   type PosterEdits,
@@ -14,16 +15,54 @@ import {
 } from "@/lib/poster-editor";
 import { Poster } from "./poster";
 import {
-  GridIcon,
+  CopyIcon,
+  CropIcon,
+  DropIcon,
+  EraserIcon,
+  EyedropperIcon,
+  ExportIcon,
+  HandIcon,
+  LassoIcon,
+  LayersIcon,
+  MagicWandIcon,
+  MoveIcon,
+  PanelLeftIcon,
   PanelRightIcon,
+  PaintBrushIcon,
+  PaintBucketIcon,
+  PaletteIcon,
+  RectangleSelectIcon,
   ResetIcon,
+  RedoIcon,
+  RestyleIcon,
+  SaveIcon,
+  ScissorsIcon,
   SlidersIcon,
   SparkleIcon,
+  StampIcon,
+  ShuffleIcon,
+  TextIcon,
+  TrashIcon,
+  ZoomIcon,
 } from "./icons";
 import { ColorField, Field, SegmentedControl, inputClass } from "./ui";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FloatingButtonGroup } from "@/components/ui/floating-button-group";
 
 type InspectorTab = "layers" | "reference";
+type CanvasActionDialog = "reset-design" | "reset-project" | "delete-layer" | "save";
+
+const MIN_CANVAS_SCALE = 0.5;
+const MAX_CANVAS_SCALE = 3;
 
 const COPY_FIELDS: { key: CopyKey; label: string }[] = [
   { key: "venue", label: "Venue" },
@@ -63,25 +102,45 @@ function textKeyForLayer(id: string | null): TextLayerKey | null {
 
 export function DesignCanvas({
   design,
+  selectedPaletteId,
   dispatch,
   posterEdits,
+  layerOrder,
   selectedLayerId,
   activeTool,
   onToolChange,
   onSelectLayer,
   onChangeLayer,
   onDeleteLayer,
+  onResetProject,
+  onSaveProject,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  referenceOpen,
+  layersOpen,
   onToggleInspector,
 }: {
   design: DesignState;
+  selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
   posterEdits: PosterEdits;
+  layerOrder: string[];
   selectedLayerId: string | null;
   activeTool: PosterTool;
   onToolChange: (tool: PosterTool) => void;
   onSelectLayer: (id: string | null) => void;
   onChangeLayer: (id: string, patch: Partial<PosterLayerEdit>) => void;
   onDeleteLayer: (id: string) => void;
+  onResetProject: () => void;
+  onSaveProject: () => Promise<void>;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  referenceOpen?: boolean;
+  layersOpen?: boolean;
   onToggleInspector?: (tab?: InspectorTab) => void;
 }) {
   const [coach, setCoach] = useState<CoachReply | null>(null);
@@ -90,7 +149,14 @@ export function DesignCanvas({
   const [exporting, setExporting] = useState(false);
   const [canvasStatus, setCanvasStatus] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [actionDialog, setActionDialog] = useState<CanvasActionDialog | null>(null);
+  const [pendingLayerId, setPendingLayerId] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const [editStatus, setEditStatus] = useState("Nothing selected");
+  const [canvasScale, setCanvasScale] = useState(1);
+  const touchPointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ distance: number; scale: number } | null>(null);
 
   const selectedEdit = selectedLayerId
     ? { ...createPosterLayerEdit(), ...(posterEdits[selectedLayerId] ?? {}) }
@@ -98,6 +164,7 @@ export function DesignCanvas({
   const selectedTextLayer = textKeyForLayer(selectedLayerId);
 
   const selectedText = selectedTextLayer ? design[selectedTextLayer] : "";
+  const posterDimensions = getPosterDimensions(design);
   const selectedTextLabel =
     TEXT_LAYERS.find((layer) => layer.key === selectedTextLayer)?.label ?? "text";
 
@@ -188,11 +255,135 @@ export function DesignCanvas({
     setCanvasStatus(`Palette: ${nextPalette.name}`);
   }
 
+  function applyPalette(id: string) {
+    const palette = colorPalettes.find((item) => item.id === id);
+    if (!palette) return;
+    dispatch({ type: "setPalette", id });
+    setPaletteOpen(false);
+    setCanvasStatus(`Palette: ${palette.name}`);
+  }
+
+  function openActionDialog(action: CanvasActionDialog, layerId: string | null = null) {
+    if (action === "delete-layer" && !layerId) return;
+    setPendingLayerId(layerId);
+    setActionDialog(action);
+  }
+
+  async function confirmActionDialog() {
+    if (!actionDialog || actionBusy) return;
+    setActionBusy(true);
+
+    try {
+      if (actionDialog === "reset-design") {
+        dispatch({ type: "resetDesign" });
+        setCanvasScale(1);
+        setCanvasStatus("Design reset");
+      } else if (actionDialog === "reset-project") {
+        onResetProject();
+        setCanvasScale(1);
+        setCanvasStatus("Project reset");
+      } else if (actionDialog === "delete-layer" && pendingLayerId) {
+        onDeleteLayer(pendingLayerId);
+        setCanvasStatus("Layer hidden");
+      } else if (actionDialog === "save") {
+        await onSaveProject();
+        setCanvasStatus("Saved");
+      }
+
+      setActionDialog(null);
+      setPendingLayerId(null);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  const actionDialogCopy =
+    actionDialog === "reset-design"
+      ? {
+          title: "Reset design?",
+          description: "Restore the poster to its original visual direction. Your conversation stays intact.",
+          confirm: "Reset design",
+          variant: "destructive" as const,
+        }
+      : actionDialog === "reset-project"
+        ? {
+            title: "Reset project?",
+            description: "This removes the current design changes and conversation from this workspace.",
+            confirm: "Reset project",
+            variant: "destructive" as const,
+          }
+        : actionDialog === "delete-layer"
+          ? {
+              title: "Hide layer?",
+              description: "The layer will leave the poster but remain in Layers so you can restore it later.",
+              confirm: "Hide layer",
+              variant: "destructive" as const,
+            }
+          : actionDialog === "save"
+            ? {
+                title: "Save project?",
+                description: "Save the current design and conversation to this workspace.",
+                confirm: "Save project",
+                variant: "default" as const,
+              }
+            : null;
+
+  function zoomCanvas() {
+    const nextScale = canvasScale >= 1.35 ? 1 : canvasScale + 0.15;
+    applyCanvasScale(nextScale, true);
+  }
+
+  function applyCanvasScale(value: number, announce = false) {
+    const nextScale = Number(Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, value)).toFixed(2));
+    setCanvasScale(nextScale);
+    if (announce) setCanvasStatus(`Canvas zoom ${Math.round(nextScale * 100)}%`);
+  }
+
+  function handleCanvasWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    applyCanvasScale(canvasScale * Math.exp(-delta / 320));
+  }
+
+  function touchDistance() {
+    const points = Array.from(touchPointers.current.values());
+    if (points.length < 2) return 0;
+    return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+  }
+
+  function handleStagePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    event.preventDefault();
+    event.stopPropagation();
+    touchPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touchPointers.current.size === 2) {
+      pinchStart.current = { distance: Math.max(1, touchDistance()), scale: canvasScale };
+    }
+  }
+
+  function handleStagePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch" || !touchPointers.current.has(event.pointerId)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    touchPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touchPointers.current.size < 2 || !pinchStart.current) return;
+    applyCanvasScale(pinchStart.current.scale * (touchDistance() / pinchStart.current.distance));
+  }
+
+  function handleStagePointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    event.preventDefault();
+    event.stopPropagation();
+    touchPointers.current.delete(event.pointerId);
+    if (touchPointers.current.size < 2) pinchStart.current = null;
+  }
+
   async function exportCanvas() {
     setExporting(true);
     setCanvasStatus("Exporting PNG...");
     try {
-        await exportPoster(design, "png", posterEdits);
+        await exportPoster(design, "png", posterEdits, layerOrder);
       setCanvasStatus("PNG downloaded");
     } catch {
       setCanvasStatus("Export failed");
@@ -305,64 +496,205 @@ export function DesignCanvas({
       </div>
 
       <div className="design-canvas-main">
-        <FloatingButtonGroup
+        <div className="design-canvas-tool-dock">
+          <FloatingButtonGroup
           label="Canvas tools"
           variant="floating"
           orientation="vertical"
           iconOnly
+          showHighlight={false}
           className="design-canvas-tool-rail"
           items={[
             {
-              id: "select",
+              id: "move",
               label: "Select and move",
-              icon: <GridIcon />,
+              icon: <MoveIcon />,
               pressed: activeTool === "select",
               onSelect: () => onToolChange("select"),
             },
             {
+              id: "rectangle-select",
+              label: "Rectangle select",
+              icon: <RectangleSelectIcon />,
+              pressed: activeTool === "rectangle-select",
+              onSelect: () => {
+                onToolChange("rectangle-select");
+                setCanvasStatus("Rectangle select");
+              },
+            },
+            {
+              id: "lasso",
+              label: "Lasso select",
+              icon: <LassoIcon />,
+              pressed: activeTool === "lasso",
+              onSelect: () => {
+                onToolChange("lasso");
+                setCanvasStatus("Lasso select");
+              },
+            },
+            {
+              id: "magic-wand",
+              label: "Review layout",
+              icon: <MagicWandIcon />,
+              disabled: checking,
+              pressed: checking,
+              onSelect: () => void checkLayout(),
+            },
+            { type: "separator", id: "canvas-select-divider" },
+            {
+              id: "crop",
+              label: "Resize selected layer",
+              icon: <CropIcon />,
+              pressed: activeTool === "crop",
+              onSelect: () => {
+                onToolChange("crop");
+                setPropertiesOpen(true);
+                setCanvasStatus("Resize selected layer");
+              },
+            },
+            {
+              id: "brush",
+              label: "Edit selected layer",
+              icon: <PaintBrushIcon />,
+              disabled: !selectedLayerId,
+              onSelect: () => {
+                onToolChange("select");
+                setPropertiesOpen(true);
+              },
+            },
+            {
+              id: "eraser",
+              label: "Hide selected layer",
+              icon: <EraserIcon />,
+              pressed: activeTool === "eraser",
+              onSelect: () => onToolChange("eraser"),
+            },
+            {
+              id: "stamp",
+              label: "Copy selected text",
+              icon: <StampIcon />,
+              disabled: !selectedTextLayer || !selectedText,
+              onSelect: () => void copySelectedText(),
+            },
+            {
+              id: "dropper",
+              label: "Sample poster color",
+              icon: <DropIcon />,
+              pressed: activeTool === "dropper",
+              onSelect: () => onToolChange("dropper"),
+            },
+            {
+              id: "fill",
+              label: "Fill background",
+              icon: <PaintBucketIcon />,
+              pressed: activeTool === "fill",
+              onSelect: () => onToolChange("fill"),
+            },
+            {
+              id: "palette",
+              label: "Color palettes",
+              icon: <PaletteIcon />,
+              pressed: paletteOpen,
+              onSelect: () => setPaletteOpen((open) => !open),
+            },
+            {
+              id: "copy",
+              label: "Copy selected text",
+              icon: <CopyIcon />,
+              disabled: !selectedTextLayer || !selectedText,
+              onSelect: () => void copySelectedText(),
+            },
+            {
               id: "text",
               label: "Text tool",
-              icon: <span className="studio-rail-text-tool">T</span>,
+              icon: <TextIcon />,
               pressed: activeTool === "text",
               onSelect: () => onToolChange("text"),
             },
             {
-              id: "properties",
-              label: "Toggle poster properties",
-              icon: <SlidersIcon />,
+              id: "eyedropper",
+              label: "Open color properties",
+              icon: <EyedropperIcon />,
               pressed: propertiesOpen,
-              onSelect: () => setPropertiesOpen((open) => !open),
+              onSelect: () => setPropertiesOpen(true),
             },
-            { type: "separator", id: "canvas-tools-divider" },
+            { type: "separator", id: "canvas-navigation-divider" },
             {
-              id: "review",
-              label: "Review layout",
-              icon: <SparkleIcon />,
-              disabled: checking,
-              pressed: checking,
-              onSelect: () => void checkLayout(),
+              id: "hand",
+              label: "Hand tool",
+              icon: <HandIcon />,
+              pressed: activeTool === "hand",
+              onSelect: () => onToolChange("hand"),
+            },
+            {
+              id: "zoom",
+              label: canvasScale >= 1.35 ? "Reset canvas zoom" : "Zoom canvas",
+              icon: <ZoomIcon />,
+              onSelect: zoomCanvas,
             },
             {
               id: "reset",
               label: "Reset design",
               icon: <ResetIcon />,
-              onSelect: () => dispatch({ type: "resetDesign" }),
+              onSelect: () => {
+                openActionDialog("reset-design");
+              },
             },
           ]}
-        />
+          />
+          {paletteOpen ? (
+            <div className="studio-palette-popover" role="dialog" aria-label="Color palettes">
+              {colorPalettes.map((palette) => (
+                <button
+                  key={palette.id}
+                  type="button"
+                  className={`studio-palette-option ${selectedPaletteId === palette.id ? "is-selected" : ""}`}
+                  aria-label={`Use ${palette.name} palette`}
+                  aria-pressed={selectedPaletteId === palette.id}
+                  title={`${palette.name}: ${palette.note}`}
+                  onClick={() => applyPalette(palette.id)}
+                >
+                  {Object.values(palette.colors).map((color) => (
+                    <span key={color} className="studio-palette-swatch" style={{ backgroundColor: color }} />
+                  ))}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
-        <div className="design-canvas-stage">
-          <div className="design-canvas-poster-frame">
-            <div className="design-canvas-poster">
+        <div
+          className="design-canvas-stage"
+          style={{ touchAction: "none", overscrollBehavior: "contain" }}
+          onWheel={handleCanvasWheel}
+          onPointerDownCapture={handleStagePointerDown}
+          onPointerMoveCapture={handleStagePointerMove}
+          onPointerUpCapture={handleStagePointerEnd}
+          onPointerCancelCapture={handleStagePointerEnd}
+        >
+          <div className="design-canvas-poster-frame" style={{ transform: `scale(${canvasScale})` }}>
+            <div
+              className="design-canvas-poster"
+              style={{ aspectRatio: `${posterDimensions.width} / ${posterDimensions.height}` }}
+            >
               <Poster
                 design={design}
                 edits={posterEdits}
+                layerOrder={layerOrder}
                 selectedLayerId={selectedLayerId}
                 activeTool={activeTool}
                 onSelectLayer={selectLayer}
                 onChangeLayer={onChangeLayer}
                 onEditText={editTextLayer}
                 onDeleteLayer={onDeleteLayer}
+                onPickColor={(value) => {
+                  dispatch({ type: "setColor", key: "accent", value });
+                  setCanvasStatus(`Sampled ${value}`);
+                }}
+                onFill={() => {
+                  dispatch({ type: "setColor", key: "background", value: design.colors.accent });
+                  setCanvasStatus(`Filled background with ${design.colors.accent}`);
+                }}
               />
             </div>
           </div>
@@ -375,23 +707,110 @@ export function DesignCanvas({
         size="sm"
         className="studio-canvas-action-bar"
         items={[
+            {
+              id: "layers",
+              label: "Layers",
+              icon: <LayersIcon />,
+              iconOnly: true,
+              pressed: layersOpen,
+            onSelect: () => onToggleInspector?.("layers"),
+            disabled: !onToggleInspector,
+          },
+          {
+            id: "reference",
+            label: "Reference",
+            icon: <PanelRightIcon />,
+            iconOnly: true,
+            pressed: referenceOpen,
+            onSelect: () => onToggleInspector?.("reference"),
+            disabled: !onToggleInspector,
+          },
+          {
+            id: "sidebar",
+            label: "Toggle side panels",
+            icon: <PanelLeftIcon />,
+            iconOnly: true,
+            pressed: Boolean(referenceOpen || layersOpen),
+            onSelect: () => {
+              if (referenceOpen || layersOpen) {
+                if (referenceOpen) onToggleInspector?.("reference");
+                if (layersOpen) onToggleInspector?.("layers");
+              } else {
+                onToggleInspector?.("reference");
+              }
+            },
+            disabled: !onToggleInspector,
+          },
+          { id: "reset", label: "Reset", icon: <ResetIcon />, onSelect: () => openActionDialog("reset-project") },
+          { type: "separator", id: "canvas-actions-divider" },
+          {
+            id: "copy-text",
+            label: "Copy selected text",
+            icon: <CopyIcon />,
+            iconOnly: true,
+            disabled: !selectedTextLayer || !selectedText,
+            onSelect: () => void copySelectedText(),
+          },
+          {
+            id: "cut-text",
+            label: "Cut selected text",
+            icon: <ScissorsIcon />,
+            iconOnly: true,
+            disabled: !selectedTextLayer || !selectedText,
+            onSelect: () => void cutSelectedText(),
+          },
+          {
+            id: "hide-layer",
+            label: "Hide selected layer",
+            icon: <TrashIcon />,
+            iconOnly: true,
+            disabled: !selectedLayerId || selectedLayerId === "background",
+            onSelect: () => {
+              openActionDialog("delete-layer", selectedLayerId);
+            },
+          },
+          { type: "separator", id: "canvas-edit-divider" },
+          {
+            id: "undo",
+            label: "Undo",
+            icon: <ResetIcon />,
+            iconOnly: true,
+            disabled: !canUndo,
+            shortcut: "⌘/Ctrl Z",
+            onSelect: onUndo,
+          },
+          {
+            id: "redo",
+            label: "Redo",
+            icon: <RedoIcon />,
+            iconOnly: true,
+            disabled: !canRedo,
+            shortcut: "⌘/Ctrl Shift Z",
+            onSelect: onRedo,
+          },
+          { type: "separator", id: "canvas-reference-divider" },
           {
             id: "inspire",
             label: "Inspire",
+            icon: <SparkleIcon />,
+            iconOnly: true,
             disabled: !onToggleInspector,
             onSelect: () => onToggleInspector?.("reference"),
           },
-          { id: "restyle", label: "Restyle", onSelect: restylePoster },
-          { id: "shuffle", label: "Shuffle", onSelect: shufflePalette },
+          { id: "restyle", label: "Restyle", icon: <RestyleIcon />, iconOnly: true, onSelect: restylePoster },
+          { id: "shuffle", label: "Shuffle", icon: <ShuffleIcon />, iconOnly: true, onSelect: shufflePalette },
           {
-            id: "layers",
-            label: "Layers",
-            disabled: !onToggleInspector,
-            onSelect: () => onToggleInspector?.("layers"),
+            id: "save",
+            label: "Save",
+            icon: <SaveIcon />,
+            iconOnly: true,
+            onSelect: () => openActionDialog("save"),
           },
           {
             id: "export",
             label: exporting ? "Exporting" : "Export",
+            icon: <ExportIcon />,
+            iconOnly: true,
             reserveLabels: ["Export", "Exporting"],
             disabled: exporting,
             onSelect: () => void exportCanvas(),
@@ -402,8 +821,8 @@ export function DesignCanvas({
       <footer className="design-canvas-footer">
         <div className="design-canvas-footer-info" aria-label="Document information">
           <span>RGB / 8-bit</span>
-          <span>100%</span>
-          <span>1080 × 1350</span>
+          <span>{Math.round(canvasScale * 100)}%</span>
+          <span>{posterDimensions.width} × {posterDimensions.height}</span>
         </div>
       </footer>
 
@@ -412,6 +831,107 @@ export function DesignCanvas({
           {canvasStatus}
         </span>
       ) : null}
+
+      <Dialog
+        open={Boolean(actionDialogCopy)}
+        onOpenChange={(open) => {
+          if (!open && !actionBusy) {
+            setActionDialog(null);
+            setPendingLayerId(null);
+          }
+        }}
+      >
+        {actionDialogCopy ? (
+          <DialogContent
+            className="studio-action-dialog"
+            showCloseButton={false}
+            style={{
+              width: "min(26rem, calc(100vw - 2rem))",
+              gap: "1rem",
+              border: "1px solid rgba(255, 255, 255, 0.14)",
+              borderRadius: "0.7rem",
+              background: "#1b1b1b",
+              padding: "1.2rem",
+              color: "#f4f3ee",
+              fontFamily: "var(--curio-body-font)",
+              boxShadow: "0 1.5rem 4rem rgba(0, 0, 0, 0.46)",
+            }}
+          >
+            <DialogHeader style={{ gap: "0.5rem" }}>
+              <DialogTitle
+                style={{
+                  color: "#f4f3ee",
+                  fontFamily: "var(--curio-heading-font)",
+                  fontSize: "1rem",
+                  fontWeight: 500,
+                  lineHeight: 1.2,
+                }}
+              >
+                {actionDialogCopy.title}
+              </DialogTitle>
+              <DialogDescription
+                style={{
+                  color: "rgba(244, 243, 238, 0.62)",
+                  fontFamily: "var(--curio-body-font)",
+                  fontSize: "0.82rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                {actionDialogCopy.description}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                gap: "0.45rem",
+                margin: 0,
+                border: 0,
+                borderRadius: 0,
+                background: "transparent",
+                padding: 0,
+              }}
+            >
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={actionBusy}
+                  className="studio-action-dialog-cancel"
+                  style={{
+                    minHeight: "2rem",
+                    borderRadius: "0.35rem",
+                    color: "rgba(244, 243, 238, 0.68)",
+                    fontFamily: "var(--curio-body-font)",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                variant={actionDialogCopy.variant}
+                disabled={actionBusy}
+                className="studio-action-dialog-confirm"
+                style={{
+                  minHeight: "2rem",
+                  borderRadius: "0.35rem",
+                  fontFamily: "var(--curio-body-font)",
+                  fontSize: "0.72rem",
+                  ...(actionDialogCopy.variant === "destructive"
+                    ? { background: "rgba(224, 112, 88, 0.16)", color: "#f4a28f" }
+                    : { background: "#f4f3ee", color: "#171717" }),
+                }}
+                onClick={() => void confirmActionDialog()}
+              >
+                {actionBusy ? "Working…" : actionDialogCopy.confirm}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
       {coach ? (
         <div className="studio-coach-card">
@@ -434,7 +954,14 @@ export function DesignCanvas({
               <p className="studio-eyebrow">Poster properties</p>
               <p>Fine-tune the poster in place.</p>
             </div>
-            <button type="button" className="studio-footer-button" onClick={() => setPropertiesOpen(false)}>
+            <button
+              type="button"
+              className="studio-footer-button"
+              onClick={() => {
+                setPropertiesOpen(false);
+                onToolChange("select");
+              }}
+            >
               Done
             </button>
           </div>

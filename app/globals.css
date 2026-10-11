@@ -965,6 +965,302 @@ summary::-webkit-details-marker {
   }
 }
 
+/* Final desktop composition pass: keep the inspector useful without making
+   its controls look like a second rounded app inside the editor. */
+.studio-inspector-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  width: 100%;
+  min-height: 0;
+  background: #0c0c0c;
+}
+
+.studio-inspector-shell.is-split {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.studio-inspector-pane {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0c0c0c;
+}
+
+.studio-inspector-pane + .studio-inspector-pane {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.studio-inspector-pane-heading {
+  display: flex;
+  min-height: 2.5rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.8rem;
+  color: rgba(247, 247, 244, 0.72);
+  font-family: var(--curio-heading-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-inspector-pane-heading button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 0.3rem;
+  color: #fff;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.studio-inspector-pane-heading button:hover,
+.studio-inspector-pane-heading button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  outline: none;
+}
+
+.studio-inspector-pane-heading svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.studio-inspector-pane > .studio-compact-reference,
+.studio-inspector-pane > .studio-inspector {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.studio-inspector-pane > .studio-layers-panel-compact {
+  max-height: none;
+}
+
+.studio-compact-imported-reference {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(247, 247, 244, 0.1);
+  text-align: left;
+}
+
+.studio-compact-imported-reference img {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  background: #242424;
+}
+
+.studio-compact-imported-reference div {
+  min-width: 0;
+}
+
+.studio-compact-imported-reference span {
+  color: rgba(247, 247, 244, 0.45);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-compact-imported-reference p {
+  margin-top: 0.25rem;
+  color: rgba(247, 247, 244, 0.76);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.studio-image-import {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  width: min(100%, 30rem);
+  margin-top: 0.9rem;
+}
+
+.studio-image-import-button {
+  display: inline-flex;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  padding: 0.48rem 0.8rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-family: var(--curio-body-font);
+  font-size: 0.72rem;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.studio-image-import-button:hover:not(:disabled),
+.studio-image-import-button:focus-visible,
+.studio-image-import.is-drag-active .studio-image-import-button {
+  border-color: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  outline: none;
+}
+
+.studio-image-import-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.studio-image-import-status,
+.studio-image-import-error {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.65rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.studio-image-import-error,
+.studio-global-import-error {
+  color: #ffd1d1;
+}
+
+.studio-image-import-result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.7rem;
+  background: rgba(0, 0, 0, 0.18);
+  text-align: left;
+}
+
+.studio-image-import-result > img {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: 0.4rem;
+}
+
+.studio-image-import-copy {
+  min-width: 0;
+}
+
+.studio-image-import-filename {
+  display: block;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-image-import-copy p {
+  margin-top: 0.3rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.studio-image-import-suggestions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.studio-image-import-suggestions button {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 0.38rem 0.58rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  text-align: left;
+}
+
+.studio-image-import-suggestions button:hover,
+.studio-image-import-suggestions button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.58);
+  color: #fff;
+  outline: none;
+}
+
+.studio-image-import.is-compact {
+  display: inline-flex;
+  width: auto;
+  margin-top: 0;
+}
+
+.studio-image-import.is-compact .studio-image-import-button {
+  min-height: 1.8rem;
+  padding: 0.28rem 0.5rem;
+  border-color: transparent;
+  font-size: 0.64rem;
+}
+
+.studio-image-import.is-compact .studio-image-import-status,
+.studio-image-import.is-compact .studio-image-import-error,
+.studio-image-import.is-compact .studio-image-import-result {
+  display: none;
+}
+
+.studio-editor-import {
+  position: absolute;
+  left: clamp(3.2rem, 5vw, 5.5rem);
+}
+
+.studio-drop-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font-family: var(--curio-heading-font);
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  pointer-events: none;
+}
+
+.studio-global-import-error {
+  position: fixed;
+  z-index: 101;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: 20rem;
+  margin: 0;
+  border: 1px solid rgba(255, 160, 160, 0.35);
+  border-radius: 0.5rem;
+  background: #241515;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.72rem;
+}
+
+/* The standard desktop view gets the compact document bar requested in the
+   reference. The editor remains desktop-first; smaller screens keep the
+   existing fallback rules below. */
+@media (min-width: 1024px) {
+  .studio-editor-header {
+    min-height: 3.3rem;
+    padding-block: 0.35rem;
+  }
+
+  .studio-editor-header .studio-project-field input {
+    font-size: 0.98rem;
+  }
+
+  .studio-editor-import {
+    left: clamp(3rem, 4.4vw, 4.75rem);
+  }
+
+  .studio-inspector-shell.is-split .studio-inspector-pane-heading {
+    min-height: 2.2rem;
+  }
+}
+
 @media (max-width: 640px) {
   .onboarding-topbar {
     padding: 1.1rem 1rem;
@@ -1336,11 +1632,14 @@ select {
 
 .floating-button-group-highlight {
   position: absolute;
-  z-index: -1;
+  top: 0;
+  left: 0;
+  z-index: 0;
   border: 0;
   border-radius: 0.42rem;
   background: rgba(255, 255, 255, 0.13);
   pointer-events: none;
+  will-change: transform, width, height;
 }
 
 .floating-button-group-button,
@@ -1362,6 +1661,8 @@ select {
   font-family: var(--curio-body-font);
   font-size: 0.64rem;
   font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
   white-space: nowrap;
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
@@ -1380,6 +1681,16 @@ select {
 .floating-button-group-button:focus-visible,
 .floating-button-group-button.is-pressed {
   color: var(--editor-text, #f5f4ef);
+}
+
+.floating-button-group:not(.has-highlight) .floating-button-group-button.is-pressed {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.floating-button-group.has-highlight .floating-button-group-button:hover:not(:disabled),
+.floating-button-group.has-highlight .floating-button-group-button:focus-visible,
+.floating-button-group.has-highlight .floating-button-group-button.is-pressed {
+  background: transparent;
 }
 
 .floating-button-group-button:focus-visible {
@@ -1443,7 +1754,13 @@ select {
   --editor-line: rgba(255, 255, 255, 0.13);
   --editor-muted: rgba(245, 245, 240, 0.54);
   --editor-text: #f5f4ef;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-y;
   background: var(--editor-bg);
   color: var(--editor-text);
 }
@@ -1473,21 +1790,6 @@ select {
   background: var(--editor-bg);
 }
 
-.studio-editor-brand {
-  display: flex;
-  min-width: 10rem;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.studio-editor-brand h1 {
-  font-family: var(--curio-heading-font);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-}
-
-.studio-editor-brand p,
 .studio-project-field > span,
 .studio-eyebrow {
   color: var(--editor-muted);
@@ -1496,20 +1798,6 @@ select {
   letter-spacing: 0.18em;
   line-height: 1.2;
   text-transform: uppercase;
-}
-
-.studio-editor-brand p {
-  margin-top: 0.25rem;
-  letter-spacing: 0.04em;
-  text-transform: none;
-}
-
-.studio-brand-mark {
-  display: block;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: #f5f4ef;
 }
 
 .studio-project-field {
@@ -1598,7 +1886,7 @@ select {
   flex: 0 0 clamp(18rem, 23vw, 23rem);
   min-height: 0;
   overflow: hidden;
-  border-radius: 0 1.75rem 1.75rem 0;
+  border-radius: 0;
   background: #050505;
 }
 
@@ -1902,7 +2190,7 @@ select {
 
 .studio-inspector-layers-dock {
   min-height: 12rem;
-  background: #4c4c4c;
+  background: #0c0c0c;
   color: #f7f7f4;
 }
 
@@ -1927,7 +2215,7 @@ select {
 
 .studio-layers-panel-compact {
   max-height: 16rem;
-  background: #4c4c4c !important;
+  background: #0c0c0c !important;
 }
 
 .studio-layers-panel-compact .studio-layers-body {
@@ -1936,7 +2224,7 @@ select {
 
 .studio-inspector-layers-dock .studio-layers-panel-compact,
 .studio-inspector-layers-dock .studio-layers-panel-compact > div {
-  background: #4c4c4c !important;
+  background: #0c0c0c !important;
 }
 
 .studio-layers-panel-compact .studio-layer-row {
@@ -2299,17 +2587,28 @@ select {
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
+  position: relative;
+  overflow: hidden;
 }
 
 .studio-canvas-action-bar {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(2.75rem + 0.55rem);
+  left: 50%;
   display: flex;
   align-self: center;
+  max-width: calc(100% - 1rem);
+  transform: translateX(-50%);
   gap: 0.15rem;
-  margin: 0.4rem auto 0.55rem;
+  margin: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
 }
 
-.studio-canvas-action-bar.floating-button-group {
-  border-radius: 0.75rem;
+.studio-canvas-action-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .design-canvas-stage {
@@ -2319,6 +2618,8 @@ select {
   flex: 1 1 auto;
   place-items: center;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: none;
   background:
     linear-gradient(rgba(255, 255, 255, 0.034) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.034) 1px, transparent 1px),
@@ -2380,16 +2681,31 @@ select {
   cursor: nwse-resize;
 }
 
+.poster-marquee-selection {
+  stroke: #76a7ff;
+  stroke-width: 3;
+  stroke-dasharray: 10 8;
+  vector-effect: non-scaling-stroke;
+}
+
 .design-canvas-tool-rail {
   display: flex;
   width: 3.15rem;
+  height: 100%;
   flex: 0 0 auto;
+  min-height: 0;
   flex-direction: column;
   align-items: center;
   gap: 0.4rem;
   order: -1;
+  overflow-y: auto;
   background: #1d1d1d;
   padding: 0.8rem 0.45rem;
+  scrollbar-width: none;
+}
+
+.design-canvas-tool-rail::-webkit-scrollbar {
+  display: none;
 }
 
 .design-canvas-tool-rail.floating-button-group {
@@ -2401,12 +2717,151 @@ select {
   box-shadow: none;
 }
 
+.design-canvas-tool-dock {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.design-canvas-tool-dock .design-canvas-tool-rail {
+  order: 0;
+}
+
+.studio-palette-popover {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: calc(100% + 0.55rem);
+  display: grid;
+  width: clamp(8rem, 12vw, 11rem);
+  gap: 0.25rem;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.45rem;
+  background: #171717;
+  padding: 0.4rem;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.36);
+}
+
+.studio-palette-option {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 0.3rem;
+  padding: 0.28rem;
+}
+
+.studio-palette-option:hover,
+.studio-palette-option:focus-visible,
+.studio-palette-option.is-selected {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.studio-palette-swatch {
+  display: block;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.18rem;
+}
+
+.studio-action-dialog {
+  width: min(26rem, calc(100vw - 2rem));
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.7rem;
+  background: #1b1b1b;
+  padding: 1.2rem;
+  color: #f4f3ee;
+  font-family: var(--curio-body-font);
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.46);
+}
+
+.studio-action-dialog [data-slot="dialog-header"] {
+  gap: 0.5rem;
+}
+
+.studio-action-dialog [data-slot="dialog-title"] {
+  color: #f4f3ee;
+  font-family: var(--curio-heading-font);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.studio-action-dialog [data-slot="dialog-description"] {
+  color: rgba(244, 243, 238, 0.62);
+  font-family: var(--curio-body-font);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.studio-action-dialog [data-slot="dialog-footer"] {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.studio-action-dialog .studio-action-dialog-cancel,
+.studio-action-dialog .studio-action-dialog-confirm {
+  min-height: 2rem;
+  border-radius: 0.35rem;
+  font-family: var(--curio-body-font);
+  font-size: 0.72rem;
+}
+
+.studio-action-dialog .studio-action-dialog-cancel {
+  color: rgba(244, 243, 238, 0.68);
+}
+
+.studio-action-dialog .studio-action-dialog-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f3ee;
+}
+
+.studio-action-dialog .studio-action-dialog-confirm[data-variant="default"] {
+  background: #f4f3ee;
+  color: #171717;
+}
+
+.studio-action-dialog .studio-action-dialog-confirm[data-variant="default"]:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.studio-action-dialog .studio-action-dialog-confirm[data-variant="destructive"] {
+  background: rgba(224, 112, 88, 0.16);
+  color: #f4a28f;
+}
+
+.studio-action-dialog .studio-action-dialog-confirm[data-variant="destructive"]:hover:not(:disabled) {
+  background: rgba(224, 112, 88, 0.26);
+  color: #ffc1b1;
+}
+
 .design-canvas-tool-rail .floating-button-group-button {
   width: 2.05rem;
   min-width: 2.05rem;
   height: 2.05rem;
   min-height: 2.05rem;
   padding: 0;
+}
+
+.design-canvas-tool-rail .floating-button-group-button:hover:not(:disabled),
+.design-canvas-tool-rail .floating-button-group-button:focus-visible,
+.design-canvas-tool-rail .floating-button-group-button.is-pressed {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--editor-text, #f5f4ef);
 }
 
 .studio-rail-tool {
@@ -2693,10 +3148,6 @@ select {
     flex-wrap: wrap;
   }
 
-  .studio-editor-brand {
-    min-width: auto;
-  }
-
   .studio-project-field {
     flex: 1 1 12rem;
   }
@@ -2725,7 +3176,6 @@ select {
     gap: 0.65rem;
   }
 
-  .studio-editor-brand p,
   .studio-project-field > span,
   .studio-header-action span:not(:last-child),
   .design-canvas-header .studio-eyebrow,
@@ -2823,6 +3273,709 @@ select {
 .director-mascot .voice-keyframes {
   width: 2.5rem;
   height: 2.5rem;
+}
+
+/* Reference-style editor chat: one centered conversation column with quiet
+   response cards and a composer that stays anchored to the bottom. */
+.studio-editor-chat {
+  flex-basis: clamp(15rem, 26vw, 24rem);
+}
+
+.studio-editor-chat .director-header {
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vh, 2rem) 1.25rem 0.7rem;
+}
+
+.studio-editor-chat .director-heading-row {
+  display: grid;
+  place-items: center;
+  gap: 0;
+}
+
+.studio-editor-chat .director-heading-row > div,
+.studio-editor-chat .creative-process {
+  display: none;
+}
+
+.studio-editor-chat .director-mascot {
+  width: clamp(3.6rem, 6vw, 4.8rem);
+  height: clamp(3.6rem, 6vw, 4.8rem);
+  margin-inline: auto;
+}
+
+.studio-editor-chat .director-mascot .voice-keyframes {
+  width: 100%;
+  height: 100%;
+}
+
+.studio-editor-chat .studio-chat-messages {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0;
+  overflow-x: hidden;
+  padding: 0.35rem 1.25rem 1rem;
+}
+
+.studio-editor-chat .director-message-row {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.studio-editor-chat .director-message-row.is-assistant {
+  justify-content: flex-start;
+}
+
+.studio-editor-chat .director-message-row.is-user {
+  justify-content: flex-end;
+}
+
+.studio-editor-chat .director-message-row + .director-message-row {
+  margin-top: clamp(1rem, 2.4vh, 1.7rem);
+}
+
+.studio-editor-chat .director-message {
+  width: min(90%, 22rem);
+  min-width: 0;
+}
+
+.studio-editor-chat .director-message-row.is-assistant .director-message {
+  width: min(76%, 18rem);
+  margin-right: auto;
+}
+
+.studio-editor-chat .director-message-row.is-user .director-message {
+  width: min(76%, 18rem);
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.studio-editor-chat .director-message-kicker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.studio-editor-chat .director-message-bubble {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.78rem 0.82rem;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: #080808;
+  color: rgba(247, 247, 244, 0.9);
+  font-family: var(--curio-body-font);
+  font-size: clamp(0.68rem, 0.82vw, 0.8rem);
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.studio-editor-chat .director-message-row.is-assistant .director-message-bubble {
+  border-color: rgba(247, 247, 244, 0.2);
+  border-radius: 0.8rem;
+  background: #0b0b0b;
+  padding: 0.82rem 0.88rem 0.72rem;
+}
+
+.studio-editor-chat .director-message-bubble .streaming-text {
+  color: rgba(247, 247, 244, 0.9);
+  font-size: inherit;
+  line-height: inherit;
+  margin: 0;
+}
+
+.studio-editor-chat .director-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  margin: 0.18rem 0 0 0.45rem;
+}
+
+.studio-editor-chat .director-message-actions .warm-tooltip__trigger {
+  border-radius: 0.25rem;
+}
+
+.studio-editor-chat .director-message-actions button {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border-radius: 0.25rem;
+  color: rgba(247, 247, 244, 0.42);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.studio-editor-chat .director-message-actions button:hover,
+.studio-editor-chat .director-message-actions button:focus-visible,
+.studio-editor-chat .director-message-actions button.is-selected {
+  background: rgba(247, 247, 244, 0.1);
+  color: rgba(247, 247, 244, 0.88);
+}
+
+.studio-editor-chat .director-message-actions svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  stroke-width: 1.7;
+}
+
+.studio-editor-chat .director-message > .flex.flex-wrap {
+  justify-content: flex-start;
+}
+
+.studio-editor-chat .studio-chip-row,
+.chat-screen-main .studio-chip-row {
+  width: 100%;
+  justify-content: flex-start !important;
+  margin-right: auto;
+}
+
+.studio-editor-chat .director-message > .flex.flex-wrap button {
+  border-color: rgba(247, 247, 244, 0.23);
+  color: rgba(247, 247, 244, 0.7);
+}
+
+.studio-editor-chat .director-message > .flex.flex-wrap button:hover {
+  border-color: rgba(247, 247, 244, 0.7);
+  background: rgba(247, 247, 244, 0.08);
+  color: #f7f7f4;
+}
+
+.studio-editor-chat .studio-change-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  border: 1px solid rgba(247, 247, 244, 0.1);
+  border-radius: 999px;
+  background: rgba(247, 247, 244, 0.08);
+  padding: 0.45rem 0.8rem;
+  color: rgba(247, 247, 244, 0.62);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.studio-editor-chat .studio-chat-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 1.25rem 0.7rem;
+}
+
+.studio-editor-chat .director-prompt-row {
+  width: min(100%, 22rem);
+  align-self: center;
+  align-content: flex-start;
+  justify-content: center !important;
+  margin: 0;
+}
+
+.studio-editor-chat .director-prompt-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  border-color: rgba(247, 247, 244, 0.35);
+  border-radius: 999px;
+  color: rgba(247, 247, 244, 0.62);
+  text-align: center;
+}
+
+.studio-editor-chat .studio-prompt-chip-icon,
+.chat-screen-main .studio-prompt-chip-icon {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 auto;
+  color: rgba(247, 247, 244, 0.5);
+}
+
+.studio-editor-chat .director-prompt-row button:hover {
+  border-color: rgba(247, 247, 244, 0.78);
+  background: rgba(247, 247, 244, 0.08);
+  color: #f7f7f4;
+}
+
+.studio-editor-chat .director-composer-shell {
+  width: min(100%, 22rem);
+}
+
+.studio-editor-chat .director-composer-shell > .director-chat-box,
+.studio-editor-chat .editor-voice-beam {
+  width: 100%;
+}
+
+.studio-editor-chat .director-composer-status,
+.chat-screen-main .director-composer-status {
+  display: grid;
+  width: 1.6rem;
+  height: 1.95rem;
+  flex: 0 0 auto;
+  place-items: center;
+  color: rgba(247, 247, 244, 0.72);
+}
+
+.studio-editor-chat .director-composer-status .ld-wave,
+.chat-screen-main .director-composer-status .ld-wave {
+  color: currentColor;
+}
+
+@media (max-width: 640px) {
+  .studio-editor-chat {
+    flex-basis: min(24rem, 70vw);
+  }
+}
+
+/* The chat rail is a full-height surface in both the editor and the
+   standalone director route. Keep the existing editor header, but let the
+   working surface run edge to edge beneath it. */
+.studio-editor-grid {
+  padding: 0;
+}
+
+.studio-editor-surface {
+  height: 100%;
+  border-radius: 0;
+}
+
+.studio-editor-chat,
+.studio-editor-canvas,
+.studio-editor-inspector {
+  height: 100%;
+}
+
+/* Full-height director route: the chat rail and supporting context panels
+   should read as one continuous dark workspace instead of floating cards. */
+.chat-screen {
+  height: 100dvh;
+  min-height: 100dvh;
+  background: #101113;
+  color: #f7f7f4;
+}
+
+.chat-screen-header {
+  flex: 0 0 auto;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #181818;
+}
+
+.chat-screen-brand,
+.chat-screen-editor-link {
+  color: rgba(247, 247, 244, 0.82);
+}
+
+.chat-screen-title {
+  color: rgba(247, 247, 244, 0.48);
+}
+
+.chat-screen-title-detail {
+  color: #f7f7f4;
+}
+
+.chat-screen-grid {
+  grid-template-columns: minmax(12rem, 0.72fr) minmax(0, 2.2fr) minmax(15rem, 0.95fr);
+  gap: 0;
+  padding: 0;
+}
+
+.chat-context-card {
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  background: #101010;
+  color: #f7f7f4;
+  padding: 1.25rem;
+}
+
+.chat-context-card-brief {
+  border-right: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: #141414;
+}
+
+.chat-context-kicker,
+.chat-context-copy span,
+.chat-context-note {
+  color: rgba(247, 247, 244, 0.54);
+}
+
+.chat-context-poster {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.22);
+}
+
+.chat-context-copy {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.chat-context-heading {
+  color: #f7f7f4;
+}
+
+.chat-context-action {
+  color: #f7f7f4;
+}
+
+.chat-screen-main {
+  border: 0;
+  border-radius: 0;
+  background: #050505;
+  box-shadow: none;
+}
+
+.chat-screen-main > section {
+  background: #050505;
+  color: #f7f7f4;
+}
+
+.chat-screen-main .director-header {
+  border-color: transparent;
+  background: #050505;
+  padding: clamp(1rem, 4vh, 2rem) 1.25rem 0.7rem;
+  text-align: center;
+}
+
+.chat-screen-main .director-heading-row {
+  display: grid;
+  place-items: center;
+  gap: 0;
+}
+
+.chat-screen-main .director-heading-row > div,
+.chat-screen-main .creative-process {
+  display: none;
+}
+
+.chat-screen-main .director-mascot {
+  width: clamp(3.6rem, 6vw, 4.8rem);
+  height: clamp(3.6rem, 6vw, 4.8rem);
+  margin-inline: auto;
+  background: transparent;
+}
+
+.chat-screen-main .director-mascot .voice-keyframes {
+  width: 100%;
+  height: 100%;
+}
+
+.chat-screen-main .studio-chat-messages {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0;
+  overflow-x: hidden;
+  background: #050505;
+  padding: 0.35rem 1.25rem 1rem;
+}
+
+.chat-screen-main .director-message-row {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.chat-screen-main .director-message-row + .director-message-row {
+  margin-top: clamp(1rem, 2.4vh, 1.7rem);
+}
+
+.chat-screen-main .director-message {
+  width: min(90%, 22rem);
+  min-width: 0;
+}
+
+.chat-screen-main .director-message-row.is-assistant .director-message {
+  width: min(76%, 18rem);
+}
+
+.chat-screen-main .director-message-kicker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.chat-screen-main .director-message-bubble {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.78rem 0.82rem;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: #080808;
+  color: rgba(247, 247, 244, 0.9);
+  font-family: var(--curio-body-font);
+  font-size: clamp(0.68rem, 0.82vw, 0.8rem);
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.chat-screen-main .director-message-row.is-assistant .director-message-bubble {
+  border-color: rgba(247, 247, 244, 0.2);
+  border-radius: 0.8rem;
+  background: #0b0b0b;
+  padding: 0.82rem 0.88rem 0.72rem;
+}
+
+.chat-screen-main .director-message-bubble .streaming-text {
+  color: rgba(247, 247, 244, 0.9);
+  font-size: inherit;
+  line-height: inherit;
+  margin: 0;
+}
+
+.chat-screen-main .director-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  margin: 0.18rem 0 0 0.45rem;
+}
+
+.chat-screen-main .director-message-actions .warm-tooltip__trigger {
+  border-radius: 0.25rem;
+}
+
+.chat-screen-main .director-message-actions button {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border-radius: 0.25rem;
+  color: rgba(247, 247, 244, 0.42);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.chat-screen-main .director-message-actions button:hover,
+.chat-screen-main .director-message-actions button:focus-visible,
+.chat-screen-main .director-message-actions button.is-selected {
+  background: rgba(247, 247, 244, 0.1);
+  color: rgba(247, 247, 244, 0.88);
+}
+
+.chat-screen-main .director-message-actions svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  stroke-width: 1.7;
+}
+
+.chat-screen-main .director-message > .flex.flex-wrap {
+  justify-content: flex-start;
+}
+
+.chat-screen-main .director-message > .flex.flex-wrap button {
+  border-color: rgba(247, 247, 244, 0.23);
+  color: rgba(247, 247, 244, 0.7);
+}
+
+.chat-screen-main .director-message > .flex.flex-wrap button:hover {
+  border-color: rgba(247, 247, 244, 0.7);
+  background: rgba(247, 247, 244, 0.08);
+  color: #f7f7f4;
+}
+
+.chat-screen-main .studio-chat-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  border-color: transparent;
+  background: #050505;
+  padding: 0.75rem 1.25rem 1.1rem;
+}
+
+.chat-screen-main .director-prompt-row {
+  width: min(100%, 22rem);
+  align-self: stretch;
+  align-content: flex-start;
+  justify-content: flex-start !important;
+  margin: 0;
+}
+
+.chat-screen-main .director-prompt-row button {
+  max-width: 100%;
+  border-color: rgba(247, 247, 244, 0.35);
+  border-radius: 999px;
+  color: rgba(247, 247, 244, 0.62);
+  text-align: center;
+}
+
+.chat-screen-main .director-prompt-row button:hover {
+  border-color: rgba(247, 247, 244, 0.78);
+  background: rgba(247, 247, 244, 0.08);
+  color: #f7f7f4;
+}
+
+.chat-screen-main .director-composer-shell {
+  width: min(100%, 22rem);
+}
+
+.chat-screen-main .director-composer-shell > .director-chat-box,
+.chat-screen-main .editor-voice-beam {
+  width: 100%;
+}
+
+.chat-screen-main .director-chat-box {
+  min-height: 3rem;
+  border: 0;
+  border-radius: 999px;
+  background: #4b4b4b;
+}
+
+.chat-screen-main .director-chat-box input {
+  color: #f7f7f4;
+}
+
+.chat-screen-main .director-chat-box input::placeholder {
+  color: rgba(247, 247, 244, 0.72);
+}
+
+.chat-screen-main .director-chat-box > button:last-child {
+  background: #5e5e5e;
+  color: #f7f7f4;
+}
+
+.chat-screen-main .director-chat-box > button:not(:last-child) {
+  border: 0;
+  color: #f7f7f4;
+}
+
+/* Keep the reference response cards compact and make every suggestion chip
+   read as a light outline instead of a filled button. */
+.studio-editor-chat .director-message-bubble,
+.chat-screen-main .director-message-bubble {
+  padding: 0.62rem 0.68rem;
+}
+
+.studio-editor-chat .director-message-row.is-assistant .director-message-bubble,
+.chat-screen-main .director-message-row.is-assistant .director-message-bubble {
+  padding: 0.66rem 0.74rem 0.58rem;
+}
+
+.studio-editor-chat .director-message > .flex.flex-wrap button,
+.chat-screen-main .director-message > .flex.flex-wrap button,
+.studio-editor-chat .director-prompt-row button,
+.chat-screen-main .director-prompt-row button {
+  border: 1px solid rgba(247, 247, 244, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.studio-editor-chat .director-message > .flex.flex-wrap button:hover,
+.chat-screen-main .director-message > .flex.flex-wrap button:hover,
+.studio-editor-chat .director-prompt-row button:hover,
+.chat-screen-main .director-prompt-row button:hover {
+  border-color: rgba(247, 247, 244, 0.3);
+  background: transparent;
+}
+
+.studio-suggestion-chip,
+.studio-prompt-chip {
+  animation: studio-suggestion-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes studio-suggestion-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(247, 247, 244, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 0.24rem rgba(247, 247, 244, 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-suggestion-chip,
+  .studio-prompt-chip {
+    animation: none;
+  }
+}
+
+/* The global focus-visible rule is useful for controls, but its rectangular
+   outline is too heavy inside the pill composer. Keep the input caret and
+   leave the surrounding composer visually quiet while it is being edited. */
+.studio-editor-chat .director-chat-box input:focus,
+.studio-editor-chat .director-chat-box input:focus-visible,
+.chat-screen-main .director-chat-box input:focus,
+.chat-screen-main .director-chat-box input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Keep the conversation directional: Curio's responses start on the left,
+   while the user's prompts sit against the right edge of the chat rail. */
+.studio-editor-chat .director-message-row.is-assistant,
+.chat-screen-main .director-message-row.is-assistant {
+  justify-content: flex-start;
+  min-width: 0;
+  padding-inline: clamp(0.15rem, 0.4vw, 0.3rem);
+}
+
+.studio-editor-chat .director-message-row.is-user,
+.chat-screen-main .director-message-row.is-user {
+  justify-content: flex-end;
+  min-width: 0;
+  padding-inline: clamp(0.15rem, 0.4vw, 0.3rem);
+}
+
+.studio-editor-chat .director-message-row.is-assistant .director-message,
+.chat-screen-main .director-message-row.is-assistant .director-message {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0 auto 0 0;
+}
+
+.studio-editor-chat .director-message-row.is-user .director-message,
+.chat-screen-main .director-message-row.is-user .director-message {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0 0 0 auto;
+}
+
+.studio-editor-chat .director-message-bubble,
+.chat-screen-main .director-message-bubble {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .chat-screen-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.52fr);
+  }
+
+  .chat-context-card-poster {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .chat-screen-header {
+    display: none;
+  }
+
+  .chat-screen-grid {
+    display: flex;
+    min-height: 100%;
+    padding: 0;
+  }
+
+  .chat-context-card-brief {
+    display: none;
+  }
+
+  .chat-screen-main {
+    width: 100%;
+    min-height: 100%;
+    border-radius: 0 1.75rem 1.75rem 0;
+  }
 }
 
 @keyframes workflow-rise {
@@ -3372,4 +4525,561 @@ select {
 
 .canvas-tool-strip {
   flex: 0 0 auto;
+}
+
+/* Primary product layout: optimize the standard desktop workspace first.
+   Narrow breakpoints remain available, but they no longer define the main
+   proportions of the app surface. */
+@media (min-width: 1024px) {
+  .studio-editor-shell {
+    min-width: 1024px;
+  }
+
+  .studio-editor-header {
+    min-height: 4.25rem;
+    padding-inline: clamp(1.5rem, 2.2vw, 2.5rem);
+  }
+
+  .studio-editor-grid {
+    padding: 0;
+  }
+
+  .studio-editor-chat {
+    flex-basis: clamp(20rem, 26vw, 25rem);
+  }
+
+  .studio-editor-inspector {
+    flex-basis: clamp(20rem, 23vw, 26rem);
+  }
+}
+
+/* Keep the desktop chat rail pinned to the full workspace height. The
+   explicit flex basis prevents nested percentage heights from collapsing. */
+.studio-editor-grid {
+  height: 0;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.studio-editor-surface {
+  height: 100%;
+  min-height: 100%;
+  align-items: stretch;
+}
+
+.studio-editor-chat,
+.studio-editor-chat > section {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Reference composition: the conversation owns the left edge, while the
+   canvas gets its own header and the full remaining desktop surface. */
+@media (min-width: 1024px) {
+  .studio-editor-body {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .studio-editor-workspace {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .studio-editor-header {
+    position: relative;
+    min-height: clamp(4.25rem, 8vh, 6rem);
+    justify-content: center;
+    padding-inline: clamp(1rem, 3vw, 3rem);
+  }
+
+  .studio-editor-home {
+    position: absolute;
+    left: clamp(1rem, 2.4vw, 2.5rem);
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border: 0;
+    border-radius: 0.35rem;
+    color: rgba(245, 245, 240, 0.78);
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .studio-editor-home:hover,
+  .studio-editor-home:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--editor-text);
+    outline: none;
+  }
+
+  .studio-editor-home svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .studio-editor-header .studio-project-field {
+    min-width: min(18rem, 40%);
+    gap: 0;
+  }
+
+  .studio-editor-header .studio-project-field > span,
+  .studio-editor-header .studio-editor-actions {
+    display: none;
+  }
+
+  .studio-editor-header .studio-project-field input {
+    padding: 0;
+    text-align: center;
+    font-size: clamp(0.95rem, 1.3vw, 1.2rem);
+  }
+
+  .studio-editor-grid {
+    height: auto;
+    flex: 1 1 auto;
+  }
+
+  .studio-editor-chat {
+    flex-basis: clamp(18rem, 24vw, 24rem);
+  }
+
+  .studio-editor-inspector {
+    flex-basis: clamp(17rem, 24vw, 24rem);
+  }
+
+  .studio-editor-export {
+    position: absolute;
+    top: 50%;
+    right: clamp(1rem, 2.4vw, 2.5rem);
+    transform: translateY(-50%);
+  }
+
+  .studio-editor-export .studio-export-compact {
+    gap: 0;
+  }
+
+  .studio-editor-export .glide-select__trigger {
+    min-width: 4rem;
+    justify-content: center;
+    padding-inline: 0.65rem;
+  }
+
+  .design-canvas-header,
+  .design-canvas-edit-toolbar {
+    display: none;
+  }
+
+  .design-canvas-stage {
+    padding: clamp(1.5rem, 4vw, 5rem);
+  }
+
+  .design-canvas-poster-frame {
+    width: min(70%, 42rem);
+  }
+}
+
+/* Last cascade layer for the current desktop editor surface. */
+.studio-inspector-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  width: 100%;
+  min-height: 0;
+  background: #0c0c0c;
+}
+
+.studio-inspector-shell.is-split {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.studio-inspector-pane {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0c0c0c;
+}
+
+.studio-inspector-pane + .studio-inspector-pane {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.studio-inspector-pane-heading {
+  display: flex;
+  min-height: 2.5rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.8rem;
+  color: rgba(247, 247, 244, 0.72);
+  font-family: var(--curio-heading-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-inspector-pane-heading button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 0.3rem;
+  color: #fff;
+}
+
+.studio-inspector-pane-heading button:hover,
+.studio-inspector-pane-heading button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  outline: none;
+}
+
+.studio-inspector-pane-heading svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.studio-inspector-pane > .studio-compact-reference,
+.studio-inspector-pane > .studio-inspector {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.studio-inspector-pane > .studio-layers-panel-compact {
+  max-height: none;
+}
+
+.studio-editor-import {
+  position: absolute;
+  left: clamp(3rem, 4.4vw, 4.75rem);
+}
+
+.studio-image-import.is-compact .studio-image-import-status,
+.studio-image-import.is-compact .studio-image-import-error,
+.studio-image-import.is-compact .studio-image-import-result {
+  display: none;
+}
+
+.studio-drop-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font-family: var(--curio-heading-font);
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  pointer-events: none;
+}
+
+.studio-global-import-error {
+  position: fixed;
+  z-index: 101;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: 20rem;
+  margin: 0;
+  border: 1px solid rgba(255, 160, 160, 0.35);
+  border-radius: 0.5rem;
+  background: #241515;
+  padding: 0.7rem 0.85rem;
+  color: #ffd1d1;
+  font-size: 0.72rem;
+}
+
+@media (min-width: 1024px) {
+  .studio-editor-header {
+    min-height: 3.3rem;
+    padding-block: 0.35rem;
+  }
+
+  .studio-editor-size-control {
+    position: absolute;
+    left: clamp(9rem, 12vw, 12rem);
+    display: block;
+  }
+
+  .studio-editor-size-control [role="group"] {
+    gap: 0.08rem;
+    border-radius: 0.45rem;
+    padding: 0.12rem;
+  }
+
+  .studio-editor-size-control [role="group"] button {
+    border-radius: 0.3rem;
+    padding: 0.3rem 0.48rem;
+    font-size: 0.6rem;
+  }
+
+  .studio-editor-home {
+    left: 0;
+    width: 3.15rem;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .studio-editor-import {
+    left: 4rem;
+  }
+}
+
+.studio-editor-size-control {
+  display: block;
+  min-width: 0;
+}
+
+.studio-editor-size-control [role="group"] button[aria-pressed="true"]::after {
+  content: "";
+}
+
+.studio-compact-reference {
+  display: block;
+  overflow-y: auto;
+  padding: 1rem 0.9rem 1.2rem;
+  text-align: left !important;
+}
+
+.studio-compact-reference-section {
+  margin-top: 1.1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(247, 247, 244, 0.1);
+}
+
+.studio-compact-reference-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: rgba(247, 247, 244, 0.72);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.studio-compact-reference-section-heading span:last-child {
+  color: rgba(247, 247, 244, 0.34);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.studio-compact-reference .studio-compact-fonts {
+  gap: 0.28rem;
+  margin-top: 0.7rem;
+  text-align: right;
+}
+
+.studio-compact-reference .studio-compact-fonts span {
+  color: rgba(247, 247, 244, 0.86);
+  font-size: 0.72rem;
+}
+
+.studio-compact-reference .studio-compact-reference-grid {
+  margin-top: 0.7rem;
+  max-width: none;
+}
+
+.studio-compact-texture-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.7rem 0 0;
+  list-style: none;
+}
+
+.studio-compact-texture-grid li {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: rgba(247, 247, 244, 0.48);
+  font-size: 0.52rem;
+  line-height: 1.25;
+}
+
+.studio-compact-texture-swatch {
+  display: block;
+  aspect-ratio: 1.35;
+  border-radius: 0.25rem;
+  background: #3c3c3c;
+}
+
+.studio-compact-texture-swatch.is-paper {
+  background:
+    linear-gradient(135deg, rgba(247, 247, 244, 0.22) 25%, transparent 25%) 0 0 / 0.35rem 0.35rem,
+    #8a8379;
+}
+
+.studio-compact-texture-swatch.is-ink {
+  background:
+    radial-gradient(circle at 30% 35%, rgba(247, 247, 244, 0.5) 0 4%, transparent 5%),
+    radial-gradient(circle at 70% 65%, rgba(247, 247, 244, 0.24) 0 8%, transparent 9%),
+    #2b2b2b;
+}
+
+.studio-compact-texture-swatch.is-signal {
+  background:
+    repeating-linear-gradient(0deg, rgba(247, 247, 244, 0.17) 0 1px, transparent 1px 4px),
+    #424242;
+}
+
+/* Keep the editor's flex chain intact before the desktop media query too.
+   Without this, the grid resolves to 0px and the tool rail gets chopped. */
+html .studio-editor-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+html .studio-editor-workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+html .studio-editor-header {
+  position: relative;
+}
+
+html .studio-editor-header .studio-editor-home {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  width: 3.15rem;
+  height: 100%;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  color: rgba(245, 245, 240, 0.78);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+html .studio-editor-header .studio-editor-home:hover,
+html .studio-editor-header .studio-editor-home:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--editor-text);
+  outline: none;
+}
+
+html .studio-editor-header .studio-editor-home svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+html .studio-editor-header .studio-editor-import {
+  left: 4rem;
+}
+
+
+/* Keep prompt cards visibly against the right gutter in both chat surfaces. */
+.studio-editor-chat .director-message-row.is-user .director-message,
+.chat-screen-main .director-message-row.is-user .director-message {
+  width: min(82%, 30rem);
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.studio-editor-chat .director-message-row.is-user .director-message-bubble,
+.chat-screen-main .director-message-row.is-user .director-message-bubble {
+  text-align: left;
+}
+
+/* Give the microphone a real hover/focus surface in the dark chatbox. The
+   shared editor rule intentionally removes generic borders, so this control
+   needs its own explicit highlight. */
+.studio-editor-chat .director-chat-box > button:first-child:hover:not(:disabled),
+.studio-editor-chat .director-chat-box > button:first-child:focus-visible,
+.chat-screen-main .director-chat-box > button:first-child:hover:not(:disabled),
+.chat-screen-main .director-chat-box > button:first-child:focus-visible {
+  border-color: rgba(247, 247, 244, 0.72);
+  background: rgba(247, 247, 244, 0.14);
+  color: #fff;
+  outline: none;
+  box-shadow: 0 0 0 0.18rem rgba(247, 247, 244, 0.08);
+}
+
+.studio-editor-chat .director-chat-box > button:first-child[aria-pressed="true"],
+.chat-screen-main .director-chat-box > button:first-child[aria-pressed="true"] {
+  border-color: #fff;
+  background: #fff;
+  color: #050505;
+}
+
+.studio-editor-chat .director-chat-box,
+.chat-screen-main .director-chat-box {
+  min-height: 2.35rem;
+  height: 2.35rem;
+  gap: 0.3rem;
+  padding: 0.2rem;
+}
+
+.studio-editor-chat .director-chat-box > button:first-child,
+.studio-editor-chat .director-chat-box > button:last-child,
+.chat-screen-main .director-chat-box > button:first-child,
+.chat-screen-main .director-chat-box > button:last-child {
+  width: 1.95rem;
+  min-width: 1.95rem;
+  height: 1.95rem;
+  min-height: 1.95rem;
+}
+
+.studio-editor-chat .director-chat-box input,
+.chat-screen-main .director-chat-box input {
+  height: 1.95rem;
+  min-height: 1.95rem;
+  padding-inline: 0.55rem;
+}
+
+.studio-editor-chat .director-voice-cancel,
+.chat-screen-main .director-voice-cancel {
+  width: 1.8rem;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  min-height: 1.8rem;
+  border-color: rgba(240, 117, 102, 0.46);
+  background: rgba(240, 117, 102, 0.12);
+  color: #f08a79;
+}
+
+.studio-editor-chat .director-voice-cancel:hover,
+.studio-editor-chat .director-voice-cancel:focus-visible,
+.chat-screen-main .director-voice-cancel:hover,
+.chat-screen-main .director-voice-cancel:focus-visible {
+  border-color: rgba(255, 146, 130, 0.82);
+  background: rgba(240, 117, 102, 0.24);
+  color: #ffb0a1;
+  outline: none;
+}
+
+.studio-editor-chat .director-voice-cancel svg,
+.chat-screen-main .director-voice-cancel svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
+/* The mascot keeps its place in the composition, but no longer dominates the
+   chat header. */
+.studio-editor-chat .director-mascot,
+.chat-screen-main .director-mascot {
+  width: clamp(2.2rem, 3.6vw, 2.9rem);
+  height: clamp(2.2rem, 3.6vw, 2.9rem);
+}
+
+.studio-editor-chat .director-mascot .voice-keyframes,
+.chat-screen-main .director-mascot .voice-keyframes {
+  width: 100%;
+  height: 100%;
+}
+
+.studio-editor-chat .director-chat-box .ld-wave,
+.chat-screen-main .director-chat-box .ld-wave {
+  color: currentColor;
 }

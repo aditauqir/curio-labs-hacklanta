@@ -137,6 +137,110 @@ export type GeminiResult = {
   assetSuggestions: AssetSuggestion[];
 };
 
+export type ImageReferenceAnalysis = {
+  summary: string;
+  suggestions: string[];
+  prompt: string;
+};
+
+const IMAGE_ANALYSIS_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    summary: { type: "STRING" },
+    suggestions: { type: "ARRAY", items: { type: "STRING" } },
+    prompt: { type: "STRING" },
+  },
+  required: ["summary", "suggestions", "prompt"],
+} as const;
+
+const IMAGE_ANALYSIS_INSTRUCTIONS = `Analyze this image as a visual reference for a poster editor.
+Return concise JSON with:
+- summary: one short sentence describing composition, hierarchy, typography, color, and mood.
+- suggestions: exactly three concrete design directions the user could ask Curio to apply.
+- prompt: one concise instruction for Curio's creative director that uses the image analysis to improve the current poster, without claiming the image is already on the canvas.
+Do not identify people, infer sensitive personal traits, or invent text that is not legible. Focus on observable design choices.`;
+
+function boundedText(value: unknown, max: number) {
+  return typeof value === "string"
+    ? value.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max)
+    : "";
+}
+
+/** Analyze a user-provided image with Gemini's vision input, without storing it in the prompt or client state. */
+export async function analyzeImageReference(file: File): Promise<{ analysis: ImageReferenceAnalysis; model: string }> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new GeminiError("not_configured", "GEMINI_API_KEY is not set");
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: IMAGE_ANALYSIS_INSTRUCTIONS }] },
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: "Study this reference and return the requested JSON." },
+          { inline_data: { mime_type: file.type, data: bytes.toString("base64") } },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.25,
+      maxOutputTokens: 420,
+      responseMimeType: "application/json",
+      responseSchema: IMAGE_ANALYSIS_SCHEMA,
+    },
+  });
+
+  let lastStatus = 0;
+  for (const model of modelChain()) {
+    let response: Response;
+    try {
+      response = await callModel(model, apiKey, body);
+    } catch {
+      lastStatus = 0;
+      continue;
+    }
+
+    lastStatus = response.status;
+    if (response.status === 400 || response.status === 401 || response.status === 403) {
+      throw new GeminiError("upstream", `Gemini rejected the image request (${response.status})`);
+    }
+    if (!response.ok) continue;
+
+    const json: unknown = await response.json().catch(() => null);
+    const text = (json as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null)
+      ?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "")
+      .join("");
+    if (!text) throw new GeminiError("bad_output", "Gemini returned no image analysis");
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new GeminiError("bad_output", "Gemini returned invalid image analysis JSON");
+    }
+
+    const record = (typeof parsed === "object" && parsed !== null ? parsed : {}) as Record<string, unknown>;
+    const summary = boundedText(record.summary, 280);
+    const prompt = boundedText(record.prompt, 500);
+    const suggestions = Array.isArray(record.suggestions)
+      ? record.suggestions
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => boundedText(item, 140))
+          .filter(Boolean)
+          .slice(0, 3)
+      : [];
+
+    if (!summary || !prompt || suggestions.length !== 3) {
+      throw new GeminiError("bad_output", "Gemini returned incomplete image analysis");
+    }
+
+    return { analysis: { summary, suggestions, prompt }, model };
+  }
+
+  throw new GeminiError("upstream", `Gemini is unavailable (last status ${lastStatus})`);
+}
+
 function describeDesign(design: DesignState, paletteId: string | null, posterEdits: PosterEdits = {}) {
   const poster = buildPoster(design);
   const layers = [

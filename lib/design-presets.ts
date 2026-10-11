@@ -1,9 +1,28 @@
 import type {
   DesignDirection,
   DesignState,
+  PosterSize,
   Spacing,
   TextAlignment,
 } from "./design-types";
+
+export type PosterSizeConfig = {
+  id: PosterSize;
+  label: string;
+  dimensions: string;
+  width: number;
+  height: number;
+};
+
+export const posterSizes: PosterSizeConfig[] = [
+  { id: "social", label: "Social", dimensions: "1080 × 1350", width: 1080, height: 1350 },
+  { id: "letter", label: "Letter", dimensions: "2550 × 3300", width: 2550, height: 3300 },
+  { id: "a4", label: "A4", dimensions: "2480 × 3508", width: 2480, height: 3508 },
+];
+
+export function getPosterSize(id: PosterSize) {
+  return posterSizes.find((size) => size.id === id) ?? posterSizes[0];
+}
 
 export type FontPair = {
   id: string;
@@ -66,17 +85,6 @@ export const fontPairs: FontPair[] = [
     bodyFont: 'var(--font-inter), Inter, Arial, sans-serif',
     headingWeight: 700,
     widthRatio: 0.72,
-  },
-  {
-    id: "cormorant-manrope",
-    name: "Cormorant Garamond + Manrope",
-    heading: "Cormorant Garamond",
-    body: "Manrope",
-    label: "Refined garamond",
-    headingFont: 'var(--font-cormorant), "Cormorant Garamond", Georgia, serif',
-    bodyFont: 'var(--font-manrope), Manrope, Arial, sans-serif',
-    headingWeight: 700,
-    widthRatio: 0.62,
   },
 ];
 
@@ -443,6 +451,7 @@ const baseDesign: DesignState = {
   time: "7:00 PM — 11:00 PM",
   footer: "COFFEE · MUSIC · CULTURE",
   direction: "vintage",
+  posterSize: "social",
   styleLabel: "",
   mood: "",
   typography: typographyFromPair(fontPairs[0]),

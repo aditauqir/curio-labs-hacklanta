@@ -62,10 +62,13 @@ export function useVoice({
 
   const phaseRef = useRef<VoicePhase>("idle");
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const cancelledRecordingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | undefined>(undefined);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const speakAbortRef = useRef<AbortController | null>(null);
   const unmountedRef = useRef(false);
   const onTranscriptRef = useRef(onTranscript);
@@ -77,6 +80,22 @@ export function useVoice({
   const setPhase = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
     setPhaseState(next);
+  }, []);
+
+  // Unlock the browser's audio policy during the user's click or key press.
+  // The actual speech arrives later, after the network request finishes.
+  const unlockAudio = useCallback(() => {
+    if (typeof window === "undefined" || typeof window.AudioContext === "undefined") return;
+    let context = audioContextRef.current;
+    if (!context) {
+      try {
+        context = new window.AudioContext();
+      } catch {
+        return;
+      }
+    }
+    audioContextRef.current = context;
+    if (context.state === "suspended") void context.resume();
   }, []);
 
   // Browsers only expose the microphone on HTTPS or localhost. Reporting the
@@ -99,6 +118,18 @@ export function useVoice({
   }, []);
 
   const releaseAudio = useCallback(() => {
+    const source = audioSourceRef.current;
+    audioSourceRef.current = null;
+    if (source) {
+      source.onended = null;
+      try {
+        source.stop();
+      } catch {
+        // The source may have ended between the state check and cleanup.
+      }
+      source.disconnect();
+    }
+
     const audio = audioRef.current;
     audioRef.current = null;
     if (audio) {
@@ -180,6 +211,7 @@ export function useVoice({
     if (block !== null) return;
     if (phaseRef.current === "listening" || phaseRef.current === "transcribing") return;
 
+    unlockAudio();
     stopPlayback(); // never record the assistant's own voice
     setError(null);
 
@@ -216,11 +248,18 @@ export function useVoice({
       releaseMic();
       recorderRef.current = null;
       if (unmountedRef.current) return;
+      if (cancelledRecordingRef.current) {
+        cancelledRecordingRef.current = false;
+        setSeconds(0);
+        setPhase("idle");
+        return;
+      }
       const type = recorder.mimeType || mimeType || "audio/webm";
       void upload(new Blob(chunks, { type }), type);
     };
 
     recorderRef.current = recorder;
+    cancelledRecordingRef.current = false;
     streamRef.current = stream;
     setStream(stream);
     recorder.start();
@@ -233,7 +272,7 @@ export function useVoice({
       setSeconds(elapsed);
       if (elapsed >= MAX_RECORD_SECONDS && recorder.state === "recording") recorder.stop();
     }, 1000);
-  }, [block, releaseMic, setPhase, stopPlayback, upload]);
+  }, [block, releaseMic, setPhase, stopPlayback, unlockAudio, upload]);
 
   const stop = useCallback(() => {
     const recorder = recorderRef.current;
@@ -241,6 +280,15 @@ export function useVoice({
       window.clearInterval(timerRef.current);
       recorder.stop();
     }
+  }, []);
+
+  const cancel = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (phaseRef.current !== "listening" || !recorder || recorder.state !== "recording") return;
+    cancelledRecordingRef.current = true;
+    window.clearInterval(timerRef.current);
+    setError(null);
+    recorder.stop();
   }, []);
 
   const speak = useCallback(
@@ -265,6 +313,32 @@ export function useVoice({
 
         const blob = await response.blob();
         if (controller.signal.aborted) return;
+
+        const context = audioContextRef.current;
+        if (context) {
+          try {
+            await context.resume();
+            if (context.state === "running") {
+              const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+              if (controller.signal.aborted) return;
+
+              const source = context.createBufferSource();
+              source.buffer = buffer;
+              source.connect(context.destination);
+              audioSourceRef.current = source;
+              source.onended = () => {
+                if (audioSourceRef.current !== source) return;
+                audioSourceRef.current = null;
+                source.disconnect();
+                setPhase("idle");
+              };
+              source.start();
+              return;
+            }
+          } catch {
+            // Fall back to the media element path below.
+          }
+        }
 
         const url = URL.createObjectURL(blob);
         audioUrlRef.current = url;
@@ -306,6 +380,9 @@ export function useVoice({
       releaseMic();
       speakAbortRef.current?.abort();
       releaseAudio();
+      const context = audioContextRef.current;
+      audioContextRef.current = null;
+      if (context && context.state !== "closed") void context.close();
     };
   }, [releaseAudio, releaseMic]);
 
@@ -317,8 +394,10 @@ export function useVoice({
     block,
     /** Playback does not need a secure context, so replies can be spoken on plain HTTP. */
     canSpeak,
+    unlockAudio,
     start,
     stop,
+    cancel,
     speak,
     stopSpeaking: stopPlayback,
     clearError: () => setError(null),

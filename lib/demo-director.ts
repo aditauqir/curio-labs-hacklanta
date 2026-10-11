@@ -23,7 +23,7 @@ const ACCENT_COLORS: Record<string, string> = {
 };
 
 const VINTAGE = /\b(warm|warmer|vintage|retro|cozy|1970s|70s|smoky)\b/;
-const MINIMAL = /\b(minimal|minimalist|swiss|clean|cleaner|simple|modern)\b/;
+const MINIMAL = /\b(minimal|minimalist|swiss|clean|cleaner|simple|modern|contemporary|sleek)\b/;
 const EXPERIMENTAL = /\b(experimental|bold|bolder|dark|edgy|loud|electric|night)\b/;
 
 function breakHeadline(value: string) {

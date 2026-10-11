@@ -1,4 +1,20 @@
-export type PosterTool = "select" | "text" | "hand";
+/**
+ * The editor keeps the tool selection separate from poster data. That mirrors
+ * GIMP's tool/options model: changing tools never rasterizes or mutates the
+ * source layer until the user performs an operation on the canvas.
+ */
+export type PosterTool =
+  | "select"
+  | "rectangle-select"
+  | "lasso"
+  | "text"
+  | "crop"
+  | "brush"
+  | "eraser"
+  | "stamp"
+  | "dropper"
+  | "fill"
+  | "hand";
 
 export type PosterLayerEdit = {
   x: number;

@@ -1,6 +1,7 @@
 import type { PosterEdits } from "./poster-editor";
 
 export type DesignDirection = "vintage" | "minimal" | "experimental";
+export type PosterSize = "social" | "letter" | "a4";
 export type TextAlignment = "left" | "center" | "right";
 export type Spacing = "compact" | "normal" | "spacious";
 
@@ -13,6 +14,7 @@ export type DesignState = {
   time: string;
   footer: string;
   direction: DesignDirection;
+  posterSize: PosterSize;
   styleLabel: string;
   mood: string;
   typography: {
@@ -34,6 +36,13 @@ export type DesignState = {
   };
 };
 
+export type ChatCheckpoint = {
+  design: DesignState;
+  selectedPaletteId: string | null;
+  posterEdits: PosterEdits;
+  layerOrder: string[];
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -50,6 +59,8 @@ export type ChatMessage = {
   /** Plain-language note, e.g. that Gemini was unavailable and local rules were used. */
   notice?: string;
   assetSuggestions?: AssetSuggestion[];
+  /** The complete editable state immediately after this assistant response. */
+  checkpoint?: ChatCheckpoint;
 };
 
 export type AssetSuggestion = {
@@ -65,4 +76,5 @@ export type PersistedStudioState = {
   /** null when the colors no longer match a curated palette. */
   selectedPaletteId: string | null;
   posterEdits: PosterEdits;
+  layerOrder: string[];
 };

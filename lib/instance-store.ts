@@ -9,6 +9,7 @@ type WorkspaceRow = {
   design: unknown;
   selected_palette_id: string | null;
   poster_edits: unknown;
+  layer_order: unknown;
   updated_at: Date | string;
 };
 
@@ -57,7 +58,7 @@ export async function loadWorkspace(instanceId: string): Promise<{ state: Studio
   await ensureInstance(sql, instanceId);
 
   const workspace = await sql<WorkspaceRow[]>`
-    SELECT design, selected_palette_id, poster_edits
+    SELECT design, selected_palette_id, poster_edits, layer_order
            , updated_at
     FROM curio_workspaces
     WHERE instance_id = ${instanceId}::uuid
@@ -77,6 +78,7 @@ export async function loadWorkspace(instanceId: string): Promise<{ state: Studio
       messages: messages.map(toMessage),
       selectedPaletteId: workspace[0].selected_palette_id,
       posterEdits: workspace[0].poster_edits,
+      layerOrder: workspace[0].layer_order,
     });
   return {
     state,
@@ -89,12 +91,13 @@ export async function saveWorkspace(instanceId: string, state: StudioState) {
   const updatedAt = await sql.begin(async (tx) => {
     await ensureInstance(tx, instanceId);
     const rows = await tx<{ updated_at: Date | string }[]>`
-      INSERT INTO curio_workspaces (instance_id, design, selected_palette_id, poster_edits, updated_at)
-      VALUES (${instanceId}::uuid, ${tx.json(state.design)}, ${state.selectedPaletteId}, ${tx.json(state.posterEdits)}, NOW())
+      INSERT INTO curio_workspaces (instance_id, design, selected_palette_id, poster_edits, layer_order, updated_at)
+      VALUES (${instanceId}::uuid, ${tx.json(state.design)}, ${state.selectedPaletteId}, ${tx.json(state.posterEdits)}, ${tx.json(state.layerOrder)}, NOW())
       ON CONFLICT (instance_id) DO UPDATE SET
         design = EXCLUDED.design,
         selected_palette_id = EXCLUDED.selected_palette_id,
         poster_edits = EXCLUDED.poster_edits,
+        layer_order = EXCLUDED.layer_order,
         updated_at = NOW()
       RETURNING updated_at
     `;
