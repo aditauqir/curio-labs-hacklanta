@@ -109,6 +109,15 @@
   --muted: #6b6963;
   --curio-body-font: "Apfel Grotezk", system-ui, sans-serif;
   --curio-heading-font: "Neue Montreal", system-ui, sans-serif;
+  /* Keep poster font-pair variables local too; the server must not download
+     or resolve a remote next/font/google asset during production builds. */
+  --font-inter: "Apfel Grotezk", system-ui, sans-serif;
+  --font-space: "Neue Montreal", system-ui, sans-serif;
+  --font-playfair: "LT Superior Serif", Georgia, serif;
+  --font-dm-serif: "LT Superior Serif", Georgia, serif;
+  --font-dm-sans: "Apfel Grotezk", system-ui, sans-serif;
+  --font-cormorant: "LT Superior Serif", Georgia, serif;
+  --font-manrope: "Apfel Grotezk", system-ui, sans-serif;
   --curio-ease: cubic-bezier(0.215, 0.61, 0.355, 1);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

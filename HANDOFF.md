@@ -59,7 +59,7 @@ Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (
 
 ```
 app/
-  layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; bundled Neue Montreal, Apfel Grotezk, and Redaction 20 assets load from globals.css; declares the Curio Labs app icons
+  layout.tsx            Uses the bundled local font faces from globals.css; declares the Curio Labs app icons without a remote next/font build dependency
   icon.png              Supplied 200×200 Curio Labs wordmark used as the browser favicon and app icon
   page.tsx              Apex redirects to /home; proxy.ts rewrites the app-subdomain root to /app
   proxy.ts              Keeps the app-subdomain root at / while rendering the canonical /app home internally
@@ -290,5 +290,6 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
 | `tldraw-voice-onboarding` | 2026-10-10 | Add start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | merged | PR #14 merged to `main`; the first production workflow run exposed stale E2E expectations for the current desktop flow; follow-up fix is on `e2e-current-flow` |
-| `e2e-current-flow` | 2026-10-11 | Align production E2E tests with the current home-to-app desktop flow | PR open (#15) | Updated route, desktop workspace, editor-property, and reference-panel assertions; all 17 local E2E tests pass; PR #15 is open and production deploy is pending merge |
+| `e2e-current-flow` | 2026-10-11 | Align production E2E tests with the current home-to-app desktop flow | merged | PR #15 merged to `main`; all 17 E2E tests passed, then the server build exposed a separate next/font compatibility issue |
+| `server-local-fonts` | 2026-10-11 | Remove remote Google font build dependency from the production bundle | PR open (#16) | Vultr failed while resolving a generated `next/font/google` asset; the app now uses bundled local font faces; `npm run check`, 9 unit tests, and diff checks pass; PR #16 is open and production deploy is pending merge |
 <!-- BRANCH-LOG-INSERT -->
