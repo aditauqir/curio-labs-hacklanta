@@ -3,7 +3,15 @@
 import type { DesignState } from "@/lib/design-types";
 import { buildPoster, normalizeLayerOrder, type PosterShape, type PosterText } from "@/lib/poster-layout";
 import type { PosterEdits } from "@/lib/poster-editor";
-import { ArrowDownIcon, ArrowUpIcon, EyeIcon, LayersIcon, LockIcon, LockOpenIcon } from "./icons";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  EyeIcon,
+  LayersIcon,
+  LockIcon,
+  LockOpenIcon,
+  TrashIcon,
+} from "./icons";
 
 type Layer = {
   id: string;
@@ -65,6 +73,7 @@ export function LayersPanel({
   onSelectLayer,
   onToggleLayerVisibility,
   onToggleLayerLock,
+  onDeleteLayer,
   onReorderLayer,
 }: {
   design: DesignState;
@@ -75,6 +84,7 @@ export function LayersPanel({
   onSelectLayer: (id: string | null) => void;
   onToggleLayerVisibility: (id: string) => void;
   onToggleLayerLock: (id: string) => void;
+  onDeleteLayer: (id: string) => void;
   onReorderLayer: (id: string, direction: "up" | "down") => void;
 }) {
   const layers = layersFor(design, layerOrder);
@@ -166,6 +176,16 @@ export function LayersPanel({
                     onClick={() => onToggleLayerLock(layer.id)}
                   >
                     {locked ? <LockIcon /> : <LockOpenIcon />}
+                  </button>
+                  <button
+                    type="button"
+                    className="is-delete"
+                    aria-label={`Delete ${layer.name}`}
+                    title={layer.id === "background" ? "Background cannot be deleted" : `Delete ${layer.name}`}
+                    disabled={layer.id === "background"}
+                    onClick={() => onDeleteLayer(layer.id)}
+                  >
+                    <TrashIcon />
                   </button>
                 </div>
               </li>

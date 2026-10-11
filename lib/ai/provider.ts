@@ -1,25 +1,19 @@
-// Server-only. Provider abstraction for the creative pipeline.
-//
-// The pipeline never talks to a vendor SDK directly: it asks for a capability
-// ("give me structured JSON for this prompt") and gets whichever provider is
-// configured. That keeps vendor details out of the pipeline stages and lets the
-// tests run against a deterministic mock with no network and no credentials.
-//
-// Capabilities are reported honestly. This repository has a text model only;
-// there is no image generation and no vision model configured, so the matching
-// capabilities report `false` rather than being faked elsewhere.
+// Server-only provider contracts for structured Gemini workflow requests.
+// Keep vendor and credential details behind this boundary so pipeline stages
+// can share one transport without bypassing Curio's validation layers.
+import { pythonPipelineStatus } from "../pipeline/python-engine.ts";
 
-export type AiErrorKind =
-  | "not_configured"
-  | "upstream"
-  | "bad_output"
-  | "timeout";
+export type AiErrorKind = "not_configured" | "upstream" | "bad_output" | "timeout" | "grounding_unavailable";
 
 export class AiError extends Error {
   kind: AiErrorKind;
   provider: string;
 
-  constructor(kind: AiErrorKind, provider: string, message: string) {
+  constructor(
+    kind: AiErrorKind,
+    provider: string,
+    message: string,
+  ) {
     super(message);
     this.name = "AiError";
     this.kind = kind;
@@ -27,24 +21,29 @@ export class AiError extends Error {
   }
 }
 
-/** A Gemini-flavoured JSON schema. Kept loose on purpose: it is passed through. */
 export type ResponseSchema = Record<string, unknown>;
 
 export type JsonRequest = {
+  scope: string;
   system: string;
   prompt: string;
   schema: ResponseSchema;
-  /** Identifies the pipeline stage, for logs and job provenance. */
-  scope: string;
+  /** Allows longer server-to-server pipeline calls without slowing chat. */
+  timeoutMs?: number;
   maxOutputTokens?: number;
   temperature?: number;
+  topP?: number;
+  topK?: number;
+  /** Enable Gemini's managed Google Search grounding for current web context. */
+  googleSearch?: boolean;
 };
 
 export type JsonResult = {
   data: unknown;
-  /** The concrete model that answered, recorded for provenance. */
   model: string;
   provider: string;
+  googleSearchUsed?: boolean;
+  groundingSources?: Array<{ title: string; url: string }>;
 };
 
 export type TextProvider = {
@@ -53,11 +52,8 @@ export type TextProvider = {
 };
 
 export type AiCapabilities = {
-  /** Structured text generation: brief parsing, concepts, revision planning. */
   text: { available: boolean; provider: string | null };
-  /** Generating artwork. Nothing in this project provides it yet. */
   imageGeneration: { available: boolean; provider: string | null; reason?: string };
-  /** Looking at a rendered image. Required for honest creative critique. */
   vision: { available: boolean; provider: string | null; reason?: string };
 };
 
@@ -69,11 +65,17 @@ export function isGeminiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
-/**
- * Returns the active text provider, or null when nothing is configured.
- * Callers must handle null and surface a clear error rather than inventing
- * output. The mock wins when explicitly enabled so tests never hit the network.
- */
+export function isGeminiGoogleSearchEnabled() {
+  return process.env.GEMINI_ENABLE_SEARCH === "1";
+}
+
+export function geminiSearchQueryLimit() {
+  const configured = Number(process.env.GEMINI_SEARCH_MAX_QUERIES ?? "5");
+  if (!Number.isFinite(configured)) return 5;
+  return Math.max(1, Math.min(5, Math.floor(configured)));
+}
+
+/** Returns the configured structured-text provider, or null when unavailable. */
 export async function getTextProvider(): Promise<TextProvider | null> {
   if (isMockEnabled()) {
     const { mockTextProvider } = await import("./mock.ts");
@@ -89,15 +91,13 @@ export async function getTextProvider(): Promise<TextProvider | null> {
 export function aiCapabilities(): AiCapabilities {
   const mock = isMockEnabled();
   const text = mock || isGeminiConfigured();
+  const python = pythonPipelineStatus();
   return {
-    text: {
-      available: text,
-      provider: mock ? "mock" : text ? "gemini" : null,
-    },
+    text: { available: text, provider: mock ? "mock" : text ? "gemini" : null },
     imageGeneration: {
-      available: false,
-      provider: null,
-      reason: "No image generation provider is configured in this deployment.",
+      available: python.available,
+      provider: python.provider,
+      reason: python.reason,
     },
     vision: {
       available: false,

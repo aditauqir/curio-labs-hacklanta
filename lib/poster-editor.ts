@@ -6,7 +6,6 @@
 export type PosterTool =
   | "select"
   | "rectangle-select"
-  | "lasso"
   | "text"
   | "crop"
   | "brush"
@@ -20,8 +19,20 @@ export type PosterLayerEdit = {
   x: number;
   y: number;
   scale: number;
+  scaleX: number;
+  scaleY: number;
   rotation: number;
   opacity: number;
+  /** Optional text-only override; absent means use the generated layer weight. */
+  weight?: number;
+  /** Optional text-only font-size override in poster pixels. */
+  fontSize?: number;
+  /** Optional text-only tracking override in poster pixels. */
+  tracking?: number;
+  /** Optional graphic/text color overrides. */
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
   visible: boolean;
   locked: boolean;
 };
@@ -33,6 +44,8 @@ export function createPosterLayerEdit(): PosterLayerEdit {
     x: 0,
     y: 0,
     scale: 1,
+    scaleX: 1,
+    scaleY: 1,
     rotation: 0,
     opacity: 1,
     visible: true,
@@ -65,18 +78,43 @@ function boolean(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function optionalWeight(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(900, Math.max(100, Math.round(value / 100) * 100))
+    : undefined;
+}
+
 export function sanitizePosterEdits(raw: unknown): PosterEdits {
   if (!isRecord(raw)) return {};
 
   const result: PosterEdits = {};
   for (const [id, value] of Object.entries(raw)) {
     if (!isRecord(value)) continue;
+    const weight = optionalWeight(value.weight);
     result[id.slice(0, 80)] = {
       x: number(value.x, 0, -4000, 4000),
       y: number(value.y, 0, -4000, 4000),
       scale: number(value.scale, 1, 0.05, 12),
+      scaleX: number(value.scaleX, 1, 0.05, 12),
+      scaleY: number(value.scaleY, 1, 0.05, 12),
       rotation: number(value.rotation, 0, -360, 360),
       opacity: number(value.opacity, 1, 0, 1),
+      ...(weight ? { weight } : {}),
+      ...(typeof value.fontSize === "number" && Number.isFinite(value.fontSize)
+        ? { fontSize: Math.min(600, Math.max(8, value.fontSize)) }
+        : {}),
+      ...(typeof value.tracking === "number" && Number.isFinite(value.tracking)
+        ? { tracking: Math.min(160, Math.max(-80, value.tracking)) }
+        : {}),
+      ...(typeof value.fill === "string" && /^#[0-9a-f]{6}$/i.test(value.fill)
+        ? { fill: value.fill.toUpperCase() }
+        : {}),
+      ...(typeof value.stroke === "string" && /^#[0-9a-f]{6}$/i.test(value.stroke)
+        ? { stroke: value.stroke.toUpperCase() }
+        : {}),
+      ...(typeof value.strokeWidth === "number" && Number.isFinite(value.strokeWidth)
+        ? { strokeWidth: Math.min(100, Math.max(0, value.strokeWidth)) }
+        : {}),
       visible: boolean(value.visible, true),
       locked: boolean(value.locked, false),
     };

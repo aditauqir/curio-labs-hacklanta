@@ -30,12 +30,21 @@
     "foreground": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
     "alignment": { "type": "string", "enum": ["left", "center", "right"] },
     "spacing": { "type": "string", "enum": ["compact", "normal", "spacious"] },
+    "layoutVariant": {
+      "type": "string",
+      "enum": ["asymmetric-grid", "centred-stack", "diagonal-break", "edge-anchored", "full-bleed-image", "modular-grid", "typographic-stack"]
+    },
+    "projectName": { "type": "string", "maxLength": 80 },
+    "venue": { "type": "string", "maxLength": 120 },
     "headline": { "type": "string", "maxLength": 80 },
     "subtitle": { "type": "string", "maxLength": 120 },
+    "date": { "type": "string", "maxLength": 120 },
+    "time": { "type": "string", "maxLength": 120 },
+    "footer": { "type": "string", "maxLength": 160 },
     "mood": { "type": "string", "maxLength": 80 },
     "layerEdits": {
       "type": "array",
-      "maxItems": 4,
+      "maxItems": 12,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -45,12 +54,37 @@
           "x": { "type": "number", "minimum": -4000, "maximum": 4000 },
           "y": { "type": "number", "minimum": -4000, "maximum": 4000 },
           "scale": { "type": "number", "minimum": 0.05, "maximum": 12 },
+          "scaleX": { "type": "number", "minimum": 0.05, "maximum": 12 },
+          "scaleY": { "type": "number", "minimum": 0.05, "maximum": 12 },
           "rotation": { "type": "number", "minimum": -360, "maximum": 360 },
           "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "weight": { "type": "number", "minimum": 100, "maximum": 900 },
+          "fontSize": { "type": "number", "minimum": 8, "maximum": 600 },
+          "tracking": { "type": "number", "minimum": -80, "maximum": 160 },
+          "fill": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "stroke": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "strokeWidth": { "type": "number", "minimum": 0, "maximum": 100 },
           "visible": { "type": "boolean" },
           "locked": { "type": "boolean" }
         }
       }
+    },
+    "referenceTreatment": {
+      "type": "object",
+      "description": "Canvas treatment for the active reference image; omit when no reference is active.",
+      "additionalProperties": false,
+      "properties": {
+        "filter": { "type": "string", "enum": ["none", "grayscale", "high-contrast", "duotone", "invert"] },
+        "blendMode": { "type": "string", "enum": ["normal", "multiply", "screen", "overlay"] },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "textureOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "textureAssetId": { "type": "string", "description": "Exact engine-texture id from the supplied catalog." }
+      }
+    },
+    "followUps": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "type": "string", "maxLength": 160 }
     }
   }
 }

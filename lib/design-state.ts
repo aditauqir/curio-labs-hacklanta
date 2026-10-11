@@ -3,8 +3,13 @@ import type {
   ChatMessage,
   DesignDirection,
   DesignState,
+  LayoutVariant,
+  AssetSuggestion,
   PersistedStudioState,
   PosterSize,
+  ReferenceBlendMode,
+  ReferenceFilter,
+  ReferenceTreatment,
   Spacing,
   TextAlignment,
 } from "./design-types";
@@ -23,7 +28,7 @@ import {
   typographyFromPair,
 } from "./design-presets";
 import { NO_LOOK, getReferenceLook, lookPaletteId, referenceLookIds } from "./reference-looks";
-import { sanitizePosterEdits, type PosterLayerEdit } from "./poster-editor";
+import { createPosterLayerEdit, sanitizePosterEdits, type PosterLayerEdit } from "./poster-editor";
 import { buildPoster, getDefaultLayerOrder, normalizeLayerOrder, sanitizeLayerOrder } from "./poster-layout";
 
 export type StudioState = PersistedStudioState;
@@ -39,6 +44,15 @@ export type CopyKey =
 
 export type ColorKey = "background" | "foreground" | "accent";
 
+export const DEFAULT_REFERENCE_TREATMENT: ReferenceTreatment = {
+  assetId: null,
+  textureAssetId: null,
+  filter: "none",
+  blendMode: "normal",
+  opacity: 0.72,
+  textureOpacity: 0.24,
+};
+
 export type StudioAction =
   | { type: "setDirection"; direction: DesignDirection }
   | { type: "setLook"; id: string }
@@ -50,7 +64,9 @@ export type StudioAction =
   | { type: "setCopy"; key: CopyKey; value: string }
   | { type: "setAlignment"; value: TextAlignment }
   | { type: "setSpacing"; value: Spacing }
+  | { type: "setLayoutVariant"; value: LayoutVariant }
   | { type: "setMood"; value: string }
+  | { type: "setReferenceTreatment"; patch: Partial<ReferenceTreatment> }
   | { type: "addMessages"; messages: ChatMessage[] }
   | { type: "setPosterLayerEdit"; id: string; patch: Partial<PosterLayerEdit> }
   | { type: "reorderLayer"; id: string; direction: "up" | "down" }
@@ -60,6 +76,15 @@ export type StudioAction =
   | { type: "resetProject" };
 
 export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+export const LAYOUT_VARIANTS: readonly LayoutVariant[] = [
+  "asymmetric-grid",
+  "centred-stack",
+  "diagonal-break",
+  "edge-anchored",
+  "full-bleed-image",
+  "modular-grid",
+  "typographic-stack",
+];
 const MAX_FIELD = 200;
 const MAX_MESSAGES = 60;
 const INITIAL_LAYER_ORDER = getDefaultLayerOrder(buildPoster(initialDesign));
@@ -87,6 +112,68 @@ const seedMessages: ChatMessage[] = [
       selectedPaletteId: initialPaletteId,
       posterEdits: {},
       layerOrder: INITIAL_LAYER_ORDER,
+      referenceTreatment: { ...DEFAULT_REFERENCE_TREATMENT },
+    },
+  },
+];
+
+const DEMO_DESIGN = applyDirection(
+  {
+    ...initialDesign,
+    projectName: "Signal After Dark",
+    venue: "THE SIGNAL ROOM",
+    headline: "SIGNAL\nAFTER DARK",
+    subtitle: "A Curio Labs pipeline demo",
+    date: "THURSDAY · NOVEMBER 14",
+    time: "8:00 PM — LATE",
+    footer: "BRIEF · REFERENCES · REFINE",
+  },
+  "experimental",
+);
+const DEMO_PALETTE_ID = directionConfigs.experimental.paletteId;
+const DEMO_LAYER_ORDER = getDefaultLayerOrder(buildPoster(DEMO_DESIGN));
+const DEMO_ASSETS: AssetSuggestion[] = [
+  {
+    id: "font:space-inter",
+    kind: "font",
+    name: "Space Grotesk + Inter",
+    description: "Geometric grotesk",
+  },
+  {
+    id: "palette:night-signal",
+    kind: "palette",
+    name: "Night Signal",
+    description: "High contrast after dark",
+  },
+  {
+    id: "reference:signal-noise",
+    kind: "reference",
+    name: "Signal / noise",
+    description: "Experimental poster · high contrast",
+  },
+];
+
+const demoMessages: ChatMessage[] = [
+  {
+    id: "demo-brief",
+    role: "user",
+    content:
+      "Create a high-contrast poster for Signal After Dark, a late-night creative technology showcase. Use a dark field, an electric accent, geometric type, and an asymmetric editorial layout.",
+  },
+  {
+    id: "demo-ready",
+    role: "assistant",
+    source: "demo",
+    content:
+      "This preloaded pipeline demo has a structured brief, Curio library assets, and a composed poster ready to refine. Ask for one focused change to see the validated patch update only that property.",
+    suggestions: ["experimental"],
+    assetSuggestions: DEMO_ASSETS,
+    checkpoint: {
+      design: DEMO_DESIGN,
+      selectedPaletteId: DEMO_PALETTE_ID,
+      posterEdits: {},
+      layerOrder: DEMO_LAYER_ORDER,
+      referenceTreatment: { ...DEFAULT_REFERENCE_TREATMENT },
     },
   },
 ];
@@ -98,6 +185,48 @@ export function createDefaultState(): StudioState {
     selectedPaletteId: initialPaletteId,
     posterEdits: {},
     layerOrder: INITIAL_LAYER_ORDER,
+    referenceTreatment: { ...DEFAULT_REFERENCE_TREATMENT },
+  };
+}
+
+const FRESH_DESIGN = applyDirection(
+  {
+    ...initialDesign,
+    projectName: "Untitled Poster",
+    venue: "YOUR VENUE",
+    headline: "YOUR\nHEADLINE",
+    subtitle: "A first brief to refine",
+    date: "DATE · TIME",
+    time: "DETAILS TO FOLLOW",
+    footer: "BRIEF · REFERENCES · REFINE",
+    mood: "",
+  },
+  "minimal",
+);
+const FRESH_PALETTE_ID = directionConfigs.minimal.paletteId;
+const FRESH_LAYER_ORDER = getDefaultLayerOrder(buildPoster(FRESH_DESIGN));
+
+/** A clean starting canvas for a new idea, without the seeded sample conversation. */
+export function createFreshState(): StudioState {
+  return {
+    design: FRESH_DESIGN,
+    messages: [],
+    selectedPaletteId: FRESH_PALETTE_ID,
+    posterEdits: {},
+    layerOrder: FRESH_LAYER_ORDER,
+    referenceTreatment: { ...DEFAULT_REFERENCE_TREATMENT },
+  };
+}
+
+/** A clearly labeled, preloaded workspace for demos and judge walkthroughs. */
+export function createDemoState(): StudioState {
+  return {
+    design: DEMO_DESIGN,
+    messages: demoMessages,
+    selectedPaletteId: DEMO_PALETTE_ID,
+    posterEdits: {},
+    layerOrder: DEMO_LAYER_ORDER,
+    referenceTreatment: { ...DEFAULT_REFERENCE_TREATMENT },
   };
 }
 
@@ -192,10 +321,27 @@ export function studioReducer(
           layout: { ...state.design.layout, spacing: action.value },
         },
       };
+    case "setLayoutVariant":
+      if (!LAYOUT_VARIANTS.includes(action.value)) return state;
+      return {
+        ...state,
+        design: {
+          ...state.design,
+          layout: { ...state.design.layout, variant: action.value },
+        },
+      };
     case "setMood":
       return {
         ...state,
         design: { ...state.design, mood: action.value.slice(0, 80) },
+      };
+    case "setReferenceTreatment":
+      return {
+        ...state,
+        referenceTreatment: sanitizeReferenceTreatment({
+          ...state.referenceTreatment,
+          ...action.patch,
+        }),
       };
     case "addMessages":
       return {
@@ -203,15 +349,7 @@ export function studioReducer(
         messages: [...state.messages, ...action.messages].slice(-MAX_MESSAGES),
       };
     case "setPosterLayerEdit": {
-      const current = state.posterEdits[action.id] ?? {
-        x: 0,
-        y: 0,
-        scale: 1,
-        rotation: 0,
-        opacity: 1,
-        visible: true,
-        locked: false,
-      };
+      const current = state.posterEdits[action.id] ?? createPosterLayerEdit();
       return {
         ...state,
         posterEdits: {
@@ -242,6 +380,7 @@ export function studioReducer(
         design: initialDesign,
         selectedPaletteId: initialPaletteId,
         layerOrder: INITIAL_LAYER_ORDER,
+        referenceTreatment: { ...DEFAULT_REFERENCE_TREATMENT },
       };
     case "resetProject":
       return createDefaultState();
@@ -295,7 +434,7 @@ export function getBrief(
     {
       id: "layout",
       label: "Layout",
-      value: `${ALIGNMENT_LABEL[design.layout.alignment]}, ${design.layout.spacing} spacing`,
+      value: `${design.layout.variant} · ${ALIGNMENT_LABEL[design.layout.alignment]}, ${design.layout.spacing} spacing`,
     },
   ];
 }
@@ -316,6 +455,27 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
     ? (value as T)
     : fallback;
+}
+
+const REFERENCE_FILTERS: readonly ReferenceFilter[] = ["none", "grayscale", "high-contrast", "duotone", "invert"];
+const REFERENCE_BLEND_MODES: readonly ReferenceBlendMode[] = ["normal", "multiply", "screen", "overlay"];
+
+export function sanitizeReferenceTreatment(raw: unknown): ReferenceTreatment {
+  const value = isRecord(raw) ? raw : {};
+  const opacity = typeof value.opacity === "number" && Number.isFinite(value.opacity)
+    ? Math.min(1, Math.max(0, value.opacity))
+    : DEFAULT_REFERENCE_TREATMENT.opacity;
+  const textureOpacity = typeof value.textureOpacity === "number" && Number.isFinite(value.textureOpacity)
+    ? Math.min(1, Math.max(0, value.textureOpacity))
+    : DEFAULT_REFERENCE_TREATMENT.textureOpacity;
+  return {
+    assetId: typeof value.assetId === "string" ? value.assetId.slice(0, 160) : null,
+    textureAssetId: typeof value.textureAssetId === "string" ? value.textureAssetId.slice(0, 160) : null,
+    filter: oneOf(value.filter, REFERENCE_FILTERS, DEFAULT_REFERENCE_TREATMENT.filter),
+    blendMode: oneOf(value.blendMode, REFERENCE_BLEND_MODES, DEFAULT_REFERENCE_TREATMENT.blendMode),
+    opacity,
+    textureOpacity,
+  };
 }
 
 function sanitizeDesign(raw: unknown): DesignState {
@@ -359,6 +519,7 @@ function sanitizeDesign(raw: unknown): DesignState {
     layout: {
       alignment: oneOf(layout.alignment, ["left", "center", "right"] as const, "left"),
       spacing: oneOf(layout.spacing, ["compact", "normal", "spacious"] as const, "normal"),
+      variant: oneOf(layout.variant, LAYOUT_VARIANTS, initialDesign.layout.variant),
     },
   };
 }
@@ -391,6 +552,13 @@ function sanitizeMessages(raw: unknown): ChatMessage[] {
         ? item.suggestions.filter((entry): entry is DesignDirection =>
             directionOrder.includes(entry as DesignDirection),
           )
+        : undefined,
+      followUps: Array.isArray(item.followUps)
+        ? item.followUps
+            .filter((entry): entry is string => typeof entry === "string")
+            .map((entry) => entry.slice(0, 160))
+            .filter(Boolean)
+            .slice(0, 3)
         : undefined,
       changes: Array.isArray(item.changes)
         ? item.changes
@@ -438,6 +606,7 @@ function sanitizeCheckpoint(raw: unknown): ChatCheckpoint | undefined {
     selectedPaletteId: paletteId,
     posterEdits: sanitizePosterEdits(raw.posterEdits),
     layerOrder: sanitizeLayerOrder(buildPoster(design), raw.layerOrder),
+    referenceTreatment: sanitizeReferenceTreatment(raw.referenceTreatment),
   };
 }
 
@@ -458,5 +627,6 @@ export function sanitizeState(raw: unknown): StudioState | null {
     selectedPaletteId: paletteId,
     posterEdits: sanitizePosterEdits(raw.posterEdits),
     layerOrder: sanitizeLayerOrder(buildPoster(design), raw.layerOrder),
+    referenceTreatment: sanitizeReferenceTreatment(raw.referenceTreatment),
   };
 }

@@ -1,6 +1,7 @@
 import type {
   DesignDirection,
   DesignState,
+  LayoutVariant,
   PosterSize,
   Spacing,
   TextAlignment,
@@ -121,6 +122,7 @@ type DirectionConfig = {
   paletteId: string;
   alignment: TextAlignment;
   spacing: Spacing;
+  layoutVariant: LayoutVariant;
 };
 
 export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
@@ -132,6 +134,7 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
     paletteId: "look-newsprint",
     alignment: "left",
     spacing: "normal",
+    layoutVariant: "centred-stack",
   },
   minimal: {
     label: "Berlin Swiss ivory",
@@ -141,6 +144,7 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
     paletteId: "look-swiss-ivory",
     alignment: "left",
     spacing: "spacious",
+    layoutVariant: "asymmetric-grid",
   },
   experimental: {
     label: "Acid green duotone",
@@ -150,6 +154,7 @@ export const directionConfigs: Record<DesignDirection, DirectionConfig> = {
     paletteId: "look-acid-duotone",
     alignment: "right",
     spacing: "compact",
+    layoutVariant: "diagonal-break",
   },
 };
 
@@ -193,7 +198,7 @@ export function applyDirection(
     mood: config.mood,
     typography: typographyFromPair(getFontPair(config.fontPairId)),
     colors: { ...palette.colors },
-    layout: { alignment: config.alignment, spacing: config.spacing },
+    layout: { alignment: config.alignment, spacing: config.spacing, variant: config.layoutVariant },
   };
 }
 
@@ -229,7 +234,7 @@ const baseDesign: DesignState = {
   mood: "",
   typography: typographyFromPair(fontPairs[0]),
   colors: { ...colorPalettes[0].colors },
-  layout: { alignment: "left", spacing: "normal" },
+  layout: { alignment: "left", spacing: "normal", variant: "asymmetric-grid" },
 };
 
 export const initialDesign: DesignState = applyDirection(baseDesign, "vintage");

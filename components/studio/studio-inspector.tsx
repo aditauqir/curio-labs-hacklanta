@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch } from "react";
-import type { DesignState } from "@/lib/design-types";
+import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
 import type { StudioAction } from "@/lib/design-state";
 import type { PosterEdits } from "@/lib/poster-editor";
 import type { ImportedReference } from "@/lib/image-import-client";
@@ -16,13 +16,17 @@ export function StudioInspector({
   design,
   selectedPaletteId,
   dispatch,
+  referenceTreatment,
   posterEdits,
   layerOrder,
   selectedLayerId,
   onSelectLayer,
   onToggleLayerVisibility,
   onToggleLayerLock,
+  onDeleteLayer,
   onReorderLayer,
+  onSelectReference,
+  onSelectTexture,
   onToggleReference,
   onToggleLayers,
 }: {
@@ -32,13 +36,17 @@ export function StudioInspector({
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
+  referenceTreatment: ReferenceTreatment;
   posterEdits: PosterEdits;
   layerOrder: string[];
   selectedLayerId: string | null;
   onSelectLayer: (id: string | null) => void;
   onToggleLayerVisibility: (id: string) => void;
   onToggleLayerLock: (id: string) => void;
+  onDeleteLayer: (id: string) => void;
   onReorderLayer: (id: string, direction: "up" | "down") => void;
+  onSelectReference: (assetId: string, title: string, imageUrl: string) => void;
+  onSelectTexture: (assetId: string) => void;
   onToggleReference: () => void;
   onToggleLayers: () => void;
 }) {
@@ -58,6 +66,9 @@ export function StudioInspector({
             dispatch={dispatch}
             compact
             importedReference={importedReference}
+            referenceTreatment={referenceTreatment}
+            onSelectReference={onSelectReference}
+            onSelectTexture={onSelectTexture}
           />
         </section>
       ) : null}
@@ -78,6 +89,7 @@ export function StudioInspector({
             onSelectLayer={onSelectLayer}
             onToggleLayerVisibility={onToggleLayerVisibility}
             onToggleLayerLock={onToggleLayerLock}
+            onDeleteLayer={onDeleteLayer}
             onReorderLayer={onReorderLayer}
           />
         </section>

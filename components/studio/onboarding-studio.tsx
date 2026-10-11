@@ -12,8 +12,23 @@ import { VoiceMascot } from "./voice-keyframes";
 
 const FALLBACK_STARTER_PROMPTS = [
   "A newsprint poster for a photography exhibition",
-  "A warm identity for my small business",
-  "Something strange, loud, and editorial",
+  "Build a visual identity for a Sunday market",
+  "Make an editorial launch poster for a new album",
+];
+
+const PROJECT_EXAMPLES = [
+  {
+    title: "Kebab After Dark",
+    description: "Start a late-night food poster",
+    prompt:
+      "Create a bold, late-night poster for Kebab After Dark, a neighborhood kebab shop opening on Friday. Use a subject-specific visual direction with a memorable food-led gesture, clear opening details, and an editable type-and-shape composition.",
+  },
+  {
+    title: "Lantern Field",
+    description: "Start a music festival poster",
+    prompt:
+      "Create an expressive poster for Lantern Field, an open-air music festival at dusk. Use a different visual grammar from a restaurant poster: kinetic rhythm, an event-scale headline, atmospheric color contrast, and an editable type-and-shape composition.",
+  },
 ];
 
 function useVoiceLevel(stream: MediaStream | null, active: boolean) {
@@ -146,7 +161,8 @@ export function OnboardingStudio({
             <div className="mascot-frame">
               <VoiceMascot />
             </div>
-            <h1 id="onboarding-title">What are you thinking of?</h1>
+            <h1 id="onboarding-title">Start with an idea</h1>
+            <p className="onboarding-voice-status">Describe a poster, identity, or brief and Curio will open a fresh canvas for it.</p>
 
             <ImageImportControl
               onImport={onImportImage}
@@ -226,49 +242,37 @@ export function OnboardingStudio({
           <aside className="onboarding-projects" aria-label="Recent projects">
             <div className="onboarding-projects-heading">
               <p className="preview-label">Recent projects</p>
-              <span>03</span>
             </div>
             <button
               type="button"
               className="onboarding-project-card is-current"
               onClick={() => onStart()}
             >
-              <span className="onboarding-project-index">01</span>
               <span>
                 <strong>{projectName || "Half Tone"}</strong>
-                <small>Open current workspace</small>
+                <small>Continue your current workspace</small>
               </span>
               <span aria-hidden="true">↗</span>
             </button>
-            <button
-              type="button"
-              className="onboarding-project-card"
-              onClick={() => onStart(starterPrompts[1])}
-            >
-              <span className="onboarding-project-index">02</span>
-              <span>
-                <strong>Warm identity</strong>
-                <small>Start a new brief</small>
-              </span>
-              <span aria-hidden="true">+</span>
-            </button>
-            <button
-              type="button"
-              className="onboarding-project-card"
-              onClick={() => onStart(starterPrompts[2])}
-            >
-              <span className="onboarding-project-index">03</span>
-              <span>
-                <strong>Signal / noise</strong>
-                <small>Start a new brief</small>
-              </span>
-              <span aria-hidden="true">+</span>
-            </button>
+            {PROJECT_EXAMPLES.map((example) => (
+              <button
+                key={example.title}
+                type="button"
+                className="onboarding-project-card"
+                onClick={() => onStart(example.prompt)}
+              >
+                <span>
+                  <strong>{example.title}</strong>
+                  <small>{example.description}</small>
+                </span>
+                <span aria-hidden="true">+</span>
+              </button>
+            ))}
           </aside>
         </Card>
       </div>
 
-      <p className="onboarding-canvas-hint">Type a thought, choose a starting point, or use your voice.</p>
+      <p className="onboarding-canvas-hint">Describe a visual, choose a reference, then ask Curio to refine the canvas.</p>
     </main>
   );
 }

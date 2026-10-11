@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type Dispatch, type WheelEvent as ReactWheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type WheelEvent as ReactWheelEvent } from "react";
 import {
   createDefaultState,
+  createFreshState,
   sanitizeState,
   studioReducer,
   type StudioAction,
@@ -59,17 +60,28 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     future: [],
   }));
   const state = history.present;
-  const dispatch: Dispatch<StudioAction> = (action) => {
+  const dispatchActions = useCallback((actions: StudioAction[]) => {
     setHistory((current) => {
-      const next = studioReducer(current.present, action);
+      const next = actions.reduce(studioReducer, current.present);
       if (next === current.present) return current;
+
+      // Chat messages are context, not canvas edits. Keep them visible without
+      // spending an undo step so Undo returns to the last visual state.
+      if (actions.every((action) => action.type === "addMessages")) {
+        return { ...current, present: next };
+      }
+
       return {
         past: [...current.past, current.present].slice(-50),
         present: next,
         future: [],
       };
     });
-  };
+  }, []);
+  const dispatch: Dispatch<StudioAction> = useCallback(
+    (action) => dispatchActions([action]),
+    [dispatchActions],
+  );
   const [view, setView] = useState<StudioView>(() => {
     if (
       initialView === "start" &&
@@ -82,9 +94,11 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     return initialView;
   });
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const demoRequestedRef = useRef(false);
   const [referenceOpen, setReferenceOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
   const [importedReference, setImportedReference] = useState<ImportedReference | null>(null);
+  const [libraryReference, setLibraryReference] = useState<ImportedReference | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>("headline-0");
@@ -107,11 +121,13 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
         const remote = sanitizeState(json.state);
         const local = instanceId ? loadStudioSnapshot(instanceId) ?? loadStudioSnapshot() : loadStudioSnapshot();
         const remoteUpdatedAt = typeof json.updatedAt === "string" ? Date.parse(json.updatedAt) : NaN;
-        const restored =
-          local && (!Number.isFinite(remoteUpdatedAt) || local.savedAt > remoteUpdatedAt)
-            ? local.state
-            : remote ?? local?.state ?? null;
-        if (restored) dispatch({ type: "restoreState", state: restored });
+        if (!demoRequestedRef.current) {
+          const restored =
+            local && (!Number.isFinite(remoteUpdatedAt) || local.savedAt > remoteUpdatedAt)
+              ? local.state
+              : remote ?? local?.state ?? null;
+          if (restored) dispatch({ type: "restoreState", state: restored });
+        }
         setPersistence({
           ready: true,
           instanceId,
@@ -129,10 +145,12 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       active = false;
       controller.abort();
     };
-  }, []);
+  }, [dispatch]);
 
   const importImage = useCallback(async (file: File) => {
     const previewUrl = URL.createObjectURL(file);
+    setLibraryReference(null);
+    dispatch({ type: "setReferenceTreatment", patch: { assetId: null, textureAssetId: null } });
     setImportError(null);
     try {
       const analysis = await analyzeImage(file);
@@ -148,10 +166,32 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       setInitialPrompt(analysis.prompt);
       return imported;
     } catch (error) {
+      // Keep the local image visible even when optional Gemini analysis is down.
+      // The reference itself is still useful on the canvas; only the analysis
+      // result is unavailable.
+      if (error instanceof ImageImportError && error.status >= 500) {
+        const fallback: ImportedReference = {
+          filename: file.name || "reference-image",
+          previewUrl,
+          summary: "Imported reference loaded. Visual analysis is unavailable right now.",
+          prompt: "",
+          suggestions: [
+            "Use this image as a visual reference",
+            "Build a poster around this image",
+            "Keep the image and refine the typography",
+          ],
+        };
+        setImportedReference((previous) => {
+          if (previous?.previewUrl) URL.revokeObjectURL(previous.previewUrl);
+          return fallback;
+        });
+        setInitialPrompt(null);
+        return fallback;
+      }
       URL.revokeObjectURL(previewUrl);
       throw error;
     }
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     function fileFromDrop(event: DragEvent) {
@@ -240,7 +280,44 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const { design, messages, selectedPaletteId, posterEdits, layerOrder } = state;
+  const { design, messages, selectedPaletteId, posterEdits, layerOrder, referenceTreatment } = state;
+  const persistedLibraryReference = referenceTreatment.assetId
+    ? {
+        filename: referenceTreatment.assetId,
+        label: "Curio library reference",
+        previewUrl: `/api/assets/${encodeURIComponent(referenceTreatment.assetId)}`,
+        sourceAssetId: referenceTreatment.assetId,
+        summary: "Curio library reference selected for the canvas.",
+        prompt: "",
+        suggestions: [],
+      }
+    : null;
+  const activeReference = referenceTreatment.assetId
+    ? libraryReference ?? persistedLibraryReference
+    : importedReference;
+  const textureImageUrl = referenceTreatment.textureAssetId
+    ? `/api/assets/${encodeURIComponent(referenceTreatment.textureAssetId)}`
+    : null;
+
+  function selectReferenceAsset(assetId: string, title: string, imageUrl: string) {
+    setLibraryReference({
+      filename: title,
+      label: title,
+      previewUrl: imageUrl,
+      sourceAssetId: assetId,
+      summary: "Curio library reference selected for the canvas.",
+      prompt: "",
+      suggestions: [],
+    });
+    dispatch({
+      type: "setReferenceTreatment",
+      patch: { assetId, textureAssetId: null, filter: "none", blendMode: "normal" },
+    });
+  }
+
+  function selectTextureAsset(assetId: string) {
+    dispatch({ type: "setReferenceTreatment", patch: { textureAssetId: assetId } });
+  }
 
   function changeLayer(id: string, patch: Partial<PosterLayerEdit>) {
     dispatch({ type: "setPosterLayerEdit", id, patch });
@@ -360,7 +437,15 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   function startStudio(prompt?: string) {
     window.localStorage.setItem(ONBOARDING_KEY, "true");
-    setInitialPrompt(prompt?.trim() || importedReference?.prompt || null);
+    const cleanPrompt = prompt?.trim() || importedReference?.prompt || "";
+    if (cleanPrompt) {
+      // A typed idea is a new brief, not a request to reopen the persisted
+      // workspace. Mark the restore as intentionally superseded before the
+      // async workspace request can hydrate the old project again.
+      demoRequestedRef.current = true;
+      setHistory({ past: [], present: createFreshState(), future: [] });
+    }
+    setInitialPrompt(cleanPrompt || null);
     navigateTo("editor");
   }
 
@@ -409,7 +494,9 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
             selectedPaletteId={selectedPaletteId}
             posterEdits={posterEdits}
             layerOrder={layerOrder}
+            referenceTreatment={referenceTreatment}
             dispatch={dispatch}
+            dispatchBatch={dispatchActions}
             initialPrompt={initialPrompt}
           />
         </aside>
@@ -464,9 +551,13 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                   design={design}
                   selectedPaletteId={selectedPaletteId}
                   dispatch={dispatch}
+                  dispatchBatch={dispatchActions}
                   posterEdits={posterEdits}
                   layerOrder={layerOrder}
                   selectedLayerId={selectedLayerId}
+                  importedReference={activeReference}
+                  referenceTreatment={referenceTreatment}
+                  textureImageUrl={textureImageUrl}
                   activeTool={activeTool}
                   onToolChange={setActiveTool}
                   onSelectLayer={setSelectedLayerId}
@@ -491,17 +582,21 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
                   <StudioInspector
                     referenceOpen={referenceOpen}
                     layersOpen={layersOpen}
-                    importedReference={importedReference}
+                    importedReference={activeReference}
                     design={design}
                     selectedPaletteId={selectedPaletteId}
                     dispatch={dispatch}
+                    referenceTreatment={referenceTreatment}
                     posterEdits={posterEdits}
                     layerOrder={layerOrder}
                     selectedLayerId={selectedLayerId}
                     onSelectLayer={setSelectedLayerId}
                     onToggleLayerVisibility={toggleLayerVisibility}
                     onToggleLayerLock={toggleLayerLock}
+                    onDeleteLayer={deleteLayer}
                     onReorderLayer={(id, direction) => dispatch({ type: "reorderLayer", id, direction })}
+                    onSelectReference={selectReferenceAsset}
+                    onSelectTexture={selectTextureAsset}
                     onToggleReference={() => setReferenceOpen((open) => !open)}
                     onToggleLayers={() => setLayersOpen((open) => !open)}
                   />

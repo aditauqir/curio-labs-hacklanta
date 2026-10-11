@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { DesignState } from "@/lib/design-types";
+import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
+import type { ImportedReference } from "@/lib/image-import-client";
 import {
   POSTER_HEIGHT,
   POSTER_WIDTH,
@@ -16,7 +17,16 @@ import { useLookPlate } from "./use-look-plate";
 
 type Bounds = { x: number; y: number; width: number; height: number };
 type DragMode = "move" | "scale";
-type SelectionMode = "rectangle-select" | "lasso";
+type SelectionMode = "rectangle-select";
+type BrushPoint = { x: number; y: number };
+
+export type BrushStroke = {
+  id: string;
+  points: BrushPoint[];
+  color: string;
+  size: number;
+  opacity: number;
+};
 
 type LayerInteraction = {
   kind: "layer";
@@ -45,7 +55,14 @@ type SelectionInteraction = {
   points: { x: number; y: number }[];
 };
 
-type Interaction = LayerInteraction | PanInteraction | SelectionInteraction;
+type BrushInteraction = {
+  kind: "brush";
+  pointerId: number;
+  strokeId: string;
+  points: BrushPoint[];
+};
+
+type Interaction = LayerInteraction | PanInteraction | SelectionInteraction | BrushInteraction;
 
 type SelectionPreview = {
   mode: SelectionMode;
@@ -59,6 +76,9 @@ type PosterProps = {
   edits?: PosterEdits;
   layerOrder?: string[];
   selectedLayerId?: string | null;
+  referenceImage?: ImportedReference | null;
+  referenceTreatment?: ReferenceTreatment;
+  textureImageUrl?: string | null;
   activeTool?: PosterTool;
   onSelectLayer?: (id: string | null) => void;
   onChangeLayer?: (id: string, patch: Partial<ReturnType<typeof createPosterLayerEdit>>) => void;
@@ -66,6 +86,13 @@ type PosterProps = {
   onDeleteLayer?: (id: string) => void;
   onPickColor?: (value: string) => void;
   onFill?: () => void;
+  brushStrokes?: BrushStroke[];
+  brushColor?: string;
+  brushSize?: number;
+  brushOpacity?: number;
+  onChangeBrushStrokes?: (
+    update: BrushStroke[] | ((current: BrushStroke[]) => BrushStroke[]),
+  ) => void;
 };
 
 function editFor(edits: PosterEdits | undefined, id: string) {
@@ -99,7 +126,7 @@ function boundsForText(item: PosterText): Bounds {
 function transformFor(bounds: Bounds, edit: ReturnType<typeof createPosterLayerEdit>) {
   const cx = bounds.x + bounds.width / 2;
   const cy = bounds.y + bounds.height / 2;
-  return `translate(${edit.x} ${edit.y}) translate(${cx} ${cy}) rotate(${edit.rotation}) scale(${edit.scale}) translate(${-cx} ${-cy})`;
+  return `translate(${edit.x} ${edit.y}) translate(${cx} ${cy}) rotate(${edit.rotation}) scale(${edit.scale * edit.scaleX} ${edit.scale * edit.scaleY}) translate(${-cx} ${-cy})`;
 }
 
 function localPoint(svg: SVGSVGElement, event: ReactPointerEvent<SVGElement>) {
@@ -113,7 +140,13 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function renderShape(shape: PosterShape) {
+function brushPath(points: BrushPoint[]) {
+  if (points.length === 0) return "";
+  const [first, ...rest] = points;
+  return `M ${first.x} ${first.y}${rest.map((point) => ` L ${point.x} ${point.y}`).join("")}`;
+}
+
+function renderShape(shape: PosterShape, edit: ReturnType<typeof createPosterLayerEdit>) {
   if (shape.kind === "rect") {
     return (
       <rect
@@ -121,9 +154,9 @@ function renderShape(shape: PosterShape) {
         y={shape.y}
         width={shape.width}
         height={shape.height}
-        fill={shape.fill ?? "none"}
-        stroke={shape.stroke}
-        strokeWidth={shape.strokeWidth}
+        fill={edit.fill ?? shape.fill ?? "none"}
+        stroke={edit.stroke ?? shape.stroke}
+        strokeWidth={edit.strokeWidth ?? shape.strokeWidth}
         opacity={shape.opacity}
       />
     );
@@ -134,9 +167,9 @@ function renderShape(shape: PosterShape) {
         cx={shape.cx}
         cy={shape.cy}
         r={shape.r}
-        fill={shape.fill ?? "none"}
-        stroke={shape.stroke}
-        strokeWidth={shape.strokeWidth}
+        fill={edit.fill ?? shape.fill ?? "none"}
+        stroke={edit.stroke ?? shape.stroke}
+        strokeWidth={edit.strokeWidth ?? shape.strokeWidth}
         opacity={shape.opacity}
       />
     );
@@ -147,8 +180,8 @@ function renderShape(shape: PosterShape) {
       y1={shape.y1}
       x2={shape.x2}
       y2={shape.y2}
-      stroke={shape.stroke}
-      strokeWidth={shape.strokeWidth}
+      stroke={edit.stroke ?? shape.stroke}
+      strokeWidth={edit.strokeWidth ?? shape.strokeWidth}
       opacity={shape.opacity}
     />
   );
@@ -163,6 +196,16 @@ export function Poster({
   edits,
   layerOrder = [],
   selectedLayerId = null,
+  referenceImage = null,
+  referenceTreatment = {
+    assetId: null,
+    textureAssetId: null,
+    filter: "none",
+    blendMode: "normal",
+    opacity: 0.72,
+    textureOpacity: 0.24,
+  },
+  textureImageUrl = null,
   activeTool = "select",
   onSelectLayer,
   onChangeLayer,
@@ -170,9 +213,15 @@ export function Poster({
   onDeleteLayer,
   onPickColor,
   onFill,
+  brushStrokes = [],
+  brushColor = "#ffffff",
+  brushSize = 24,
+  brushOpacity = 1,
+  onChangeBrushStrokes,
 }: PosterProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const interaction = useRef<Interaction | null>(null);
+  const brushStrokeIndex = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const [selection, setSelection] = useState<SelectionPreview | null>(null);
   const { shapes, texts } = useMemo(() => buildPoster(design), [design]);
@@ -193,6 +242,8 @@ export function Poster({
 
   const selectedBounds = selectedLayerId ? layerBounds.get(selectedLayerId) : undefined;
   const selectedEdit = selectedLayerId ? editFor(edits, selectedLayerId) : null;
+  const referenceFilter =
+    referenceTreatment.filter === "none" ? undefined : `url(#reference-${referenceTreatment.filter})`;
   const layerColors = useMemo(() => {
     const result = new Map<string, string>();
     result.set("background", design.colors.background);
@@ -221,6 +272,30 @@ export function Poster({
     setIsDragging(true);
   }
 
+  function beginBrush(event: ReactPointerEvent<SVGElement>) {
+    const svg = svgRef.current;
+    if (!svg || !onChangeBrushStrokes) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = localPoint(svg, event);
+    const stroke: BrushStroke = {
+      id: `brush-${++brushStrokeIndex.current}`,
+      points: [point],
+      color: brushColor,
+      size: brushSize,
+      opacity: brushOpacity,
+    };
+    onChangeBrushStrokes((current) => [...current, stroke]);
+    interaction.current = {
+      kind: "brush",
+      pointerId: event.pointerId,
+      strokeId: stroke.id,
+      points: [point],
+    };
+    svg.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+  }
+
   function beginSelection(event: ReactPointerEvent<SVGElement>, mode: SelectionMode) {
     const svg = svgRef.current;
     if (!svg) return;
@@ -241,15 +316,15 @@ export function Poster({
   }
 
   function transformedBounds(bounds: Bounds, edit: ReturnType<typeof createPosterLayerEdit>): Bounds {
-    const width = bounds.width * edit.scale;
-    const height = bounds.height * edit.scale;
+    const width = bounds.width * edit.scale * edit.scaleX;
+    const height = bounds.height * edit.scale * edit.scaleY;
     const centerX = bounds.x + bounds.width / 2 + edit.x;
     const centerY = bounds.y + bounds.height / 2 + edit.y;
     return { x: centerX - width / 2, y: centerY - height / 2, width, height };
   }
 
   function selectionBounds(preview: SelectionPreview | SelectionInteraction): Bounds {
-    const points = preview.mode === "lasso" ? preview.points : [preview.start, preview.current];
+    const points = [preview.start, preview.current];
     const xs = points.map((point) => point.x);
     const ys = points.map((point) => point.y);
     const x = Math.min(...xs);
@@ -290,8 +365,12 @@ export function Poster({
       beginPan(event);
       return;
     }
-    if (activeTool === "rectangle-select" || activeTool === "lasso") {
+    if (activeTool === "rectangle-select") {
       beginSelection(event, activeTool);
+      return;
+    }
+    if (activeTool === "brush") {
+      beginBrush(event);
       return;
     }
     event.stopPropagation();
@@ -347,13 +426,21 @@ export function Poster({
     const point = localPoint(svg, event);
     if (current.kind === "selection") {
       current.current = point;
-      if (current.mode === "lasso") current.points = [...current.points, point];
       setSelection({
         mode: current.mode,
         start: current.start,
         current: point,
         points: current.points,
       });
+      return;
+    }
+    if (current.kind === "brush") {
+      current.points = [...current.points, point];
+      onChangeBrushStrokes?.((strokes) =>
+        strokes.map((stroke) =>
+          stroke.id === current.strokeId ? { ...stroke, points: current.points } : stroke,
+        ),
+      );
       return;
     }
     if (!onChangeLayer) return;
@@ -438,13 +525,13 @@ export function Poster({
           x={item.x}
           y={item.y}
           textAnchor={item.anchor}
-          fontSize={item.size}
-          fontWeight={item.weight}
+          fontSize={edit.fontSize ?? item.size}
+          fontWeight={edit.weight ?? item.weight}
           fontStyle={item.italic ? "italic" : "normal"}
-          fill={item.color}
+          fill={edit.fill ?? item.color}
           style={{
             fontFamily: item.font === "heading" ? design.typography.headingFont : design.typography.bodyFont,
-            letterSpacing: item.tracking,
+            letterSpacing: edit.tracking ?? item.tracking,
             whiteSpace: "pre",
           }}
         >
@@ -482,7 +569,7 @@ export function Poster({
                 : "crosshair",
         }}
       >
-        {renderShape(shape)}
+        {renderShape(shape, edit)}
       </g>
     );
   };
@@ -499,6 +586,38 @@ export function Poster({
               width={POSTER_WIDTH}
               height={POSTER_HEIGHT}
               preserveAspectRatio="none"
+            />
+          ) : null}
+          {referenceImage ? (
+            <image
+              href={referenceImage.previewUrl}
+              x="0"
+              y="0"
+              width={POSTER_WIDTH}
+              height={POSTER_HEIGHT}
+              preserveAspectRatio="xMidYMid slice"
+              filter={referenceFilter}
+              opacity={referenceTreatment.opacity}
+              style={{ mixBlendMode: referenceTreatment.blendMode }}
+              pointerEvents="none"
+              data-imported-reference-image="true"
+              data-reference-image="true"
+              aria-label={`Imported reference: ${referenceImage.filename}`}
+            />
+          ) : null}
+          {referenceImage && textureImageUrl && referenceTreatment.textureAssetId ? (
+            <image
+              href={textureImageUrl}
+              x="0"
+              y="0"
+              width={POSTER_WIDTH}
+              height={POSTER_HEIGHT}
+              preserveAspectRatio="xMidYMid slice"
+              opacity={referenceTreatment.textureOpacity}
+              style={{ mixBlendMode: referenceTreatment.blendMode }}
+              pointerEvents="none"
+              data-reference-texture="true"
+              aria-label="Selected reference texture"
             />
           ) : null}
         </g>
@@ -522,8 +641,10 @@ export function Poster({
       onPointerDown={(event) => {
         if (activeTool === "hand") {
           beginPan(event);
-        } else if (activeTool === "rectangle-select" || activeTool === "lasso") {
+        } else if (activeTool === "rectangle-select") {
           beginSelection(event, activeTool);
+        } else if (activeTool === "brush") {
+          beginBrush(event);
         } else if (event.target === event.currentTarget) {
           onSelectLayer?.(null);
         }
@@ -533,8 +654,47 @@ export function Poster({
       onPointerCancel={endInteraction}
       onKeyDown={handleKeyDown}
     >
+      <defs>
+        <filter id="reference-grayscale">
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <filter id="reference-high-contrast">
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="1.35" intercept="-0.16" />
+            <feFuncG type="linear" slope="1.35" intercept="-0.16" />
+            <feFuncB type="linear" slope="1.35" intercept="-0.16" />
+          </feComponentTransfer>
+        </filter>
+        <filter id="reference-duotone">
+          <feColorMatrix
+            type="matrix"
+            values="0.25 0.25 0.25 0 0.08 0.25 0.25 0.25 0 0.1 0.25 0.25 0.25 0 0.12 0 0 0 1 0"
+          />
+        </filter>
+        <filter id="reference-invert">
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="1 0" />
+            <feFuncG type="table" tableValues="1 0" />
+            <feFuncB type="table" tableValues="1 0" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
       {[...orderedLayerIds].reverse().map(renderLayer)}
 
+      {brushStrokes.map((stroke) => (
+        <path
+          key={stroke.id}
+          data-brush-stroke="true"
+          d={brushPath(stroke.points)}
+          fill="none"
+          stroke={stroke.color}
+          strokeWidth={stroke.size}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={stroke.opacity}
+          pointerEvents="none"
+        />
+      ))}
       {look ? (
         <g className="poster-look-finish" pointerEvents="none" aria-hidden="true">
           {visibleLookTextures(look, design.hiddenTextures).map((texture) => (
@@ -552,21 +712,12 @@ export function Poster({
       ) : null}
 
       {selection ? (
-        selection.mode === "lasso" ? (
-          <polyline
-            className="poster-marquee-selection"
-            points={selection.points.map((point) => `${point.x},${point.y}`).join(" ")}
-            fill="rgba(118, 167, 255, 0.08)"
-            pointerEvents="none"
-          />
-        ) : (
-          <rect
-            className="poster-marquee-selection"
-            {...selectionBounds(selection)}
-            fill="rgba(118, 167, 255, 0.08)"
-            pointerEvents="none"
-          />
-        )
+        <rect
+          className="poster-marquee-selection"
+          {...selectionBounds(selection)}
+          fill="rgba(118, 167, 255, 0.08)"
+          pointerEvents="none"
+        />
       ) : null}
 
       {selectedLayerId && selectedBounds && selectedEdit && selectedLayerId !== "background" ? (

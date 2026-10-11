@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "label": "Curio synthetic visual-grammar corpus",
+  "status": "conditioning_examples_only",
+  "disclosure": "These are authored design-system examples for prompt conditioning. They are not scraped data, model training, or claims about any artist's work.",
+  "examples": [
+    {
+      "name": "Receipt ledger",
+      "bestFor": ["restaurant", "market", "menu"],
+      "composition": "dense left rail with a quiet right field and a small anchored footer",
+      "typeSystem": "condensed grotesk headline, tabular numerals, tiny monospace annotations",
+      "shapeLanguage": "receipt rules, crop marks, clipped blocks",
+      "colorLogic": "warm paper, ink black, one food-color accent",
+      "rhythm": "compressed information at the top, generous pause before details"
+    },
+    {
+      "name": "Sun slice",
+      "bestFor": ["restaurant", "bakery", "summer event"],
+      "composition": "oversized diagonal wedge crossing the page with copy tucked under its edge",
+      "typeSystem": "friendly display serif paired with compact sans-serif labels",
+      "shapeLanguage": "soft arcs and offset paper slabs",
+      "colorLogic": "butter yellow, tomato, turquoise, dark plum",
+      "rhythm": "one dominant gesture, then short bursts of copy"
+    },
+    {
+      "name": "Window grid",
+      "bestFor": ["restaurant", "retail", "editorial"],
+      "composition": "asymmetric modular grid with one oversized empty cell",
+      "typeSystem": "wide grotesk headline with narrow body copy and numeric captions",
+      "shapeLanguage": "thin window rules, one solid corner block",
+      "colorLogic": "cool grey field, mineral green, warm orange signal",
+      "rhythm": "repeating modules interrupted by one deliberate gap"
+    },
+    {
+      "name": "Handbill burst",
+      "bestFor": ["festival", "opening", "night market"],
+      "composition": "stacked type bursts from a low corner with a rotated event stamp",
+      "typeSystem": "heavy grotesk at three scales, condensed details, rotated microcopy",
+      "shapeLanguage": "stamps, rays, torn rectangles",
+      "colorLogic": "ink black, signal red, faded cream, cobalt",
+      "rhythm": "hard jumps between scales rather than a smooth hierarchy"
+    },
+    {
+      "name": "Orbit diagram",
+      "bestFor": ["music", "technology", "night event"],
+      "composition": "small type nucleus with large off-canvas orbital geometry",
+      "typeSystem": "geometric sans-serif with widely tracked metadata",
+      "shapeLanguage": "ellipses, crossing lines, partial rings",
+      "colorLogic": "deep blue field, acid chartreuse, pale lavender",
+      "rhythm": "quiet center, kinetic perimeter"
+    },
+    {
+      "name": "Cut-up archive",
+      "bestFor": ["editorial", "gallery", "artist release"],
+      "composition": "overlapping cards with text split across two unrelated alignments",
+      "typeSystem": "expressive serif title, neutral sans body, tiny archival index",
+      "shapeLanguage": "paper cards, masking bands, uneven crop windows",
+      "colorLogic": "aged white, oxblood, dusty blue, graphite",
+      "rhythm": "layered and tactile, with visible overlaps"
+    },
+    {
+      "name": "Kinetic staircase",
+      "bestFor": ["dance", "launch", "sale"],
+      "composition": "headline steps across the page while details counter-step below",
+      "typeSystem": "bold italic grotesk with compressed utility text",
+      "shapeLanguage": "short bars, stair-step blocks, sharp underlines",
+      "colorLogic": "electric violet, citrus, black, soft grey",
+      "rhythm": "repeated offset increments create motion without centering"
+    },
+    {
+      "name": "Quiet monument",
+      "bestFor": ["fine dining", "museum", "luxury product"],
+      "composition": "single tall text column balanced by a low horizontal anchor",
+      "typeSystem": "high-contrast serif with restrained small caps",
+      "shapeLanguage": "one hairline, one measured block, no decorative circle",
+      "colorLogic": "chalk, espresso, muted copper, fog",
+      "rhythm": "large quiet field and precise small details"
+    },
+    {
+      "name": "Signal stack",
+      "bestFor": ["concert", "club", "technology"],
+      "composition": "oversized title cropped by the frame with details pinned to opposing edges",
+      "typeSystem": "variable-width grotesk, compressed label row, mono coordinates",
+      "shapeLanguage": "hard bars, scan lines, one offset notch",
+      "colorLogic": "near-black, hot coral, pale mint, ultraviolet",
+      "rhythm": "high contrast and intentional collisions"
+    },
+    {
+      "name": "Table map",
+      "bestFor": ["restaurant", "food", "community event"],
+      "composition": "wide table-like grid with the headline occupying a side seat",
+      "typeSystem": "humanist sans headline, menu-style labels, handwritten accent only for one word",
+      "shapeLanguage": "table cells, rounded tabs, ingredient-like dots",
+      "colorLogic": "herb green, cream, paprika, charcoal",
+      "rhythm": "ordered rows with one playful interruption"
+    },
+    {
+      "name": "Poster as object",
+      "bestFor": ["experimental", "brand", "editorial"],
+      "composition": "small centered information surrounded by an oversized cropped object",
+      "typeSystem": "neutral grotesk with one enormous low-weight word",
+      "shapeLanguage": "one abstract object, hard crop, thin registration marks",
+      "colorLogic": "generated from the brief's most specific color cue",
+      "rhythm": "deliberate imbalance and an unexpected empty corner"
+    }
+  ]
+}

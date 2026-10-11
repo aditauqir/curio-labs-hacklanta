@@ -24,12 +24,14 @@ import {
   LockOpen,
   MagicWand,
   MagnifyingGlass,
+  Minus,
   Microphone,
   MicrophoneSlash,
   PaintBrush,
   PaintBucket,
   Palette,
   PaperPlaneTilt,
+  Plus,
   RectangleDashed,
   Sidebar,
   SidebarSimple,
@@ -204,6 +206,14 @@ export function HandIcon({ className }: IconProps) {
 
 export function ZoomIcon({ className }: IconProps) {
   return <MagnifyingGlass {...phosphorProps} className={className} />;
+}
+
+export function MinusIcon({ className }: IconProps) {
+  return <Minus {...phosphorProps} className={className} />;
+}
+
+export function PlusIcon({ className }: IconProps) {
+  return <Plus {...phosphorProps} className={className} />;
 }
 
 export function LayersIcon({ className }: IconProps) {

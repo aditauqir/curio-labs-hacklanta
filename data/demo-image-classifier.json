@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "kind": "demo-image-routing-seed",
+  "trained": false,
+  "reviewMethod": "human visual review of three public demo images",
+  "purpose": "Small, inspectable routing seed for restaurant and music-festival demos. This is not model training and does not claim that pixels were classified by Gemini or Antigravity.",
+  "licenseNote": "Source URLs are retained for attribution and license review before production use.",
+  "images": [
+    {
+      "id": "demo-kebab-shop",
+      "sourceFile": "kebab-shop.jpg",
+      "sourceUrl": "https://unsplash.com/s/photos/kebab-shop",
+      "useCase": "restaurant",
+      "subjectTags": ["kebab", "street-food", "storefront", "menu-photography"],
+      "compositionTags": ["vertical-signage", "dark-field", "centered-subject"],
+      "colorTags": ["olive-green", "cream", "black"],
+      "confidence": 0.96
+    },
+    {
+      "id": "demo-kebab-night",
+      "sourceFile": "kebab-night.jpg",
+      "sourceUrl": "https://unsplash.com/photos/a-brightly-lit-fast-food-restaurant-at-night-1UJ9KLaK3bo",
+      "useCase": "restaurant",
+      "subjectTags": ["kebab", "fast-food", "restaurant", "night storefront"],
+      "compositionTags": ["facade", "wide storefront", "signage"],
+      "colorTags": ["red", "orange", "cyan", "black"],
+      "confidence": 0.98
+    },
+    {
+      "id": "demo-festival-crowd",
+      "sourceFile": "festival-crowd.jpg",
+      "sourceUrl": "https://unsplash.com/photos/a-crowd-of-people-watching-a-concert-on-stage-o7wPTlBgQ98",
+      "useCase": "music-festival",
+      "subjectTags": ["music", "festival", "concert", "crowd", "stage"],
+      "compositionTags": ["crowd-foreground", "stage-background", "wide-scene"],
+      "colorTags": ["orange", "magenta", "blue", "black"],
+      "confidence": 0.99
+    }
+  ],
+  "routingRules": {
+    "restaurant": ["restaurant", "kebab", "street-food", "storefront", "menu-photography", "fast-food"],
+    "music-festival": ["music", "festival", "concert", "crowd", "stage"]
+  }
+}

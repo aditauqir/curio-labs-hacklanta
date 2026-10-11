@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logDatabaseFailure } from "@/lib/db";
 import { getAccountContext } from "@/lib/instance";
+import { listInstancePipelineAssets, type PipelineAssetSummary } from "@/lib/pipeline/store";
 import {
   createLibraryAsset,
   LIBRARY_KINDS,
@@ -20,6 +21,11 @@ function safeText(value: FormDataEntryValue | null, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function assetLimit(request: Request) {
+  const raw = Number(new URL(request.url).searchParams.get("limit"));
+  return Number.isFinite(raw) ? Math.min(200, Math.max(1, Math.floor(raw))) : 60;
+}
+
 export async function GET(request: Request) {
   const kind = new URL(request.url).searchParams.get("kind");
   if (kind && !(LIBRARY_KINDS as readonly string[]).includes(kind)) {
@@ -27,8 +33,19 @@ export async function GET(request: Request) {
   }
   try {
     const instance = await getAccountContext();
+    const assets = await listLibraryAssets(kind as LibraryKind | undefined, assetLimit(request), instance.id);
+    let pipelineAssets: PipelineAssetSummary[] = [];
+    if (!kind) {
+      try {
+        pipelineAssets = await listInstancePipelineAssets(instance.id);
+      } catch {
+        // Keep the legacy library usable while a deployment is migrating the
+        // pipeline tables.
+        logDatabaseFailure("list pipeline assets");
+      }
+    }
     return NextResponse.json(
-      { assets: await listLibraryAssets(kind as LibraryKind | undefined, 60, instance.id) },
+      { assets, pipelineAssets },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {

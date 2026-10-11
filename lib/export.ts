@@ -74,7 +74,7 @@ function withLayerTransform(
   const cy = bounds.y + bounds.height / 2;
   ctx.translate(edit.x + cx, edit.y + cy);
   ctx.rotate((edit.rotation * Math.PI) / 180);
-  ctx.scale(edit.scale, edit.scale);
+  ctx.scale(edit.scale * edit.scaleX, edit.scale * edit.scaleY);
   ctx.translate(-cx, -cy);
   ctx.globalAlpha *= edit.opacity;
 }
@@ -86,32 +86,32 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: PosterShape, edit: Post
 
   if (shape.kind === "rect") {
     if (shape.fill) {
-      ctx.fillStyle = shape.fill;
+      ctx.fillStyle = edit.fill ?? shape.fill;
       ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
     }
     if (shape.stroke) {
-      ctx.strokeStyle = shape.stroke;
-      ctx.lineWidth = shape.strokeWidth;
+      ctx.strokeStyle = edit.stroke ?? shape.stroke;
+      ctx.lineWidth = edit.strokeWidth ?? shape.strokeWidth;
       ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
     }
   } else if (shape.kind === "circle") {
     ctx.beginPath();
     ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2);
     if (shape.fill) {
-      ctx.fillStyle = shape.fill;
+      ctx.fillStyle = edit.fill ?? shape.fill;
       ctx.fill();
     }
     if (shape.stroke) {
-      ctx.strokeStyle = shape.stroke;
-      ctx.lineWidth = shape.strokeWidth;
+      ctx.strokeStyle = edit.stroke ?? shape.stroke;
+      ctx.lineWidth = edit.strokeWidth ?? shape.strokeWidth;
       ctx.stroke();
     }
   } else {
     ctx.beginPath();
     ctx.moveTo(shape.x1, shape.y1);
     ctx.lineTo(shape.x2, shape.y2);
-    ctx.strokeStyle = shape.stroke;
-    ctx.lineWidth = shape.strokeWidth;
+    ctx.strokeStyle = edit.stroke ?? shape.stroke;
+    ctx.lineWidth = edit.strokeWidth ?? shape.strokeWidth;
     ctx.stroke();
   }
 
@@ -128,8 +128,10 @@ function drawText(
   ctx.save();
   withLayerTransform(ctx, boundsForText(item), edit);
   const family = item.font === "heading" ? headingStack : bodyStack;
-  ctx.font = `${item.italic ? "italic " : ""}${item.weight} ${item.size}px ${family}`;
-  ctx.fillStyle = item.color;
+  const fontSize = edit.fontSize ?? item.size;
+  const tracking = edit.tracking ?? item.tracking;
+  ctx.font = `${item.italic ? "italic " : ""}${edit.weight ?? item.weight} ${fontSize}px ${family}`;
+  ctx.fillStyle = edit.fill ?? item.color;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
@@ -138,12 +140,12 @@ function drawText(
   let width: number;
 
   if (nativeSpacing) {
-    ctx.letterSpacing = `${item.tracking}px`;
+    ctx.letterSpacing = `${tracking}px`;
     width = ctx.measureText(item.text).width;
   } else {
     width =
       [...item.text].reduce((total, char) => total + ctx.measureText(char).width, 0) +
-      item.tracking * item.text.length;
+      tracking * item.text.length;
   }
 
   const startX =
@@ -159,7 +161,7 @@ function drawText(
   let cursor = startX;
   for (const char of item.text) {
     ctx.fillText(char, cursor, item.y);
-    cursor += ctx.measureText(char).width + item.tracking;
+    cursor += ctx.measureText(char).width + tracking;
   }
   ctx.restore();
 }

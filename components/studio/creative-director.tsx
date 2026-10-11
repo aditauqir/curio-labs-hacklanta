@@ -8,11 +8,18 @@ import {
   type FormEvent,
 } from "react";
 import { Wave } from "loading-dev";
-import type { AssetSuggestion, ChatMessage, DesignState } from "@/lib/design-types";
+import type { AssetSuggestion, ChatMessage, DesignState, ReferenceTreatment } from "@/lib/design-types";
 import { describePatch, patchToActions } from "@/lib/ai-patch";
 import { directionConfigs } from "@/lib/design-presets";
 import { interpretRequest } from "@/lib/demo-director";
 import { askDirector, DirectorError } from "@/lib/director-client";
+import {
+  generateStudioPipeline,
+  pipelineAssetSuggestions,
+  pipelineChangeLabels,
+  pipelineFollowUps,
+  pipelineResultToActions,
+} from "@/lib/studio-pipeline-client";
 import {
   createDefaultState,
   makeId,
@@ -30,37 +37,20 @@ import { MessageActions } from "./message-actions";
 
 const MAX_MESSAGE = 500;
 
+function isBriefShapedRequest(content: string) {
+  const words = content.trim().split(/\s+/).filter(Boolean);
+  return (
+    words.length >= 8 ||
+    (words.length >= 3 &&
+      /\b(poster|identity|brief|restaurant|market|festival|launch|editorial|packaging|campaign|menu)\b/i.test(content))
+  );
+}
+
 const SOURCE_LABEL: Record<NonNullable<ChatMessage["source"]>, string> = {
   example: "Example conversation",
   demo: "Curio",
   gemini: "AI direction",
 };
-
-const PROMPTS: Record<DesignState["direction"], string[]> = {
-  vintage: [
-    "Make it more minimal but keep the layout",
-  ],
-  minimal: [
-    "Make it warmer and more vintage, but keep the layout",
-  ],
-  experimental: [
-    "Make it warmer and more vintage, but keep the layout",
-  ],
-};
-
-function ensureQuestion(reply: string, design: DesignState) {
-  const clean = reply.trim();
-  if (/[?？]$/.test(clean)) return clean;
-
-  const question =
-    design.direction === "vintage"
-      ? "Should we keep this warm direction, or push it somewhere sharper?"
-      : design.direction === "minimal"
-        ? "Should I keep this quiet and minimal, or push the contrast further?"
-        : "Should we keep this experimental tension, or make the hierarchy calmer?";
-
-  return `${clean} ${question}`;
-}
 
 type Outcome = {
   reply: string;
@@ -71,6 +61,8 @@ type Outcome = {
   skipped?: string[];
   notice?: string;
   assets?: AssetSuggestion[];
+  followUps?: string[];
+  groundingSources?: ChatMessage["groundingSources"];
 };
 
 export function CreativeDirector({
@@ -79,7 +71,9 @@ export function CreativeDirector({
   selectedPaletteId,
   posterEdits,
   layerOrder,
+  referenceTreatment,
   dispatch,
+  dispatchBatch,
   initialPrompt,
 }: {
   messages: ChatMessage[];
@@ -87,7 +81,9 @@ export function CreativeDirector({
   selectedPaletteId: string | null;
   posterEdits: PosterEdits;
   layerOrder: string[];
+  referenceTreatment: ReferenceTreatment;
   dispatch: Dispatch<StudioAction>;
+  dispatchBatch: (actions: StudioAction[]) => void;
   initialPrompt?: string | null;
 }) {
   const capabilities = useCapabilities();
@@ -126,8 +122,37 @@ export function CreativeDirector({
         changes: result.changes,
         source: "demo" as const,
         suggestions: result.suggestions,
+        notice: "Gemini was not used for this message. Curio applied its small offline safety fallback.",
       };
     };
+
+    const isFreshBrief =
+      messages.length === 0 &&
+      (!initialPrompt || initialPrompt === content) &&
+      isBriefShapedRequest(content);
+    if (isFreshBrief && capabilities.gemini) {
+      try {
+        const pipeline = await generateStudioPipeline(content);
+        const actions = pipelineResultToActions(pipeline);
+        const providerIsGemini = pipeline.provider === "gemini";
+        return {
+          reply: pipeline.canvasAsset
+            ? `I translated this into ${pipeline.selectedConcept.title} and attached the generated output so you can refine it.`
+            : `I translated this into ${pipeline.selectedConcept.title}. I used the Curio library for direction only, so the canvas stays editable with type and shapes until you choose an image.`,
+          actions,
+          changes: pipelineChangeLabels(pipeline),
+          source: providerIsGemini ? "gemini" : "demo",
+          assets: pipelineAssetSuggestions(pipeline),
+          followUps: pipelineFollowUps(pipeline),
+          notice: pipeline.python.available
+            ? "Gemini set the direction and the Python raster engine returned the visual output."
+            : "Gemini used TigerData reference metadata for direction only. No library image was placed; the Python raster renderer is not configured on this local server yet.",
+        };
+      } catch {
+        // The existing director/fallback path remains the safe recovery path
+        // if the staged generation request is unavailable.
+      }
+    }
 
     if (!capabilities.gemini) return local();
 
@@ -137,13 +162,39 @@ export function CreativeDirector({
         design,
         paletteId: selectedPaletteId,
         posterEdits,
+        referenceTreatment,
         history,
       });
       const actions = patchToActions(ai.patch);
+      const fallback = local();
+      const startsBrief = fallback.actions.some(
+        (action) => action.type === "setCopy" && action.key === "projectName",
+      );
+      const modelSetsProjectName = actions.some(
+        (action) => action.type === "setCopy" && action.key === "projectName",
+      );
+      if (startsBrief && !modelSetsProjectName) {
+        const modelCopyKeys = new Set(
+          actions
+            .filter((action) => action.type === "setCopy")
+            .map((action) => action.key),
+        );
+        const starterActions = fallback.actions.filter(
+          (action) => action.type !== "setCopy" || !modelCopyKeys.has(action.key),
+        );
+        return {
+          reply: ai.reply,
+          actions: [...actions, ...starterActions],
+          changes: [...describePatch(ai.patch), ...fallback.changes],
+          source: "gemini",
+          skipped: ai.skipped,
+          assets: ai.assets,
+          notice: "Curio completed the starter brief fields so the new idea has a usable canvas.",
+        };
+      }
       // Gemini can occasionally answer correctly in prose but omit the
       // structured patch. Keep the interaction honest, but still make a
       // recognizable request such as "make it more modern" change the poster.
-      const fallback = local();
       if (actions.length === 0 && fallback.actions.length > 0) {
         return {
           ...fallback,
@@ -158,14 +209,19 @@ export function CreativeDirector({
         source: "gemini",
         skipped: ai.skipped,
         assets: ai.assets,
+        followUps: ai.followUps,
+        groundingSources: ai.groundingSources,
       };
     } catch (failure) {
       const limited = failure instanceof DirectorError && failure.status === 429;
       return {
         ...local(),
-        notice: limited
-          ? "Curio is using a fallback for this change."
-          : "Curio is using a fallback for this change.",
+        notice:
+          failure instanceof DirectorError && failure.code === "grounding_unavailable"
+            ? "Gemini Search grounding is unavailable for this API key or model, so no web research was used."
+            : limited
+              ? "Curio is using a fallback for this change."
+              : "Curio is using a fallback for this change.",
       };
     }
   }
@@ -185,12 +241,12 @@ export function CreativeDirector({
 
     try {
       const outcome = await interpret(content);
-      const reply = ensureQuestion(outcome.reply, design);
+      const reply = outcome.reply.trim();
       const appliedState = outcome.actions.reduce<StudioState>(
         (next, action) => studioReducer(next, action),
-        { design, messages, selectedPaletteId, posterEdits, layerOrder },
+        { design, messages, selectedPaletteId, posterEdits, layerOrder, referenceTreatment },
       );
-      for (const action of outcome.actions) dispatch(action);
+      dispatchBatch(outcome.actions);
       dispatch({
         type: "addMessages",
         messages: [
@@ -204,11 +260,14 @@ export function CreativeDirector({
             skipped: outcome.skipped?.length ? outcome.skipped : undefined,
             notice: outcome.notice,
             assetSuggestions: outcome.assets,
+            followUps: outcome.followUps,
+            groundingSources: outcome.groundingSources,
             checkpoint: {
               design: appliedState.design,
               selectedPaletteId: appliedState.selectedPaletteId,
               posterEdits: appliedState.posterEdits,
               layerOrder: appliedState.layerOrder,
+              referenceTreatment: appliedState.referenceTreatment,
             },
           },
         ],
@@ -247,12 +306,13 @@ export function CreativeDirector({
     const checkpoint =
       message.checkpoint ??
       (messageIndex === messages.length - 1
-        ? { design, selectedPaletteId, posterEdits, layerOrder }
+        ? { design, selectedPaletteId, posterEdits, layerOrder, referenceTreatment }
         : {
             design: fallback.design,
             selectedPaletteId: fallback.selectedPaletteId,
             posterEdits: fallback.posterEdits,
             layerOrder: fallback.layerOrder,
+            referenceTreatment: fallback.referenceTreatment,
           });
 
     dispatch({
@@ -263,6 +323,7 @@ export function CreativeDirector({
         selectedPaletteId: checkpoint.selectedPaletteId,
         posterEdits: checkpoint.posterEdits,
         layerOrder: checkpoint.layerOrder,
+        referenceTreatment: checkpoint.referenceTreatment,
       },
     });
     setStartFromHereId(messageId);
@@ -473,8 +534,36 @@ export function CreativeDirector({
               ) : null}
               {message.assetSuggestions && message.assetSuggestions.length > 0 ? (
                 <p className="mt-2 text-[11px] text-muted">
-                  Related references: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
+                  Related assets: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
                 </p>
+              ) : null}
+              {message.groundingSources && message.groundingSources.length > 0 ? (
+                <p className="mt-2 text-[11px] text-muted">
+                  Web research: {message.groundingSources.slice(0, 4).map((source, index) => (
+                    <span key={source.url}>
+                      {index > 0 ? ", " : ""}
+                      <a href={source.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
+                        {source.title || "source"}
+                      </a>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+              {message.id === lastId && message.followUps && message.followUps.length > 0 ? (
+                <div className="studio-chip-row mt-3 flex flex-wrap gap-2" aria-label="Suggested next moves">
+                  {message.followUps.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => void send(prompt)}
+                      className="studio-prompt-chip rounded-md border border-line px-2.5 py-1.5 text-left text-[11px] leading-snug text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-40"
+                    >
+                      <ArrowBendDownRightIcon className="studio-prompt-chip-icon" />
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               ) : null}
               {message.id === lastId && message.suggestions?.length ? (
                 <div className="studio-chip-row mt-3 flex flex-wrap gap-2">
@@ -499,21 +588,6 @@ export function CreativeDirector({
       </div>
 
       <div className="studio-chat-footer border-t border-line px-5 pb-5 pt-4">
-        <div className="director-prompt-row mb-3 flex flex-wrap gap-1.5">
-          {PROMPTS[design.direction].map((prompt) => (
-            <button
-              key={prompt}
-              type="button"
-              disabled={pending}
-              onClick={() => void send(prompt)}
-              className="studio-prompt-chip rounded-md border border-line px-2.5 py-1.5 text-left text-[11px] leading-snug text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-40"
-            >
-              <ArrowBendDownRightIcon className="studio-prompt-chip-icon" />
-              {prompt}
-            </button>
-          ))}
-        </div>
-
         <div className="director-composer-shell">
           {chatComposer}
         </div>

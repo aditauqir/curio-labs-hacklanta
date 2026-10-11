@@ -1,8 +1,8 @@
 "use client";
 
-import type { Dispatch, ReactNode } from "react";
+import { useEffect, useState, type Dispatch, type ReactNode } from "react";
 import Image from "next/image";
-import type { DesignState } from "@/lib/design-types";
+import type { DesignState, ReferenceTreatment } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
 import type { ImportedReference } from "@/lib/image-import-client";
@@ -10,6 +10,177 @@ import { referenceLooks, type ReferenceLook } from "@/lib/reference-looks";
 import { ColorPaletteSelector } from "./color-palette-selector";
 import { CreativeBrief } from "./creative-brief";
 import { TypographySelector } from "./typography-selector";
+
+const THUMBNAIL_THEMES = [
+  { background: "#E8D9BF", ink: "#2B2723", accent: "#D8784C" },
+  { background: "#F7F7F4", ink: "#171717", accent: "#171717" },
+  { background: "#151719", ink: "#F2EEE6", accent: "#C9F05D" },
+  { background: "#E9E0F2", ink: "#1C1724", accent: "#7D45B7" },
+  { background: "#D8E5EB", ink: "#10212A", accent: "#D44B3D" },
+  { background: "#F0D8D2", ink: "#351D1B", accent: "#C52F54" },
+];
+
+type LoadedLibraryAsset = {
+  id: string;
+  kind: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  sourceUrl: string | null;
+  contentType?: string | null;
+  sizeBytes?: number | null;
+};
+
+type LoadedPipelineAsset = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  conceptId: string | null;
+  type: string;
+  role: string;
+  description: string;
+  source: string;
+  status: string;
+  note: string;
+};
+
+type DisplayReference = {
+  id: string;
+  assetId: string;
+  kind: "reference" | "image";
+  title: string;
+  category: string;
+  source: string;
+  sourceUrl: string;
+  imageUrl: string | null;
+};
+
+function isLoadedLibraryAsset(value: unknown): value is LoadedLibraryAsset {
+  if (typeof value !== "object" || value === null) return false;
+  const asset = value as Record<string, unknown>;
+  return (
+    typeof asset.id === "string" &&
+    typeof asset.kind === "string" &&
+    typeof asset.name === "string" &&
+    (asset.description === null || typeof asset.description === "string") &&
+    Array.isArray(asset.tags) &&
+    asset.tags.every((tag) => typeof tag === "string") &&
+    typeof asset.metadata === "object" &&
+    asset.metadata !== null &&
+    !Array.isArray(asset.metadata) &&
+    (asset.sourceUrl === null || typeof asset.sourceUrl === "string") &&
+    (asset.contentType === undefined || asset.contentType === null || typeof asset.contentType === "string") &&
+    (asset.sizeBytes === undefined || asset.sizeBytes === null || typeof asset.sizeBytes === "number")
+  );
+}
+
+function isLoadedPipelineAsset(value: unknown): value is LoadedPipelineAsset {
+  if (typeof value !== "object" || value === null) return false;
+  const asset = value as Record<string, unknown>;
+  return (
+    typeof asset.id === "string" &&
+    typeof asset.projectId === "string" &&
+    typeof asset.projectName === "string" &&
+    (asset.conceptId === null || typeof asset.conceptId === "string") &&
+    typeof asset.type === "string" &&
+    typeof asset.role === "string" &&
+    typeof asset.description === "string" &&
+    typeof asset.source === "string" &&
+    typeof asset.status === "string" &&
+    typeof asset.note === "string"
+  );
+}
+
+function imageUrlForAsset(asset: LoadedLibraryAsset) {
+  if (asset.contentType?.startsWith("image/") && (asset.sizeBytes ?? 0) > 0) {
+    return `/api/assets/${encodeURIComponent(asset.id)}`;
+  }
+
+  for (const key of ["previewUrl", "imageUrl", "assetUrl"]) {
+    const value = asset.metadata[key];
+    if (typeof value === "string" && value.startsWith("/")) return value;
+  }
+  return null;
+}
+
+function referenceCardsFromLibrary(assets: LoadedLibraryAsset[]): DisplayReference[] {
+  return assets.map((asset) => {
+    const referenceId = typeof asset.metadata.referenceId === "string" ? asset.metadata.referenceId : null;
+    const fallback = referenceCards.find(
+      (card) => card.id === referenceId || asset.id === `reference:${card.id}`,
+    );
+    return {
+      id: asset.id,
+      assetId: asset.id,
+      kind: asset.kind === "image" ? "image" : "reference",
+      title: asset.name || fallback?.title || "Curio reference",
+      category: asset.description || fallback?.category || "Curio library reference",
+      source: fallback?.source || "Curio library",
+      sourceUrl: asset.sourceUrl || fallback?.sourceUrl || "",
+      imageUrl: imageUrlForAsset(asset) ?? fallback?.thumbnail ?? null,
+    };
+  });
+}
+
+function ReferenceThumb({ index, imageUrl, title }: { index: number; imageUrl?: string | null; title?: string }) {
+  if (imageUrl) {
+    return (
+      <Image
+        src={imageUrl}
+        alt={title ? `${title} reference` : "Curio reference"}
+        width={320}
+        height={220}
+        unoptimized
+        className="block h-full w-full object-cover"
+      />
+    );
+  }
+
+  const theme = THUMBNAIL_THEMES[index % THUMBNAIL_THEMES.length];
+  const geometry = index % 4;
+
+  return (
+    <svg
+      viewBox="0 0 160 110"
+      aria-hidden="true"
+      className="block h-auto w-full"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <rect width="160" height="110" fill={theme.background} />
+      <rect x="8" y="8" width="144" height="94" fill="none" stroke={theme.ink} strokeWidth="1" opacity="0.5" />
+      <rect x="16" y="18" width={32 + (index % 3) * 11} height="5" fill={theme.ink} />
+      <rect x="16" y="29" width={66 + (index % 4) * 12} height="3" fill={theme.ink} opacity="0.55" />
+      {geometry === 0 ? (
+        <>
+          <circle cx="116" cy="61" r={25 + (index % 3) * 5} fill="none" stroke={theme.accent} strokeWidth="4" />
+          <circle cx="116" cy="61" r="7" fill={theme.accent} />
+        </>
+      ) : null}
+      {geometry === 1 ? (
+        <>
+          <rect x="18" y="49" width="74" height="13" fill={theme.ink} />
+          <rect x="18" y="68" width="47" height="13" fill={theme.accent} />
+          <rect x="104" y="40" width="23" height="48" fill={theme.accent} opacity="0.85" />
+        </>
+      ) : null}
+      {geometry === 2 ? (
+        <>
+          <rect x="16" y="45" width="6" height="49" fill={theme.accent} />
+          <path d="M34 88 L78 36 L126 88 Z" fill="none" stroke={theme.accent} strokeWidth="4" />
+          <circle cx="126" cy="22" r="13" fill={theme.ink} />
+        </>
+      ) : null}
+      {geometry === 3 ? (
+        <>
+          <rect x="17" y="46" width="115" height="37" fill={theme.accent} opacity="0.9" />
+          <rect x="27" y="55" width="92" height="8" fill={theme.background} />
+          <rect x="27" y="69" width="55" height="5" fill={theme.ink} />
+        </>
+      ) : null}
+    </svg>
+  );
+}
 
 /** A CSS preview of a look: its screen as a dot or line field, or its gradient map. */
 function lookSwatchStyle(look: ReferenceLook) {
@@ -54,14 +225,91 @@ export function InspirationBoard({
   dispatch,
   compact = false,
   importedReference,
+  referenceTreatment,
+  onSelectReference,
+  onSelectTexture,
 }: {
   design: DesignState;
   selectedPaletteId: string | null;
   dispatch: Dispatch<StudioAction>;
   compact?: boolean;
   importedReference?: ImportedReference | null;
+  referenceTreatment?: ReferenceTreatment;
+  onSelectReference?: (assetId: string, title: string, imageUrl: string) => void;
+  onSelectTexture?: (assetId: string) => void;
 }) {
   const fontPair = getFontPair(design.typography.id);
+  const [libraryAssets, setLibraryAssets] = useState<LoadedLibraryAsset[]>([]);
+  const [pipelineAssets, setPipelineAssets] = useState<LoadedPipelineAsset[]>([]);
+  const [libraryStatus, setLibraryStatus] = useState<"loading" | "ready" | "fallback">("loading");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const assetRequests = [
+      "/api/assets",
+      "/api/assets?kind=image&limit=200",
+      "/api/assets?kind=reference",
+      "/api/assets?kind=palette",
+    ];
+
+    Promise.allSettled(
+      assetRequests.map(async (url) => {
+        const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error(`library:${response.status}`);
+        return (await response.json()) as { assets?: unknown; pipelineAssets?: unknown };
+      }),
+    ).then((results) => {
+      const payloads = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+      const assets = [
+        ...new Map(
+          payloads
+            .flatMap((json) => (Array.isArray(json.assets) ? json.assets.filter(isLoadedLibraryAsset) : []))
+            .map((asset) => [asset.id, asset] as const),
+        ).values(),
+      ];
+      const loadedPipelineAssets = payloads.flatMap((json) =>
+        Array.isArray(json.pipelineAssets) ? json.pipelineAssets.filter(isLoadedPipelineAsset) : [],
+      );
+      setLibraryAssets(assets);
+      setPipelineAssets(loadedPipelineAssets);
+      setLibraryStatus(assets.length > 0 ? "ready" : "fallback");
+    });
+
+    return () => controller.abort();
+  }, []);
+
+  const libraryReferences = referenceCardsFromLibrary(
+    libraryAssets.filter(
+      (asset) => asset.kind === "reference" || (asset.kind === "image" && !asset.tags.includes("engine-texture")),
+    ),
+  );
+  const localReferenceCards: DisplayReference[] = referenceCards.map((card) => ({
+    ...card,
+    assetId: `reference:${card.id}`,
+    kind: "reference",
+    imageUrl: card.thumbnail,
+  }));
+  const imageReferenceCards = libraryReferences.filter((card) => card.kind === "image");
+  const libraryImageReferences = libraryReferences.filter((card) => card.kind !== "image" && card.imageUrl);
+  const visibleReferenceCards = libraryImageReferences.length > 0 ? libraryImageReferences : localReferenceCards;
+  const loadedFonts = libraryAssets.filter((asset) => asset.kind === "font");
+  const loadedPalettes = libraryAssets.filter((asset) => asset.kind === "palette");
+  const loadedReferences = libraryAssets.filter(
+    (asset) => asset.kind === "reference" || (asset.kind === "image" && !asset.tags.includes("engine-texture")),
+  );
+  const loadedTextureCards = libraryAssets
+    .filter((asset) => asset.kind === "image" && asset.tags.includes("engine-texture"))
+    .map((asset) => ({ asset, imageUrl: imageUrlForAsset(asset) }))
+    .filter((item): item is { asset: LoadedLibraryAsset; imageUrl: string } => Boolean(item.imageUrl));
+  const loadedAssetCount = libraryAssets.length + pipelineAssets.length;
+  const libraryLabel =
+    libraryStatus === "ready"
+      ? `${loadedAssetCount} loaded`
+      : libraryStatus === "loading"
+        ? "Loading"
+        : pipelineAssets.length > 0
+          ? `${pipelineAssets.length} pipeline loaded`
+          : "Local fallback";
 
   if (compact) {
     return (
@@ -95,22 +343,85 @@ export function InspirationBoard({
             <span>{fontPair.body}</span>
           </div>
         </div>
+        <div className="studio-compact-reference-section" aria-labelledby="compact-library-heading">
+          <div className="studio-compact-reference-section-heading">
+            <span id="compact-library-heading">Loaded assets</span>
+            <span>{libraryLabel}</span>
+          </div>
+          <ul className="flex flex-wrap gap-1.5" aria-label="Loaded Curio assets">
+            {[...loadedFonts.slice(0, 2), ...loadedPalettes.slice(0, 2), ...loadedReferences.slice(0, 2)].map((asset) => (
+              <li key={asset.id} className="rounded-full border border-line px-2 py-1 text-[10px] text-muted">
+                {asset.name}
+              </li>
+            ))}
+            {pipelineAssets.slice(0, 4).map((asset) => (
+              <li
+                key={`${asset.projectId}:${asset.id}`}
+                className="rounded-full border border-line px-2 py-1 text-[10px] text-muted"
+                title={`${asset.description} · ${asset.source} · ${asset.status}`}
+              >
+                {asset.projectName} · {asset.role}
+              </li>
+            ))}
+            {libraryStatus === "fallback" ? (
+              <li className="text-[10px] text-muted">Using curated local presets</li>
+            ) : null}
+          </ul>
+        </div>
         <div className="studio-compact-reference-section" aria-labelledby="compact-references-heading">
           <div className="studio-compact-reference-section-heading">
             <span id="compact-references-heading">References</span>
             <span>Image assets</span>
           </div>
           <ul className="studio-compact-reference-grid" aria-label="Reference image assets">
-            {referenceCards.map((card) => (
+            {visibleReferenceCards.map((card) => (
               <li key={card.id}>
-                <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`} title={`${card.title} · ${card.category}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- static native-scale crop; resizing would smear the screen */}
-                  <img className="studio-compact-reference-placeholder" src={card.thumbnail} alt="" loading="lazy" />
-                </a>
+                {card.imageUrl && onSelectReference ? (
+                  <button
+                    type="button"
+                    className="block w-full"
+                    onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                    aria-label={`Use ${card.title} on canvas`}
+                  >
+                    <ReferenceThumb index={visibleReferenceCards.indexOf(card)} imageUrl={card.imageUrl} title={card.title} />
+                  </button>
+                ) : card.sourceUrl ? (
+                  <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
+                    <ReferenceThumb index={visibleReferenceCards.indexOf(card)} imageUrl={card.imageUrl} title={card.title} />
+                  </a>
+                ) : (
+                  <ReferenceThumb index={visibleReferenceCards.indexOf(card)} imageUrl={card.imageUrl} title={card.title} />
+                )}
               </li>
             ))}
           </ul>
         </div>
+        {imageReferenceCards.length > 0 ? (
+          <div className="studio-compact-reference-section" aria-labelledby="compact-image-assets-heading">
+            <div className="studio-compact-reference-section-heading">
+              <span id="compact-image-assets-heading">Image assets</span>
+              <span>{imageReferenceCards.length} available</span>
+            </div>
+            <ul className="studio-compact-reference-grid" aria-label="Image assets">
+              {imageReferenceCards.slice(0, 4).map((card, index) => (
+                <li key={card.id}>
+                  {card.imageUrl && onSelectReference ? (
+                    <button
+                      type="button"
+                      className="block w-full"
+                      onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                      aria-label={`Use ${card.title} on canvas`}
+                    >
+                      <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
+                    </button>
+                  ) : (
+                    <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="studio-compact-reference-section" aria-labelledby="compact-textures-heading">
           <div className="studio-compact-reference-section-heading">
             <span id="compact-textures-heading">Looks</span>
@@ -133,6 +444,31 @@ export function InspirationBoard({
             ))}
           </ul>
         </div>
+        {loadedTextureCards.length > 0 ? (
+          <div className="studio-compact-reference-section" aria-labelledby="compact-reference-textures-heading">
+            <div className="studio-compact-reference-section-heading">
+              <span id="compact-reference-textures-heading">Textures</span>
+              <span>For the active reference</span>
+            </div>
+            <ul className="studio-compact-texture-grid" aria-label="Texture studies">
+              {loadedTextureCards.slice(0, 6).map(({ asset, imageUrl }) => (
+                <li key={asset.id}>
+                  <button
+                    type="button"
+                    className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={!importedReference}
+                    aria-pressed={referenceTreatment?.textureAssetId === asset.id}
+                    title={importedReference ? `Apply ${asset.name} to the active reference` : "Select a reference first"}
+                    onClick={() => onSelectTexture?.(asset.id)}
+                  >
+                    <Image src={imageUrl} alt="" width={160} height={110} unoptimized className="block h-auto w-full rounded" />
+                    <span>{asset.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -174,32 +510,72 @@ export function InspirationBoard({
       <Section
         id="references-heading"
         title="Visual references"
-        note={`${referenceCards.length} image assets from curio/assets that the reference looks are built from. Open a card for the full-size file.`}
+        note={`${visibleReferenceCards.length} image assets from curio/assets that the reference looks are built from${libraryStatus === "ready" ? ", plus library images" : ""}. Select an image to place it on the canvas.`}
       >
         <ul className="grid gap-3">
-          {referenceCards.map((card) => (
+          {visibleReferenceCards.map((card, index) => (
             <li key={card.id} className="overflow-hidden rounded-md border border-line bg-paper">
-              {/* eslint-disable-next-line @next/next/no-img-element -- static native-scale crop; resizing would smear the screen */}
-              <img src={card.thumbnail} alt="" loading="lazy" className="block aspect-[16/11] w-full object-cover" />
+              <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
               <div className="border-t border-line px-3 py-2.5">
                 <p className="text-sm font-medium">{card.title}</p>
                 <p className="text-xs text-muted">{card.category}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <p className="text-[11px] text-muted">{card.source}</p>
-                  <a
-                    href={card.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
-                  >
-                    Open ↗
-                  </a>
+                  <div className="flex items-center gap-2">
+                    {card.imageUrl && onSelectReference ? (
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
+                        onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                      >
+                        Use on canvas
+                      </button>
+                    ) : null}
+                    {card.sourceUrl ? (
+                      <a
+                        href={card.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
+                      >
+                        Open ↗
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </li>
           ))}
-        </ul>
+          </ul>
       </Section>
+      {imageReferenceCards.length > 0 ? (
+        <Section
+          id="image-assets-heading"
+          title="Image assets"
+          note="These image files came from the Curio library. Use one on the canvas, then refine it with the editor."
+        >
+          <ul className="grid gap-3">
+            {imageReferenceCards.map((card, index) => (
+              <li key={card.id} className="overflow-hidden rounded-md border border-line bg-paper">
+                <ReferenceThumb index={index} imageUrl={card.imageUrl} title={card.title} />
+                <div className="border-t border-line px-3 py-2.5">
+                  <p className="text-sm font-medium">{card.title}</p>
+                  <p className="text-xs text-muted">{card.category}</p>
+                  {card.imageUrl && onSelectReference ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-[11px] font-medium text-ink underline decoration-line underline-offset-2 hover:opacity-60"
+                      onClick={() => onSelectReference(card.assetId, card.title, card.imageUrl!)}
+                    >
+                      Use on canvas
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
     </section>
   );
 }

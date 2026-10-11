@@ -200,6 +200,56 @@ export async function listAssets(projectId: string): Promise<PlannedAsset[]> {
   return rows.map((row) => row.plan);
 }
 
+export type PipelineAssetSummary = PlannedAsset & {
+  projectId: string;
+  projectName: string;
+  conceptId: string | null;
+};
+
+/**
+ * Reads pipeline assets belonging to the current instance. Project assets do
+ * not carry an instance_id, so ownership is enforced through curio_projects.
+ */
+export async function listInstancePipelineAssets(
+  instanceId: string,
+  limit = 60,
+): Promise<PipelineAssetSummary[]> {
+  const sql = await getDatabase();
+  const rows = await sql<{
+    projectId: string;
+    projectName: string;
+    conceptId: string | null;
+    plan: PlannedAsset;
+  }[]>`
+    SELECT assets.project_id AS "projectId",
+           projects.name AS "projectName",
+           assets.concept_id AS "conceptId",
+           assets.plan
+    FROM curio_project_assets AS assets
+    INNER JOIN curio_projects AS projects ON projects.id = assets.project_id
+    WHERE projects.instance_id = ${instanceId}::uuid
+    ORDER BY projects.updated_at DESC, assets.created_at ASC, assets.id ASC
+    LIMIT ${limit}
+  `;
+
+  return rows.map((row) => ({
+    ...row.plan,
+    projectId: row.projectId,
+    projectName: row.projectName,
+    conceptId: row.conceptId,
+  }));
+}
+
+/** Compact, failure-tolerant context for Gemini's server-side prompts. */
+export async function pipelineAssetContext(instanceId?: string): Promise<PipelineAssetSummary[]> {
+  if (!instanceId) return [];
+  try {
+    return await listInstancePipelineAssets(instanceId, 24);
+  } catch {
+    return [];
+  }
+}
+
 // ----------------------------------------------------------------- versions
 
 export async function createVersion(
