@@ -10,7 +10,7 @@ import {
 } from "./design-presets";
 import type { AssetSuggestion, DesignState } from "./design-types";
 import { designPrinciplesContext } from "./knowledge";
-import { LIBRARY_KINDS, libraryContext, searchLibraryAssets, type LibraryKind } from "./library";
+import { ENGINE_TEXTURE_TAG, LIBRARY_KINDS, libraryContext, searchLibraryAssets, type LibraryKind } from "./library";
 import type { PosterEdits } from "./poster-editor";
 import { POSTER_HEIGHT, POSTER_WIDTH, buildPoster } from "./poster-layout";
 
@@ -647,7 +647,7 @@ async function executeCoachTool(call: CoachFunctionCall, instanceId?: string) {
   const limit = typeof call.args.limit === "number" ? Math.min(6, Math.max(1, Math.round(call.args.limit))) : 6;
 
   try {
-    const assets = await searchLibraryAssets(query, { kind, limit, ownerInstanceId: instanceId });
+    const assets = await searchLibraryAssets(query, { kind, limit, ownerInstanceId: instanceId, excludeTag: ENGINE_TEXTURE_TAG });
     return {
       query,
       assets: assets.map(({ id, kind: assetKind, name, description, tags, sourceUrl }) => ({
