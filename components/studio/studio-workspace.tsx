@@ -12,6 +12,7 @@ import { StudioInspector, type InspectorTab } from "./studio-inspector";
 import { getWorkspaceHostUrl } from "@/lib/host-routing";
 import type { PosterLayerEdit, PosterTool } from "@/lib/poster-editor";
 import { LayersIcon, ResetIcon } from "./icons";
+import { FloatingButtonGroup } from "@/components/ui/floating-button-group";
 
 export type StudioView = "start" | "chat" | "editor";
 
@@ -250,24 +251,25 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
         </label>
 
         <nav className="studio-editor-actions" aria-label="Editor actions">
-          <button
-            type="button"
-            className={`studio-header-action ${inspectorOpen ? "is-active" : ""}`}
-            onClick={() => {
-              setInspectorTab("layers");
-              setInspectorOpen((open) => !open);
-            }}
-          >
-            <LayersIcon />
-            <span>Layers</span>
-          </button>
-          <button type="button" className="studio-header-action" onClick={resetProject}>
-            <ResetIcon />
-            <span>Reset</span>
-          </button>
-          <button type="button" className="studio-header-action" onClick={openStart}>
-            <span>Home</span>
-          </button>
+          <FloatingButtonGroup
+            label="Editor actions"
+            variant="floating"
+            size="sm"
+            items={[
+              {
+                id: "layers",
+                label: "Layers",
+                icon: <LayersIcon />,
+                pressed: inspectorOpen && inspectorTab === "layers",
+                onSelect: () => {
+                  setInspectorTab("layers");
+                  setInspectorOpen((open) => !open);
+                },
+              },
+              { id: "reset", label: "Reset", icon: <ResetIcon />, onSelect: resetProject },
+              { id: "home", label: "Home", onSelect: openStart },
+            ]}
+          />
           <ExportControls design={design} selectedPaletteId={selectedPaletteId} posterEdits={posterEdits} />
         </nav>
       </header>

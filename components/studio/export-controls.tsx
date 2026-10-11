@@ -84,7 +84,7 @@ export function ExportControls({
             type="button"
             aria-label="Download brief JSON"
             onClick={exportJson}
-            className="whitespace-nowrap rounded-md border border-line px-3 py-2 text-xs font-medium text-muted transition-colors hover:border-ink hover:text-ink"
+            className="whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
           >
             Brief JSON
           </button>

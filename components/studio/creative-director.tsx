@@ -30,11 +30,6 @@ const SOURCE_LABEL: Record<NonNullable<ChatMessage["source"]>, string> = {
   gemini: "AI direction",
 };
 
-const PROVIDER_LABEL: Record<string, string> = {
-  whisper: "Voice input",
-  elevenlabs: "Voice reply",
-};
-
 const PROMPTS: Record<DesignState["direction"], string[]> = {
   vintage: [
     "Make it more minimal but keep the layout",
@@ -52,10 +47,6 @@ const PROMPTS: Record<DesignState["direction"], string[]> = {
     "Align it left",
   ],
 };
-
-function formatTime(total: number) {
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
 
 type Outcome = {
   reply: string;
@@ -87,7 +78,6 @@ export function CreativeDirector({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [desktopVoiceBeam, setDesktopVoiceBeam] = useState(false);
-  const [heard, setHeard] = useState<{ text: string; provider: string | null } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef(false);
   const initialPromptRef = useRef<string | null>(null);
@@ -96,8 +86,7 @@ export function CreativeDirector({
   const voice = useVoice({
     canListen: capabilities.listen,
     canSpeak: capabilities.speak,
-    onTranscript: (text, provider) => {
-      setHeard({ text, provider });
+    onTranscript: (text) => {
       sendRef.current(text, true);
     },
   });
@@ -237,22 +226,6 @@ export function CreativeDirector({
   if (listening) micLabel = "Stop recording and send";
   else if (voice.block) micLabel = "Voice input unavailable";
 
-  let voiceStatus: string;
-  switch (voice.block) {
-    case "not-configured":
-      voiceStatus = "Voice input is unavailable right now. Text mode only.";
-      break;
-    case "insecure":
-      voiceStatus =
-        "The browser blocks the microphone on plain HTTP. Open this over HTTPS or on localhost to use voice.";
-      break;
-    case "unsupported":
-      voiceStatus = "This browser does not support microphone recording. Text mode only.";
-      break;
-    default:
-      voiceStatus = "Press the mic, speak, then press it again to send.";
-  }
-
   const beamProcessing = pending || voice.phase === "transcribing";
   const beamActive = beamProcessing || voice.phase === "listening" || voice.phase === "speaking";
   const beamLevel = beamProcessing || voice.phase === "speaking" ? 0.34 : 0;
@@ -268,7 +241,6 @@ export function CreativeDirector({
         disabled={micDisabled}
         aria-label={micLabel}
         aria-pressed={listening}
-        title={voice.block ? voiceStatus : micLabel}
         onClick={() => (listening ? voice.stop() : void voice.start())}
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition-colors disabled:opacity-50 ${
           listening
@@ -440,18 +412,6 @@ export function CreativeDirector({
           ))}
         </div>
 
-        {heard ? (
-          <p className="mb-2 text-[11px] text-muted" data-testid="transcript">
-            <span className="font-medium uppercase tracking-[0.12em]">Heard</span>{" "}
-            &ldquo;{heard.text}&rdquo;
-            {heard.provider ? (
-              <span className="ml-1.5 rounded border border-line px-1 py-0.5">
-                {PROVIDER_LABEL[heard.provider] ?? heard.provider}
-              </span>
-            ) : null}
-          </p>
-        ) : null}
-
         {desktopVoiceBeam ? (
           <VoiceBeam
             className="editor-voice-beam"
@@ -471,42 +431,7 @@ export function CreativeDirector({
           chatComposer
         )}
 
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <p className="min-w-0 text-[11px] text-muted" role="status" data-testid="voice-status">
-            {listening ? (
-              <span className="inline-flex items-center gap-1.5 text-ink">
-                <span className="rec-dot" aria-hidden="true" />
-                Listening {formatTime(voice.seconds)}. Press the mic to send.
-              </span>
-            ) : voice.phase === "transcribing" ? (
-              "Transcribing..."
-            ) : voice.phase === "speaking" ? (
-              <span className="inline-flex items-center gap-2 text-ink">
-                <VoiceKeyframes active />
-                Speaking...
-                <button
-                  type="button"
-                  onClick={voice.stopSpeaking}
-                  className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:text-ink"
-                >
-                  Stop
-                </button>
-              </span>
-            ) : (
-              voiceStatus
-            )}
-          </p>
-
-          <span className={`shrink-0 text-[11px] ${voice.canSpeak ? "text-ink" : "text-muted"}`}>
-            {voice.canSpeak ? "Voice replies on" : "Text replies only"}
-          </span>
-        </div>
-
-        {voice.error ? (
-          <p role="alert" className="mt-2 text-[11px] text-red-700">
-            {voice.error}
-          </p>
-        ) : null}
+        {voice.error ? <span className="sr-only" role="alert">{voice.error}</span> : null}
       </div>
     </section>
   );

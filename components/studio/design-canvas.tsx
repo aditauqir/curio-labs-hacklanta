@@ -21,6 +21,7 @@ import {
   SparkleIcon,
 } from "./icons";
 import { ColorField, Field, SegmentedControl, inputClass } from "./ui";
+import { FloatingButtonGroup } from "@/components/ui/floating-button-group";
 
 type InspectorTab = "layers" | "reference";
 
@@ -204,7 +205,6 @@ export function DesignCanvas({
     <section aria-label="Design canvas" className="design-canvas">
       <header className="design-canvas-header">
         <div className="design-canvas-heading">
-          <span className="design-canvas-live-dot" aria-hidden="true" />
           <div>
             <p className="studio-eyebrow">Poster</p>
             <p className="design-canvas-title">{design.projectName || "Untitled poster"}</p>
@@ -222,27 +222,32 @@ export function DesignCanvas({
           tone="dark"
         />
 
-        <div className="design-canvas-header-actions">
-          <button
-            type="button"
-            className={`studio-tool-button ${propertiesOpen ? "is-active" : ""}`}
-            onClick={() => setPropertiesOpen((open) => !open)}
-            aria-pressed={propertiesOpen}
-          >
-            <SlidersIcon />
-            <span>Properties</span>
-          </button>
-          {onToggleInspector ? (
-            <button
-              type="button"
-              className="studio-tool-button studio-inspector-toggle"
-              onClick={() => onToggleInspector("reference")}
-            >
-              <PanelRightIcon />
-              <span>References</span>
-            </button>
-          ) : null}
-        </div>
+        <FloatingButtonGroup
+          label="Canvas panels"
+          size="sm"
+          className="design-canvas-header-actions"
+          items={[
+            {
+              id: "properties",
+              label: "Properties",
+              icon: <SlidersIcon />,
+              iconOnly: true,
+              pressed: propertiesOpen,
+              onSelect: () => setPropertiesOpen((open) => !open),
+            },
+            ...(onToggleInspector
+              ? [
+                  {
+                    id: "references",
+                    label: "References",
+                    icon: <PanelRightIcon />,
+                    iconOnly: true,
+                    onSelect: () => onToggleInspector("reference"),
+                  },
+                ]
+              : []),
+          ]}
+        />
       </header>
 
       <div className="design-canvas-edit-toolbar" aria-label="Text editing controls">
@@ -265,98 +270,89 @@ export function DesignCanvas({
             ))}
           </select>
         </label>
-        <div className="studio-edit-actions">
-          <button
-            type="button"
-            className="studio-edit-button"
-            onClick={() => {
-              onSelectLayer(null);
-              setEditStatus("Nothing selected");
-            }}
-            disabled={!selectedTextLayer}
-          >
-            Deselect
-          </button>
-          <button
-            type="button"
-            className="studio-edit-button"
-            onClick={() => void copySelectedText()}
-            disabled={!selectedTextLayer || !selectedText}
-          >
-            Copy
-          </button>
-          <button
-            type="button"
-            className="studio-edit-button studio-edit-button-primary"
-            onClick={() => void cutSelectedText()}
-            disabled={!selectedTextLayer || !selectedText}
-          >
-            Cut
-          </button>
-        </div>
-        <span className="studio-edit-status" role="status" aria-live="polite">
+        <FloatingButtonGroup
+          label="Text editing actions"
+          size="sm"
+          className="studio-edit-actions"
+          items={[
+            {
+              id: "deselect",
+              label: "Deselect",
+              disabled: !selectedTextLayer,
+              onSelect: () => {
+                onSelectLayer(null);
+                setEditStatus("Nothing selected");
+              },
+            },
+            {
+              id: "copy",
+              label: "Copy",
+              disabled: !selectedTextLayer || !selectedText,
+              onSelect: () => void copySelectedText(),
+            },
+            {
+              id: "cut",
+              label: "Cut",
+              disabled: !selectedTextLayer || !selectedText,
+              onSelect: () => void cutSelectedText(),
+            },
+          ]}
+        />
+        <span className="studio-edit-status sr-only" role="status" aria-live="polite">
           {editStatus}
         </span>
         <span className="studio-edit-shortcuts">⌘/Ctrl C · ⌘/Ctrl X · Esc</span>
       </div>
 
       <div className="design-canvas-main">
-        <nav className="design-canvas-tool-rail" aria-label="Canvas tools">
-          <button
-            type="button"
-            className={`studio-rail-tool ${activeTool === "select" ? "is-active" : ""}`}
-            aria-label="Select and move tool"
-            title="Select and move"
-            onClick={() => onToolChange("select")}
-          >
-            <GridIcon />
-          </button>
-          <button
-            type="button"
-            className={`studio-rail-tool studio-rail-text-tool ${activeTool === "text" ? "is-active" : ""}`}
-            aria-label="Text tool"
-            title="Text tool"
-            onClick={() => onToolChange("text")}
-          >
-            T
-          </button>
-          <button
-            type="button"
-            className={`studio-rail-tool ${propertiesOpen ? "is-active" : ""}`}
-            aria-label="Toggle poster properties"
-            title="Toggle poster properties"
-            onClick={() => setPropertiesOpen((open) => !open)}
-          >
-            <SlidersIcon />
-          </button>
-          <span className="studio-rail-divider" aria-hidden="true" />
-          <button
-            type="button"
-            className={`studio-rail-tool ${checking ? "is-active" : ""}`}
-            aria-label="Review layout"
-            title="Review layout"
-            onClick={() => void checkLayout()}
-            disabled={checking}
-          >
-            <SparkleIcon />
-          </button>
-          <button
-            type="button"
-            className="studio-rail-tool"
-            aria-label="Reset design"
-            title="Reset design"
-            onClick={() => dispatch({ type: "resetDesign" })}
-          >
-            <ResetIcon />
-          </button>
-        </nav>
+        <FloatingButtonGroup
+          label="Canvas tools"
+          variant="floating"
+          orientation="vertical"
+          iconOnly
+          className="design-canvas-tool-rail"
+          items={[
+            {
+              id: "select",
+              label: "Select and move",
+              icon: <GridIcon />,
+              pressed: activeTool === "select",
+              onSelect: () => onToolChange("select"),
+            },
+            {
+              id: "text",
+              label: "Text tool",
+              icon: <span className="studio-rail-text-tool">T</span>,
+              pressed: activeTool === "text",
+              onSelect: () => onToolChange("text"),
+            },
+            {
+              id: "properties",
+              label: "Toggle poster properties",
+              icon: <SlidersIcon />,
+              pressed: propertiesOpen,
+              onSelect: () => setPropertiesOpen((open) => !open),
+            },
+            { type: "separator", id: "canvas-tools-divider" },
+            {
+              id: "review",
+              label: "Review layout",
+              icon: <SparkleIcon />,
+              disabled: checking,
+              pressed: checking,
+              onSelect: () => void checkLayout(),
+            },
+            {
+              id: "reset",
+              label: "Reset design",
+              icon: <ResetIcon />,
+              onSelect: () => dispatch({ type: "resetDesign" }),
+            },
+          ]}
+        />
 
         <div className="design-canvas-stage">
           <div className="design-canvas-poster-frame">
-            <div className="design-canvas-poster-meta">
-              <span>Poster / live</span>
-              <span>1080 × 1350</span>
-            </div>
             <div className="design-canvas-poster">
               <Poster
                 design={design}
@@ -373,47 +369,49 @@ export function DesignCanvas({
         </div>
       </div>
 
-      <div className="studio-canvas-action-bar" aria-label="Canvas actions">
-        <button
-          type="button"
-          onClick={() => onToggleInspector?.("reference")}
-          disabled={!onToggleInspector}
-        >
-          Inspire
-        </button>
-        <button type="button" onClick={restylePoster}>
-          Restyle
-        </button>
-        <button type="button" onClick={shufflePalette}>
-          Shuffle
-        </button>
-        <button
-          type="button"
-          onClick={() => onToggleInspector?.("layers")}
-          disabled={!onToggleInspector}
-        >
-          Layers
-        </button>
-        <button type="button" onClick={() => void exportCanvas()} disabled={exporting}>
-          {exporting ? "Exporting" : "Export"}
-        </button>
-      </div>
+      <FloatingButtonGroup
+        label="Canvas actions"
+        variant="floating"
+        size="sm"
+        className="studio-canvas-action-bar"
+        items={[
+          {
+            id: "inspire",
+            label: "Inspire",
+            disabled: !onToggleInspector,
+            onSelect: () => onToggleInspector?.("reference"),
+          },
+          { id: "restyle", label: "Restyle", onSelect: restylePoster },
+          { id: "shuffle", label: "Shuffle", onSelect: shufflePalette },
+          {
+            id: "layers",
+            label: "Layers",
+            disabled: !onToggleInspector,
+            onSelect: () => onToggleInspector?.("layers"),
+          },
+          {
+            id: "export",
+            label: exporting ? "Exporting" : "Export",
+            reserveLabels: ["Export", "Exporting"],
+            disabled: exporting,
+            onSelect: () => void exportCanvas(),
+          },
+        ]}
+      />
 
       <footer className="design-canvas-footer">
-        <div className="design-canvas-footer-meta">
-          <span className="design-canvas-footer-status" aria-hidden="true" />
-          <span>
-            {checking
-              ? "Reviewing layout"
-              : canvasStatus ?? (coach ? "Layout review ready" : "Saved")}
-          </span>
-        </div>
         <div className="design-canvas-footer-info" aria-label="Document information">
           <span>RGB / 8-bit</span>
           <span>100%</span>
           <span>1080 × 1350</span>
         </div>
       </footer>
+
+      {canvasStatus ? (
+        <span className="sr-only" role="status" aria-live="polite">
+          {canvasStatus}
+        </span>
+      ) : null}
 
       {coach ? (
         <div className="studio-coach-card">
