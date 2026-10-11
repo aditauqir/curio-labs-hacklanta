@@ -293,4 +293,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `e2e-current-flow` | 2026-10-11 | Align production E2E tests with the current home-to-app desktop flow | merged | PR #15 merged to `main`; all 17 E2E tests passed, then the server build exposed a separate next/font compatibility issue |
 | `server-local-fonts` | 2026-10-11 | Remove remote Google font build dependency from the production bundle | merged | PR #16 merged to `main`; server build, PM2 restart, and the canonical `/app` HTTPS route now pass; the workflow’s raw-host health check was the only remaining false failure |
 | `canonical-healthcheck` | 2026-10-11 | Verify production through the canonical HTTPS domain after deployment | PR open (#17) | Replaces the raw Vultr HTTP probe with the live HTTPS domain and follows the apex redirect; production code is live, `/app` returns 200, and PR #17 is open |
+| `handoff-deploy-verified` | 2026-10-11 | Record the green production deployment and public endpoint verification | in progress | |
 <!-- BRANCH-LOG-INSERT -->
