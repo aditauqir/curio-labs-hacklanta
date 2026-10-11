@@ -4,6 +4,18 @@ Status: ready for the next contributor
 
 This document is the implementation and PR sign-off brief for the next person working on Curio Labs' Gemini workflow. The goal is to replace unreliable demo-style behavior with a measurable, data-grounded creative-direction workflow that still produces safe, editable poster changes.
 
+## Merge-conflict priority
+
+If the PR conflicts with the current UI branch, preserving the Gemini intelligence layer is the top priority. Do not resolve a conflict by deleting or bypassing any of these files or contracts:
+
+- `lib/gemini.ts` and its model fallback/configuration logic;
+- `app/api/creative-director/route.ts` and the server-only Gemini boundary;
+- `lib/ai-patch.ts`, `lib/knowledge.ts`, and the validated reducer path;
+- `data/gemini/*` and `data/design-principles.json`;
+- structured `AiPatch`, `layerEdits`, `validatePatch()`, and `reconcilePatch()` behavior.
+
+Resolve those files manually. Preserve the newer intelligence/data behavior, then reapply any UI changes around the stable response contract. A UI change may be adapted to the Gemini response shape; the Gemini layer must not be replaced with a demo rule, a raw prose parser, or a deleted route just to make the merge clean. After resolving, inspect the conflict list and run the Gemini evaluation plus the full PR checklist below.
+
 ## Scope
 
 The next PR owns the Gemini quality path only:
