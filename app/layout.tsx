@@ -9,6 +9,8 @@ import {
   Space_Grotesk,
 } from "next/font/google";
 import "./globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
+
 
 // Inter and Space Grotesk drive the interface. The rest only download when a
 // font pairing that uses them is selected on the poster.
@@ -57,6 +59,11 @@ export const metadata: Metadata = {
   title: "Curio Labs | From vague ideas to visual direction",
   description:
     "An AI creative director that turns vague preferences into explicit, editable design decisions.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -74,7 +81,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
-      <body className="h-full">{children}</body>
+      <body className="h-full">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

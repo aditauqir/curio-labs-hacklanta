@@ -1,5 +1,6 @@
 import type { AssetSuggestion, ChatMessage, DesignState } from "./design-types";
 import { validatePatch, type AiPatch } from "./ai-patch";
+import type { PosterEdits } from "./poster-editor";
 
 export type DirectorReply = {
   reply: string;
@@ -25,6 +26,7 @@ export async function askDirector(input: {
   message: string;
   design: DesignState;
   paletteId: string | null;
+  posterEdits: PosterEdits;
   history: ChatMessage[];
 }): Promise<DirectorReply> {
   const controller = new AbortController();
@@ -44,6 +46,7 @@ export async function askDirector(input: {
         message: input.message,
         design: input.design,
         paletteId: input.paletteId,
+        posterEdits: input.posterEdits,
         history,
       }),
       signal: controller.signal,

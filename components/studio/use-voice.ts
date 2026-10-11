@@ -58,6 +58,7 @@ export function useVoice({
   const [phase, setPhaseState] = useState<VoicePhase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   const phaseRef = useRef<VoicePhase>("idle");
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -94,6 +95,7 @@ export function useVoice({
     timerRef.current = undefined;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    setStream(null);
   }, []);
 
   const releaseAudio = useCallback(() => {
@@ -220,6 +222,7 @@ export function useVoice({
 
     recorderRef.current = recorder;
     streamRef.current = stream;
+    setStream(stream);
     recorder.start();
     setSeconds(0);
     setPhase("listening");
@@ -310,6 +313,7 @@ export function useVoice({
     phase,
     error,
     seconds,
+    stream,
     block,
     /** Playback does not need a secure context, so replies can be spoken on plain HTTP. */
     canSpeak,

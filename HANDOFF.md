@@ -19,32 +19,38 @@ The demo we are building toward: three distinct poster directions -> user asks f
 
 Live at **https://idkjustmakeitlookgood.gay/** and **https://155-138-194-120.sslip.io/**. Deployed from `main` on every merge.
 
-Live verification on 2026-10-10: Gemini and ElevenLabs returned successful responses, Whisper is online on the server, HTTPS is active, and the browser reports a secure context with the microphone control enabled.
+Live verification on 2026-10-10: Gemini and ElevenLabs returned successful responses, Whisper is online on the server, HTTPS is active, and the browser reports a secure context with the microphone control enabled. Local verification also confirmed the wireframe start screen and Gemini coaching tool loop.
 
 | Area | Status |
 | --- | --- |
-| Three-panel workspace (director, canvas, inspiration) | Working |
+| Start, director, and full editor screen states | Working locally. The start/home screen gathers an idea at `/home`, the director screen owns the conversation, and the full editor is at `/app` with a dark surface combining the director, live poster, vertical tools, properties drawer, and optional references inspector. |
+| Entry route | Working locally. The apex `/` redirects to `/home`; a fresh direct `/app` visit now opens the same start screen before entering the canonical `/app` workspace; the home flow enters the full app at `/app`, the app-subdomain root rewrites to `/app`, and `/director` plus `/editor` remain direct aliases. Live `app.` DNS/nginx/TLS is still pending. The supplied Curio Labs wordmark image is now the browser/app icon. |
+| Onboarding/editor visual workflow | Working locally. The wireframe-led start screen uses `voice_key1.svg` as the mascot, a lighter full-bleed supplied landscape scene with a denser ASCII Magic-inspired character-ramp overlay, a focal-point prompt positioned just below the vertical center, smaller high-contrast typography with local glyph-level blur, and a crisp prompt placeholder with no text shadow. The synthetic white prompt underline and voice waveform bars were removed; microphone activity now keeps only the surrounding glow/orb. Bundled Redaction 35 is used for the main thought heading, with a centered LT Superior Serif Curio Labs wordmark, white Neue Montreal recent-project text, Gemini-backed starter chips with a static fallback, and the `loading-dev` Leap loading shell. The mascot is positioned as part of the hero flow so its speaking animation does not overlap the heading. The white card surface, “Edit and ready” action, and redundant chat/voice button are removed while real start/director/editor transitions remain intact; the right rail is limited to recent/demo projects and is vertically centered on the right side. The editor’s Vintage Jazz poster now has a stronger warm composition with a structured accent panel, vertical marker, layered ring motif, and improved spacing. The mascot container is transparent, and all five supplied mascot frames rotate through a randomized timed loop while speaking. |
+| Unified editor workspace (director, canvas, optional inspiration) | Working locally at `/app`. The editor is one desktop workspace surface matching the refined supplied composition: a rounded black Chatbox area on the left, live poster and vertical tools in the center, and a compact right-aligned Reference plus Layers dock on the right by default. The former stacked panes, workspace tab strip, and freeform board are gone. The surface has a document header, artboard grid, left tool rail, inspector, properties drawer, quiet document status bar, user-facing copy that hides provider/database implementation details, a compact Brief → Concept → References → Compose → Refine workflow rail, AICSS thinking/streaming presentation for director responses, and a desktop-only `voice-glow` beam around the chat composer. The Reference rail now uses the supplied simple 2×2 study-tile treatment with active font names right-aligned above a visible Layers dock; reference tiles retain source links. Header Editor actions plus Canvas tools, text actions, and Inspire/Restyle/Shuffle/Layers/Export actions now share a floating-button-group interaction with one morphing hover highlight, pressed states, separators, tooltips, and keyboard navigation. Internal voice/canvas status copy, provider labels, recording/live dots, and saved-state chrome are hidden from the product surface while accessible announcements and actual controls remain. Decorative editor borders, divider rules, tile strokes, button outlines, and the poster metadata strip are removed so the chat, canvas, inspector, and overlays read as one cohesive surface; functional poster selection handles remain. The right inspector still supports full Layers and Reference views; the Layers view exposes the live poster stack while Reference preserves the active poster's brief context. Manual editor actions now work on the SVG poster: select layers, drag to move, drag corner handles to scale, edit X/Y/scale/rotation/opacity, hide/show, lock/unlock, edit text through the Text tool or double-click, and Delete to hide the selected layer. Exports include the current transforms and visibility in PNG/JPG/PSD/JSON output, and poster edits persist in local/TigerData workspace state. The implementation uses pointer capture and reducer-backed layer state rather than embedding tldraw, Compositor, or GIMP; it follows the practical layer/transform/text interaction model described by [Compositor](https://github.com/robbietilton/Compositor). The editor uses fluid columns without a top-level viewport aspect-ratio lock, and all voice mascot frames are rendered white. |
 | Three poster directions (Vintage Jazz, Modern Minimal, Experimental Editorial) | Working |
 | Independent edits: headline, copy, accent, alignment, spacing, font pairing, palette | Working |
 | Creative brief reflecting and editing the live design | Working |
 | LocalStorage persistence with validation of stored data | Working |
 | PostgreSQL persistence | Working. Anonymous instances have separate profiles, hashed passwords, workspace state, chat history, and files; the shared library seeds fonts, palettes, and references for Gemini context. |
+| Design-principles source of truth | Working. The two supplied PDFs are represented in TigerData by two source records, 240 bounded extracts/curated clips (including 224 text-page extracts from *How Posters Work*), and two searchable document assets. Gemini retrieves relevant clips for each design brief; the raster-only grid PDF is explicitly marked as manual visual notes. |
 | Account sessions and ownership | Built on `user-persistence-refresh`; local checks, a real TigerData smoke test, and production API verification pass. |
 | PNG export (renders the same layout model as the screen) and brief JSON export | Working |
-| Mobile layout (tabs: Director / Canvas / Inspiration) | Working |
+| Poster export formats | Working locally. PNG and JPG are raster exports; PSD is a real layered Photoshop-compatible document with background, graphics, and typography layers. |
+| Narrow viewport behavior | Intentionally desktop-first. The three-pane editor composition remains in place; mobile tabs are not part of the product surface. |
+| Viewport behavior | Working locally. The document and all top-level screens are locked to `100dvh` with no page scroll; long chat, inspiration, and canvas content stays inside its own panel. |
 | Chat replies | **Gemini** when `GEMINI_API_KEY` is set (replies labelled "Gemini"). Otherwise local keyword rules in `lib/demo-director.ts`, labelled "Demo rules". If Gemini fails, the UI falls back to the rules and says so. |
-| Gemini integration | Built. `POST /api/creative-director`. Output is validated against whitelists and reconciled with the user's intent (see section 4). |
+| Gemini integration | Built. `POST /api/creative-director` returns validated reducer patches and receives relevant design-principles clips from TigerData for each request. The server injects `data/gemini/whoami.md` and `taste.json`, sends current poster geometry/transforms, and accepts validated `layerEdits` for exact canvas ids so requests such as “use this font” or “move the headline right” apply through the same reducer as manual editing. `POST /api/creative-coach` performs a Gemini function-call round trip into the TigerData library and receives the same principles context before returning placement feedback. |
 | Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Production microphone access is enabled over HTTPS. |
-| Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Opt-in via the "Speak replies" toggle, and automatic for voice requests. Works over plain HTTP. |
-| Visual reference cards | **Placeholders.** Original abstract art, no external sources. |
+| Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Director replies speak automatically whenever ElevenLabs is configured; voice requests also speak automatically. Default voice is `ZoiZ8fuDWInAcwPXaVeq`; `ELEVENLABS_VOICE_ID` can override it. Works over plain HTTP. |
+| Visual reference cards | Working locally. 31 distinct Pinterest poster searches are source-linked in the inspiration rail; Curio renders original abstract thumbnails rather than copying remote poster images. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
-| HTTPS / custom domain | Working. One automatically renewing Let's Encrypt certificate covers `idkjustmakeitlookgood.gay`, `www.idkjustmakeitlookgood.gay` and `155-138-194-120.sslip.io`. See the nginx caveat in section 9. |
+| HTTPS / custom domain | Working for the apex and `www`; the app subdomain still needs its DNS A record and certificate expansion before it is live. See the nginx caveat in section 9. |
 
 ## 3. Stack
 
-Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (strict), Tailwind CSS 4, npm. Hosted on a Vultr VPS, not Vercel.
+Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui source components backed by Radix, npm. The poster itself stays a reducer-driven SVG for crisp text/export performance; PhotoCraft was evaluated as a Rust/WebAssembly GPU image editor, but is not bundled into the poster path. Hosted on a Vultr VPS, not Vercel.
 
 **Next.js 16 has breaking changes versus older versions.** Read the matching guide in `node_modules/next/dist/docs/` before writing Next-specific code (see `AGENTS.md`).
 `LayoutProps` is a generated global type. A bare `tsc` fails on a clean checkout, so always use `npm run typecheck`, which runs `next typegen` first.
@@ -53,44 +59,73 @@ Next.js 16 (App Router, Turbopack, `cacheComponents` on), React 19, TypeScript (
 
 ```
 app/
-  layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; sets metadata
-  page.tsx              Server component that renders <StudioLoader />
-  globals.css           Tailwind import and the neutral UI palette tokens
+  layout.tsx            Loads Inter, Space Grotesk and the poster fonts via next/font; bundled Neue Montreal, Apfel Grotezk, and Redaction 20 assets load from globals.css; declares the Curio Labs app icons
+  icon.png              Supplied 200×200 Curio Labs wordmark used as the browser favicon and app icon
+  page.tsx              Apex redirects to /home; proxy.ts rewrites the app-subdomain root to /app
+  proxy.ts              Keeps the app-subdomain root at / while rendering the canonical /app home internally
+  home/page.tsx          Addressable start/home screen at /home
+  app/page.tsx           Canonical full editor at /app
+  director/page.tsx      Addressable director screen at /director
+  editor/page.tsx        Addressable full editor at /editor
+  globals.css           Tailwind import, neutral UI palette tokens, bundled font faces, no-scroll onboarding treatment, desktop VoiceBeam styling, and Layers/Reference inspector chrome
 components/studio/
+  onboarding-studio.tsx Client home prompt, Gemini starter chips, microphone level orb, and onboarding transitions
   studio-loader.tsx     Client wrapper: dynamic(..., { ssr: false }) because state restores from browser/database persistence
-  studio-workspace.tsx  Header, mobile tabs, useReducer, database/local fallback persistence
-  creative-director.tsx Left panel: chat UI, suggestion chips, microphone and spoken replies
-  design-canvas.tsx     Centre panel: poster, direction switch, editing controls
-  poster.tsx            Renders the poster as real SVG elements from the layout model
+  studio-workspace.tsx  `/home` start flow and `/app` editor states, single three-pane editor surface, useReducer, database/local fallback persistence
+  creative-director.tsx Left panel: chat UI, suggestion chips, microphone, spoken replies, and desktop VoiceBeam composer effect
+  ThinkingState.tsx, StreamingText.tsx  AICSS-installed thinking and assistant-output presentation components
+components/ui/floating-button-group.tsx  Shared floating toolbar with morphing highlight, pressed states, separators, tooltips, and keyboard navigation
+  studio-inspector.tsx, layers-panel.tsx  Right-side compact Reference/2×2 study tiles/Layers dock plus full live poster layer list
+  design-canvas.tsx     Unified poster surface: direction switch, Select/Text tools, pointer-driven layer transforms, direct text editing, font pairing, visibility/lock/delete controls, properties drawer, Gemini/TigerData coach, and functional canvas action pill
+  poster.tsx            Renders the poster as real SVG elements from the layout model with selection, drag, scale-handle, and keyboard interactions
   inspiration-board.tsx Right panel shell, reference thumbnails
   creative-brief.tsx    Editable brief rows
   typography-selector.tsx, color-palette-selector.tsx, export-controls.tsx, ui.tsx, icons.tsx
 lib/
+  host-routing.ts       App-subdomain detection and base/app host navigation helpers
   design-types.ts       DesignState, ChatMessage, PersistedStudioState
   design-presets.ts     Font pairs, palettes, direction configs, applyDirection(), initial design
   poster-layout.ts      buildPoster(design) -> shapes and texts. Shared by the SVG poster and the PNG exporter
   design-state.ts       studioReducer, StudioAction, getBrief(), sanitizeState() for untrusted stored data
   demo-director.ts      interpretRequest(): local rule engine that returns StudioAction[]
   storage.ts            LocalStorage load/save (key: studio-workspace-v1)
-  export.ts             PNG (canvas) and brief JSON export
+  export.ts             PNG/JPG/PSD export plus brief JSON export with poster transforms and visibility
+  instance-store.ts     Anonymous workspace persistence, including poster layer edits
 app/api/
   status/route.ts             Which integrations are configured (booleans only). Uses connection() so it is not prerendered
+  onboarding-suggestions/route.ts Gemini-generated home starter chips with rate limiting and fallback-safe errors
   creative-director/route.ts  Gemini design edits. Validates input, rate limits, never returns upstream error text
+  creative-coach/route.ts     Gemini visual coaching with a TigerData library search tool
   voice/transcribe/route.ts   Audio upload -> text (Whisper, ElevenLabs fallback)
   voice/speak/route.ts        Text -> MP3 (ElevenLabs), streamed
   workspace/route.ts           Anonymous instance workspace load/save
   instance/route.ts            Anonymous profile metadata and password hash updates
   files/route.ts, files/[id]   Instance-owned file upload, listing, download, delete
   assets/route.ts, assets/[id] Shared font/media library listing and token-gated ingestion
+public/
+  home-landscape.png          Supplied light landscape reference used as the full-bleed home screen scene
+  home-ascii-overlay.svg      Dense local ASCII Magic-inspired character-ramp texture layered over the home scene
+  fonts/Redaction35-*.otf      Bundled Redaction 35 faces used by the home thought heading
+  fonts/LTSuperiorSerif-*.otf Bundled LT Superior Serif faces used by the Curio Labs wordmark
+data/design-principles.json    Source metadata and curated clips for the two supplied design PDFs
+data/gemini/whoami.md          Curio-specific Gemini identity and operating contract
+data/gemini/taste.json         Machine-readable Curio design rubric and canvas edit policy
+data/gemini/system-prompt.md   Copy/paste system prompt for the Gemini backend implementation
+data/gemini/response.schema.json Structured response contract for the friend-owned Gemini backend
 lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.ts, gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
   ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
+  poster-editor.ts      Bounded non-destructive layer transforms and visibility/lock state for the SVG editor
+  knowledge.ts          Search and compact retrieval context for the TigerData design-principles corpus
   director-client.ts    Browser fetch for the director with a timeout
+  coach-client.ts       Browser fetch for the Gemini/TigerData coaching route
 components/studio/use-voice.ts, use-capabilities.ts   Mic recording, playback, and server capability detection
+components/ui/             shadcn/ui source primitives used by the workflow
 scripts/new-branch.mjs  Creates a branch and logs it here (see Working agreement)
 scripts/check-secrets.mjs  Fails if a credential-shaped string is in a committable file
 scripts/add-domain-ssl.sh  Server-side: add a domain to nginx and expand the Let's Encrypt certificate
 scripts/fix-nginx-server-names.sh  Server-side: repair duplicate server_name declarations
 scripts/nginx-server-names.mjs     The pure rewrite behind it, with tests alongside
+scripts/import-design-principles.mjs  Idempotent PDF extract/clip import into TigerData (`npm run design-principles:import`)
 ```
 
 ### The key design decision
@@ -117,7 +152,7 @@ All edits go through one reducer. Each `StudioAction` changes only its own slice
 | Offline transcription | PM2, process name `whisper`, `whisper.cpp` server on `127.0.0.1:8178`, `base.en` model in `/home/linuxuser/.curio-whisper` |
 | Database | TigerData/Timescale PostgreSQL; connection string is in `/var/www/curiolabs/.env.local` only |
 | Reverse proxy | nginx on :80 (redirect) and :443 (TLS) -> `127.0.0.1:3000`, config `/etc/nginx/sites-available/curiolabs` |
-| Domain | `idkjustmakeitlookgood.gay`; apex and `www` are A records pointing at the server. No AAAA record, so Let's Encrypt validates over IPv4 |
+| Domain | `idkjustmakeitlookgood.gay`; apex and `www` are A records pointing at the server. Planned app host: `app.idkjustmakeitlookgood.gay`. No AAAA record, so Let's Encrypt validates over IPv4 |
 | Firewall | ufw: 22, 80, 443 open |
 
 ### Pipelines (`.github/workflows/`)
@@ -131,7 +166,7 @@ The live site uses `https://idkjustmakeitlookgood.gay/` (and still `https://155-
 
 ### Adding another domain
 
-`scripts/add-domain-ssl.sh` runs on the server, adds the names to nginx and expands the existing certificate rather than issuing a second one. It is a dry run unless given `--apply`; **read the diff before applying**. Point the name at the server with an A record first, or the Let's Encrypt HTTP challenge fails.
+`scripts/add-domain-ssl.sh` runs on the server, adds the names to nginx and expands the existing certificate rather than issuing a second one. It is a dry run unless given `--apply`; **read the diff before applying**. Point the name at the server with an A record first, or the Let's Encrypt HTTP challenge fails. For the studio host, use `DOMAINS='app.idkjustmakeitlookgood.gay' bash scripts/add-domain-ssl.sh --apply` after DNS propagates.
 
 `scripts/fix-nginx-server-names.sh` repairs the case where a name ends up declared in more than one block for the same port. The rewrite it uses lives in `scripts/nginx-server-names.mjs` and is covered by `npm run test:unit`.
 
@@ -214,10 +249,12 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 - Voice recordings are capped at 30 seconds. Safari (mp4/m4a) and Firefox recording paths are implemented but were only tested in Chromium.
 - Microphone permission errors were tested by throwing the same `DOMException` names browsers throw (`NotAllowedError`, `NotFoundError`, `NotReadableError`, `NotSupportedError`), because headless Chromium cannot show a real permission prompt.
 - Without Gemini or voice keys, the app runs in demo mode and says so. Demo mode is keyword rules only, so unmatched requests get a clarifying prompt.
+- The Tiger MCP connection currently reports stale `tsdbadmin` credentials, but the app's existing server-side `DATABASE_URL` successfully applied and verified the design-principles import. No database credential was rotated.
+- `npm run check` passes. A production build is still environment-blocked here: Turbopack hits a worker/process permission panic, while the webpack fallback reaches the existing Google `next/font` Cormorant loader and fails while fetching/parsing the font stylesheet; neither failure points at the knowledge or Gemini changes.
 - Fonts use `next/font/google`. Builds need outbound network access to fetch them.
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
-- The committed Playwright suite covers the public API contracts, no-database fallback, mobile workspace, local director edits, panel switching, and JSON export. Voice hardware and production Gemini/Whisper flows still need separate integration coverage.
+- The committed Playwright suite covers the public API contracts, no-database fallback, onboarding, start-to-director-to-editor navigation, mobile workspace, local director edits, a mocked Gemini-to-editor patch, panel switching, JSON export, JPG/PSD export, and warm tooltips. Voice hardware and production Gemini/Whisper flows still need separate integration coverage.
 - Anonymous instance cookies identify a workspace but are not authentication. The future auth service must bind authenticated users to these instance records before exposing profile/password operations broadly.
 - Instance files are capped at 10 MB and shared library assets at 25 MB. Library writes require `LIBRARY_WRITE_TOKEN` until the auth service exists.
 
@@ -225,10 +262,11 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 
 In priority order, matching the build phases:
 
-1. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply.
-2. **Real references.** Replace placeholders with legally usable assets or verified sources, with true attribution.
-3. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
-4. **Security hardening.** Rotate exposed credentials (section 6) and pin the SSH host key.
+1. **Merge and deploy `tldraw-voice-onboarding`.** The branch contains the verified manual editor pass, improved warm Vintage Jazz canvas, transparent mascot container, and randomized five-frame speaking loop. Review the `/home` start flow into the `/app` editor, director, Gemini/TigerData coach, and PNG/JPG/PSD export flows before promoting it to `main`; do not push directly to `main`.
+2. **Canonical editor is `/app`.** Keep `/home` as the start screen and do not add another editor route unless the user asks.
+3. **Gemini editing quality.** Add more intents (font size, copy rewrites, multi-step requests) and few-shot examples. Consider streaming the reply. The friend implementing the Gemini backend should preserve `data/gemini/system-prompt.md` and the `layerEdits` semantics.
+4. **Reference depth.** Replace or supplement the 31 source-linked Pinterest searches with legally usable, verified assets when licensing/attribution requirements are settled.
+5. **SVG export, tablet collapsible panels, Auth0** (Auth0 last; the app must stay usable without login).
 
 ## Branch log
 
@@ -251,4 +289,5 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
+| `tldraw-voice-onboarding` | 2026-10-10 | Add start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | PR open (#14) | Lighter full-bleed home scene with dense ASCII overlay, focal-point prompt placement, smaller shadowed type, mascot overlap fix, removed “Edit and ready” and chat/voice controls, transparent onboarding surface, Gemini-generated starter chips with fallback, audio-reactive home mic orb, 31 source-linked Pinterest studies, refined single desktop three-pane Photoshop-like editor with rounded Chatbox area, compact Reference 2×2 study tiles, visible Layers dock, no workspace tab strip or freeform board, functional text selection/font/copy/cut controls, functional canvas Inspire/Restyle/Shuffle/Layers/Export actions, stronger warm Vintage Jazz poster composition, transparent mascot background, randomized five-frame speaking loop, Gemini/TigerData coaching tool loop, exact ElevenLabs voice default, `/home` start flow into canonical `/app` editor, app-subdomain root rewrite, TigerData design-principles source-of-truth corpus, and a Curio-specific Gemini identity/taste contract with validated canvas layer edits; `npm run check`, 9 unit tests, and browser verification pass; current borderless editor/floating-button changes are committed on this branch; PR #14 is open and production server deployment is pending merge |
 <!-- BRANCH-LOG-INSERT -->

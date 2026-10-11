@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Curio Labs Gemini response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reply"],
+  "properties": {
+    "reply": {
+      "type": "string",
+      "description": "One or two short plain sentences."
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["vintage", "minimal", "experimental"]
+    },
+    "paletteId": { "type": "string" },
+    "fontPairId": { "type": "string" },
+    "assetIds": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "type": "string" }
+    },
+    "accent": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "background": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "foreground": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "alignment": { "type": "string", "enum": ["left", "center", "right"] },
+    "spacing": { "type": "string", "enum": ["compact", "normal", "spacious"] },
+    "headline": { "type": "string", "maxLength": 80 },
+    "subtitle": { "type": "string", "maxLength": 120 },
+    "mood": { "type": "string", "maxLength": 80 },
+    "layerEdits": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "description": "Exact id from current poster.canvas.layers." },
+          "x": { "type": "number", "minimum": -4000, "maximum": 4000 },
+          "y": { "type": "number", "minimum": -4000, "maximum": 4000 },
+          "scale": { "type": "number", "minimum": 0.05, "maximum": 12 },
+          "rotation": { "type": "number", "minimum": -360, "maximum": 360 },
+          "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "visible": { "type": "boolean" },
+          "locked": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
