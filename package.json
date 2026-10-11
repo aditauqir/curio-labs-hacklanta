@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "test:unit": "node --test \"scripts/**/*.test.mjs\"",
     "branch": "node scripts/new-branch.mjs",
-    "fonts:import": "node scripts/import-fonts.mjs"
+    "fonts:import": "node scripts/import-fonts.mjs",
+    "design-principles:import": "node scripts/import-design-principles.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",
@@ -22,6 +23,7 @@
     "ag-psd": "^31.0.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "loading-dev": "^0.3.5",
     "lucide-react": "^1.55.0",
     "motion": "^14.1.0",
     "next": "16.4.0",

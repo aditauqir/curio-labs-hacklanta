@@ -1,0 +1,200 @@
+{
+  "sources": [
+    {
+      "id": "source:how-posters-work",
+      "title": "How Posters Work",
+      "filename": "How_posters_work.pdf",
+      "sourceHash": "5623cfe6fca35e56fc63af07ee486b5e6dfb99e82c219415c70318025893ba60",
+      "pageCount": 224,
+      "extractionMethod": "pypdf_text_with_curated_clips",
+      "metadata": {
+        "author": "Ellen Lupton",
+        "institution": "Cooper Hewitt, Smithsonian Design Museum",
+        "year": 2015,
+        "textPagesAvailable": true,
+        "rightsNote": "User-supplied reference; stored as short extracts and paraphrased clips for private design assistance."
+      },
+      "clips": [
+        {
+          "key": "strategy-index",
+          "type": "index",
+          "title": "Fourteen poster strategies",
+          "section": "Index",
+          "pageStart": 7,
+          "pageEnd": 7,
+          "text": "The book organizes poster practice around fourteen strategies: focus the eye, overwhelm the eye, simplify, cut and paste, overlap, assault the surface, activate the diagonal, manipulate scale, use text as image, tell a story, double the meaning, amplify, make eye contact, and make a system.",
+          "tags": ["foundational", "poster", "composition", "hierarchy", "jazz", "cafe"]
+        },
+        {
+          "key": "vision-as-process",
+          "type": "principle",
+          "title": "Design for how perception groups information",
+          "section": "Vision Is a Process",
+          "pageStart": 16,
+          "pageEnd": 17,
+          "text": "Treat perception as an active process rather than a passive scan. Grouping, continuation, closure, simplicity, figure and ground, overlap, contrast, and scale help a viewer turn a flat field into a readable visual structure.",
+          "tags": ["foundational", "perception", "gestalt", "figure-ground", "hierarchy", "jazz", "cafe"]
+        },
+        {
+          "key": "overlap-creates-depth",
+          "type": "principle",
+          "title": "Use overlap to create depth",
+          "section": "Vision Is a Process",
+          "pageStart": 17,
+          "pageEnd": 17,
+          "text": "On a flat surface, overlap creates a minimal illusion of one thing being in front of another. Use it deliberately to create depth, sequence, and a clear front-to-back relationship rather than accidental collisions.",
+          "tags": ["overlap", "depth", "layers", "composition", "poster", "cafe"]
+        },
+        {
+          "key": "typography-as-signal",
+          "type": "principle",
+          "title": "Typography carries visual signals",
+          "section": "Vision Is a Process",
+          "pageStart": 19,
+          "pageEnd": 19,
+          "text": "Typography communicates more than language. Weight, style, alignment, spacing, and grid position create emphasis, hierarchy, rhythm, and multiple points of access to the same message.",
+          "tags": ["typography", "hierarchy", "emphasis", "rhythm", "grid", "jazz", "cafe"]
+        },
+        {
+          "key": "find-the-focal-point",
+          "type": "method",
+          "title": "Find and protect the focal point",
+          "section": "Focal Point",
+          "pageStart": 46,
+          "pageEnd": 46,
+          "text": "Ask what the viewer sees first and test whether the composition supports that decision. A focal point can come from an image, a face, a color, a word, or an unusual scale; the rest of the layout should reinforce its priority.",
+          "tags": ["focal-point", "hierarchy", "attention", "composition", "jazz", "cafe"]
+        },
+        {
+          "key": "anchor-and-contrast",
+          "type": "principle",
+          "title": "Give the eye an uncontested anchor",
+          "section": "Focus the Eye",
+          "pageStart": 72,
+          "pageEnd": 72,
+          "text": "A strong anchor can be created with a single object, heavy form, bright value, outline, or controlled contrast. Use that anchor to organize supporting text and imagery instead of making every element compete equally.",
+          "tags": ["focus", "contrast", "anchor", "figure-ground", "hierarchy", "jazz", "cafe"]
+        },
+        {
+          "key": "diagonal-guides-the-eye",
+          "type": "principle",
+          "title": "Use diagonals to create movement",
+          "section": "Activate the Diagonal",
+          "pageStart": 131,
+          "pageEnd": 131,
+          "text": "Diagonal elements can lead the eye from point to point inside an otherwise shallow field. Use a diagonal when the design needs movement, anticipation, or a directional path through information.",
+          "tags": ["diagonal", "movement", "direction", "rhythm", "energy", "music", "jazz"]
+        },
+        {
+          "key": "scale-creates-tension",
+          "type": "principle",
+          "title": "Manipulate scale for tension and depth",
+          "section": "Manipulate Scale",
+          "pageStart": 140,
+          "pageEnd": 140,
+          "text": "Large and small forms signal distance and importance. Exaggerated scale changes can create depth or visual tension; use them as a conscious relationship between elements, not as arbitrary sizing.",
+          "tags": ["scale", "depth", "tension", "hierarchy", "typography", "poster", "jazz"]
+        },
+        {
+          "key": "text-as-image",
+          "type": "principle",
+          "title": "Let type become an image when it serves the idea",
+          "section": "Use Text as Image",
+          "pageStart": 146,
+          "pageEnd": 149,
+          "text": "Letters can move from transparent carriers of language to visible shapes in the composition. Adjust size, arrangement, rhythm, and interaction with imagery so typography amplifies the concept while remaining legible enough for the intended audience.",
+          "tags": ["typography", "text-as-image", "letterforms", "legibility", "rhythm", "jazz", "cafe"]
+        },
+        {
+          "key": "balance-the-field",
+          "type": "principle",
+          "title": "Balance color, space, image, and type",
+          "section": "Use Text as Image",
+          "pageStart": 149,
+          "pageEnd": 149,
+          "text": "Balance is not equal distribution. Tune the relationships among color, positive and negative space, image, and typography so the composition feels intentional and has room for the primary message to register.",
+          "tags": ["balance", "negative-space", "color", "typography", "composition", "cafe"]
+        },
+        {
+          "key": "tell-a-story",
+          "type": "principle",
+          "title": "Build a beginning, turn, and resolution",
+          "section": "Tell a Story",
+          "pageStart": 160,
+          "pageEnd": 160,
+          "text": "A poster can imply a sequence of events inside one frame. Give the viewer an entry point, a turn or discovery, and a satisfying visual resolution through the order of image, text, and movement.",
+          "tags": ["story", "sequence", "narrative", "event", "music", "jazz", "cafe"]
+        },
+        {
+          "key": "systems-enable-variation",
+          "type": "principle",
+          "title": "Use a system to hold variation together",
+          "section": "Make a System",
+          "pageStart": 200,
+          "pageEnd": 203,
+          "text": "A visual system defines relationships among type styles, sizes, spaces, colors, and layout devices. It creates consistency without eliminating variation, making a family of compositions feel related while leaving room for change.",
+          "tags": ["system", "grid", "consistency", "variation", "brand", "series", "jazz", "cafe"]
+        },
+        {
+          "key": "grid-as-generator",
+          "type": "principle",
+          "title": "Let structure generate form",
+          "section": "Make a System",
+          "pageStart": 203,
+          "pageEnd": 203,
+          "text": "A grid can do more than align existing objects: it can generate letterforms, repeated marks, and a visual rhythm. When the structure is visible, let its logic shape the image and the typography together.",
+          "tags": ["grid", "structure", "letterforms", "rhythm", "system", "editorial", "jazz"]
+        }
+      ]
+    },
+    {
+      "id": "source:grid-systems-in-graphic-design",
+      "title": "Grid Systems in Graphic Design",
+      "filename": "Mueller-Brockmann_Josef_Grid_Systems_in_Graphic_Design_Raster_Systeme_fuer_die_Visuele_Gestaltung_English_German_no_OCR.pdf",
+      "sourceHash": "cf49bbbb18ec9a1928d32530e9676b16c34d696394579b177ab38dbadc368534",
+      "pageCount": 162,
+      "extractionMethod": "manual_visual_notes_raster_pdf",
+      "metadata": {
+        "author": "Josef Müller-Brockmann",
+        "textPagesAvailable": false,
+        "visualInspectionPages": [1, 7, 29],
+        "rightsNote": "User-supplied reference; only manual visual notes are stored because the supplied PDF has no OCR text."
+      },
+      "clips": [
+        {
+          "key": "grid-fields-and-margins",
+          "type": "visual_note",
+          "title": "A grid divides the field into usable relationships",
+          "section": "Manual visual note",
+          "pageStart": 1,
+          "pageEnd": 162,
+          "text": "Manual visual note from the raster reference: the grid divides a page into columns, rows, margins, and spatial fields. Those fields create repeatable alignment choices for type, images, illustrations, and color while preserving breathing room.",
+          "tags": ["grid", "alignment", "margins", "space", "typography", "foundational", "jazz", "cafe"],
+          "metadata": {"manualVisualReview": true, "pageReferences": [1, 7, 29]}
+        },
+        {
+          "key": "grid-legibility-and-order",
+          "type": "principle",
+          "title": "Use order to make complexity legible",
+          "section": "Manual visual note",
+          "pageStart": 1,
+          "pageEnd": 162,
+          "text": "Use a consistent underlying order before introducing expressive exceptions. A grid makes hierarchy, alignment, and repetition legible; breaking it is most effective when the viewer can still feel the structure underneath.",
+          "tags": ["grid", "legibility", "hierarchy", "order", "exception", "editorial", "jazz", "cafe"],
+          "metadata": {"manualVisualReview": true, "pageReferences": [1, 7, 29]}
+        },
+        {
+          "key": "grid-for-series",
+          "type": "method",
+          "title": "Use a shared grid for a family of outputs",
+          "section": "Manual visual note",
+          "pageStart": 1,
+          "pageEnd": 162,
+          "text": "A shared grid can carry a series across different posters, event dates, or content lengths. Keep the relationships stable and vary one or two controlled variables so each piece belongs to the same visual system.",
+          "tags": ["grid", "series", "system", "consistency", "brand", "event", "music", "jazz"],
+          "metadata": {"manualVisualReview": true, "pageReferences": [1, 7, 29]}
+        }
+      ]
+    }
+  ]
+}

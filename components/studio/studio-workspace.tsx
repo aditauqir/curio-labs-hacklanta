@@ -10,6 +10,7 @@ import { ExportControls } from "./export-controls";
 import { InspirationBoard } from "./inspiration-board";
 import { OnboardingStudio, type StartDestination } from "./onboarding-studio";
 import { getWorkspaceHostUrl } from "@/lib/host-routing";
+import { PanelLeftIcon, PanelRightIcon, ResetIcon } from "./icons";
 
 type Tab = "chat" | "canvas" | "inspiration";
 export type StudioView = "start" | "chat" | "editor";
@@ -17,7 +18,7 @@ export type StudioView = "start" | "chat" | "editor";
 const VIEW_ROUTES: Record<StudioView, string> = {
   start: "/home",
   chat: "/director",
-  editor: "/editor",
+  editor: "/app",
 };
 
 const TABS: { id: Tab; label: string }[] = [
@@ -37,6 +38,7 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
   const [tab, setTab] = useState<Tab>("canvas");
   const [view, setView] = useState<StudioView>(initialView);
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [persistence, setPersistence] = useState<{
     ready: boolean;
     instanceId: string | null;
@@ -116,10 +118,11 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   useEffect(() => {
     function handlePopState() {
+      const pathname = window.location.pathname;
       const nextView =
-        window.location.pathname === VIEW_ROUTES.chat
+        pathname === VIEW_ROUTES.chat
           ? "chat"
-          : window.location.pathname === VIEW_ROUTES.editor
+          : pathname === VIEW_ROUTES.editor || pathname === "/editor"
             ? "editor"
             : "start";
       setInitialPrompt(null);
@@ -192,69 +195,53 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
 
   return (
     <div
-      className="studio-editor-shell flex h-dvh flex-col bg-paper text-ink"
+      className="studio-editor-shell flex h-dvh flex-col bg-[#101113] text-white"
       data-testid="editor-screen"
     >
-      <header className="studio-editor-header flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 items-baseline gap-4">
-          <h1 className="font-display whitespace-nowrap text-lg font-bold tracking-[0.18em] sm:text-xl">
-            CURIO LABS
-          </h1>
-          <p className="hidden text-xs text-muted xl:block">
-            From vague ideas to visual direction.
-          </p>
-        </div>
-
-        <div className="order-3 flex w-full min-w-0 items-center justify-between gap-3 sm:order-2 sm:w-auto sm:justify-start">
-          <div className="studio-view-switcher" aria-label="Studio views">
-            <button type="button" aria-label="Open director" onClick={openChat}>
-              Director
-            </button>
-            <button type="button" aria-current="page" className="is-active" onClick={openEditor}>
-              Editor
-            </button>
-          </div>
-          <label className="flex min-w-0 items-center gap-2 text-xs text-muted">
-            <span>Project</span>
-            <input
-              type="text"
-              aria-label="Project name"
-              value={design.projectName}
-              maxLength={60}
-              onChange={(event) =>
-                dispatch({ type: "setCopy", key: "projectName", value: event.target.value })
-              }
-              className="w-40 min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm font-medium text-ink hover:border-line focus:border-line sm:w-48"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={resetProject}
-            className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
-          >
-            Reset project
-          </button>
-          <button
-            type="button"
-            onClick={openStart}
-            className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
-          >
-            Start screen
-          </button>
-          <button
-            type="button"
-            onClick={openStart}
-            className="whitespace-nowrap rounded-md px-2 py-2 text-xs font-medium text-muted transition-colors hover:text-ink"
-          >
-            Exit
-          </button>
-        </div>
-
-        <div className="order-2 sm:order-3">
-          <div className="flex items-center gap-2">
-            <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
+      <header className="studio-editor-header">
+        <div className="studio-editor-brand">
+          <span className="studio-brand-mark" aria-hidden="true" />
+          <div>
+            <h1>CURIO LABS</h1>
+            <p>Visual direction workspace</p>
           </div>
         </div>
+
+        <label className="studio-project-field">
+          <span>Project</span>
+          <input
+            type="text"
+            aria-label="Project name"
+            value={design.projectName}
+            maxLength={60}
+            onChange={(event) =>
+              dispatch({ type: "setCopy", key: "projectName", value: event.target.value })
+            }
+          />
+        </label>
+
+        <nav className="studio-editor-actions" aria-label="Editor actions">
+          <button type="button" className="studio-header-action" onClick={openChat}>
+            <PanelLeftIcon />
+            <span>Director</span>
+          </button>
+          <button
+            type="button"
+            className={`studio-header-action ${inspectorOpen ? "is-active" : ""}`}
+            onClick={() => setInspectorOpen((open) => !open)}
+          >
+            <PanelRightIcon />
+            <span>Inspector</span>
+          </button>
+          <button type="button" className="studio-header-action" onClick={resetProject}>
+            <ResetIcon />
+            <span>Reset</span>
+          </button>
+          <button type="button" className="studio-header-action" onClick={openStart}>
+            <span>Exit</span>
+          </button>
+          <ExportControls design={design} selectedPaletteId={selectedPaletteId} />
+        </nav>
       </header>
 
       <div
@@ -279,15 +266,8 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
       </div>
 
       <main className="studio-editor-grid min-h-0 flex-1" data-tab={tab}>
-        <aside className="studio-editor-rail min-h-0 border-line lg:border-r">
-          <div className="studio-rail-panel studio-rail-inspiration">
-            <InspirationBoard
-              design={design}
-              selectedPaletteId={selectedPaletteId}
-              dispatch={dispatch}
-            />
-          </div>
-          <div className="studio-rail-panel studio-rail-chat border-line lg:border-t">
+        <section className="studio-editor-surface">
+          <aside className="studio-editor-chat">
             <CreativeDirector
               messages={messages}
               design={design}
@@ -295,11 +275,24 @@ export default function StudioWorkspace({ initialView }: { initialView: StudioVi
               dispatch={dispatch}
               initialPrompt={initialPrompt}
             />
+          </aside>
+          <div className="studio-editor-canvas">
+            <DesignCanvas
+              design={design}
+              dispatch={dispatch}
+              onToggleInspector={() => setInspectorOpen((open) => !open)}
+            />
           </div>
-        </aside>
-        <div className="studio-editor-canvas min-h-0 min-w-0">
-          <DesignCanvas design={design} dispatch={dispatch} />
-        </div>
+          {inspectorOpen ? (
+            <aside className="studio-editor-inspector">
+              <InspirationBoard
+                design={design}
+                selectedPaletteId={selectedPaletteId}
+                dispatch={dispatch}
+              />
+            </aside>
+          ) : null}
+        </section>
       </main>
     </div>
   );

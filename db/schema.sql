@@ -87,3 +87,43 @@ CREATE INDEX IF NOT EXISTS curio_library_assets_kind_idx
 
 ALTER TABLE curio_chat_messages
   ADD COLUMN IF NOT EXISTS asset_suggestions JSONB;
+
+CREATE TABLE IF NOT EXISTS curio_knowledge_sources (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  source_hash TEXT NOT NULL UNIQUE,
+  source_type TEXT NOT NULL DEFAULT 'pdf',
+  page_count INTEGER NOT NULL CHECK (page_count >= 0),
+  extraction_method TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS curio_knowledge_clips (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES curio_knowledge_sources(id) ON DELETE CASCADE,
+  clip_key TEXT NOT NULL,
+  clip_type TEXT NOT NULL CHECK (clip_type IN ('principle', 'page_extract', 'visual_note', 'method', 'index')),
+  title TEXT NOT NULL,
+  section TEXT,
+  page_start INTEGER CHECK (page_start IS NULL OR page_start >= 1),
+  page_end INTEGER CHECK (page_end IS NULL OR page_end >= 1),
+  text TEXT NOT NULL,
+  normalized_text TEXT NOT NULL,
+  tags TEXT[] NOT NULL DEFAULT '{}',
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (source_id, clip_key)
+);
+
+CREATE INDEX IF NOT EXISTS curio_knowledge_clips_source_idx
+  ON curio_knowledge_clips (source_id, page_start);
+
+CREATE INDEX IF NOT EXISTS curio_knowledge_clips_tags_idx
+  ON curio_knowledge_clips USING GIN (tags);
+
+CREATE INDEX IF NOT EXISTS curio_knowledge_clips_search_idx
+  ON curio_knowledge_clips USING GIN (to_tsvector('simple', normalized_text));

@@ -64,7 +64,6 @@ function useVoiceLevel(stream: MediaStream | null, active: boolean) {
 }
 
 function VoiceActivityOrb({ active, level, processing }: { active: boolean; level: number; processing: boolean }) {
-  const barFactors = [0.5, 0.85, 1.15, 1.45, 1.15, 0.85, 0.5];
   const style = {
     "--voice-level": level,
     "--voice-scale": active ? 0.92 + level * 0.14 : 0.7,
@@ -75,18 +74,6 @@ function VoiceActivityOrb({ active, level, processing }: { active: boolean; leve
 
   return (
     <span className={`voice-activity-orb ${active ? "is-active" : ""} ${processing ? "is-processing" : ""}`} style={style}>
-      <span className="voice-activity-bars">
-        {barFactors.map((factor, index) => (
-          <span
-            key={`${factor}-${index}`}
-            className="voice-activity-bar"
-            style={{
-              "--bar-height": `${0.2 + level * factor}rem`,
-              "--bar-delay": `${index * 45}ms`,
-            } as CSSProperties}
-          />
-        ))}
-      </span>
     </span>
   );
 }
@@ -227,19 +214,11 @@ export function OnboardingStudio({
               ))}
             </div>
 
-            <button
-              type="button"
-              aria-label="Open the full studio"
-              className="onboarding-skip"
-              onClick={() => onStart(undefined, "editor")}
-            >
-              Edit and ready <span aria-hidden="true">↗</span>
-            </button>
           </section>
 
-          <aside className="onboarding-projects" aria-label="Projects and starting points">
+          <aside className="onboarding-projects" aria-label="Recent projects">
             <div className="onboarding-projects-heading">
-              <p className="preview-label">Projects</p>
+              <p className="preview-label">Recent projects</p>
               <span>03</span>
             </div>
             <button
@@ -276,10 +255,6 @@ export function OnboardingStudio({
                 <strong>Signal / noise</strong>
                 <small>Start a new brief</small>
               </span>
-              <span aria-hidden="true">+</span>
-            </button>
-            <button type="button" className="preview-chat-button" onClick={() => onStart(undefined, "chat")}>
-              <span>Chat / voice</span>
               <span aria-hidden="true">+</span>
             </button>
           </aside>
