@@ -240,6 +240,16 @@ export async function listInstancePipelineAssets(
   }));
 }
 
+/** Compact, failure-tolerant context for Gemini's server-side prompts. */
+export async function pipelineAssetContext(instanceId?: string): Promise<PipelineAssetSummary[]> {
+  if (!instanceId) return [];
+  try {
+    return await listInstancePipelineAssets(instanceId, 24);
+  } catch {
+    return [];
+  }
+}
+
 // ----------------------------------------------------------------- versions
 
 export async function createVersion(

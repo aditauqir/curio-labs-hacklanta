@@ -475,7 +475,7 @@ export function CreativeDirector({
               ) : null}
               {message.assetSuggestions && message.assetSuggestions.length > 0 ? (
                 <p className="mt-2 text-[11px] text-muted">
-                  Related references: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
+                  Related assets: {message.assetSuggestions.map((asset) => asset.name).join(", ")}
                 </p>
               ) : null}
               {message.id === lastId && message.suggestions?.length ? (

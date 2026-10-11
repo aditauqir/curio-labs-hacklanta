@@ -34,6 +34,8 @@ Latest demo workflow: the home screen now opens a clearly labeled preloaded `Sig
 
 Latest pipeline-data wiring: the reviewed creative-pipeline backend is now present on `codex/tool-options-palette`; `GET /api/assets` preserves the legacy library response and adds instance-scoped `curio_project_assets` plans joined through `curio_projects`. The compact Reference inspector surfaces the project name, asset role, source, and status while retaining the old Gemini/library data path and local fallback.
 
+Latest Gemini texture grounding: production TigerData contains 42 `engine-texture` PNGs (about 52.6 MB). The public `/api/assets?kind=image` catalog still exposes all of them, while the general Gemini library context excludes the renderer-only tag and a separate bounded context supplies up to eight exact texture IDs to the director and coach. Gemini receives metadata only and must not claim to see pixels or that a planned texture is already attached.
+
 Latest image import behavior: imported references now remain visible on the poster canvas even when Gemini image analysis is unavailable; the Reference inspector clearly labels that analysis fallback while the local preview remains usable.
 
 Latest Layers behavior: the compact Layers inspector now has a dedicated Delete control for every non-background layer; deletion remains reversible through the row's Show control, and the layer rows use a tighter viewport-relative vertical rhythm.
