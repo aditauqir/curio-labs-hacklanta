@@ -27,6 +27,9 @@ export default defineConfig({
       GEMINI_API_KEY: "",
       LIBRARY_WRITE_TOKEN: "",
       WHISPER_ENABLED: "false",
+      // The pipeline's deterministic stand-in, so stage routing can be tested
+      // offline. It identifies itself as provider "mock" in every response.
+      CURIO_AI_MOCK: "1",
     },
   },
 });

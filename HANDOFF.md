@@ -72,6 +72,7 @@ Live verification on 2026-10-11: Gemini and ElevenLabs returned successful respo
 | Microphone (speech to text) | Built. The browser converts recordings to 16 kHz mono WAV, then `POST /api/voice/transcribe` uses local **Whisper** (`whisper.cpp`) first and **ElevenLabs** as fallback. Production microphone access is enabled over HTTPS; browsers without `mediaDevices`/`MediaRecorder` now expose the reason through the mic tooltip instead of appearing silently inactive. The dark chat composer has an explicit hover/focus highlight, and active response/voice states use the `loading-dev` Wave indicator instead of the old voice-glow composer animation. |
 | Spoken replies (text to speech) | Built. `POST /api/voice/speak`, ElevenLabs. Director replies speak automatically whenever ElevenLabs is configured; voice requests also speak automatically. Browser playback is unlocked on the user's send/microphone gesture and uses a resumed Web Audio context with a media-element fallback. Default voice is `ZoiZ8fuDWInAcwPXaVeq`; `ELEVENLABS_VOICE_ID` can override it. Works over plain HTTP. |
 | Visual reference cards | Working locally. 31 distinct Pinterest poster searches are source-linked in the inspiration rail; Curio renders original abstract thumbnails rather than copying remote poster images. |
+| Creative pipeline API | Built on `creative-pipeline-backend`, merged with `main` on 2026-10-11. This is the intended backend route for Gemini and data into the app; the UI is unchanged and does not call it yet. `/api/projects/*` runs brief -> concepts -> references -> asset plan -> composition -> render -> critique -> revise -> versions -> SVG/JSON export, with jobs de-duplicated by request hash. `GET /api/pipeline/status` reports which stages are available. Text stages use Gemini through `lib/ai/` when `GEMINI_API_KEY` is set; there is no image generation or vision model, and those capabilities report `false`. Contract: `docs/pipeline-api.yaml`. |
 | Auth0 | Not built. App is open, no login. |
 | SVG export | Not built. |
 | Tablet collapsible panels | Not built. Tablet reuses the mobile tabs. |
@@ -143,6 +144,10 @@ data/gemini/whoami.md          Curio-specific Gemini identity and operating cont
 data/gemini/taste.json         Machine-readable Curio design rubric and canvas edit policy
 data/gemini/system-prompt.md   Copy/paste system prompt for the Gemini backend implementation
 data/gemini/response.schema.json Structured response contract for the friend-owned Gemini backend
+lib/ai/                 provider.ts (capability-based provider interface), gemini-json.ts (structured-JSON Gemini calls for the pipeline), mock.ts (deterministic offline stand-in, labelled provider "mock")
+lib/pipeline/           Creative pipeline stages: brief, concepts, references, assets, layout, composition, document, render, critique, revise, validate/validator, store (TigerData), http; pipeline.test.mjs and e2e.test.mjs run under `npm run test:unit`
+app/api/projects/       Pipeline REST API (projects, concepts, select, design, evaluate, exports, jobs, preview, references, revise, versions); app/api/pipeline/status reports stage availability
+docs/pipeline-api.yaml  OpenAPI contract for the pipeline API
 lib/ (server only: db.ts, instance.ts, instance-store.ts, library.ts, password.ts, gemini.ts, whisper.ts, elevenlabs.ts, transcribe.ts, rate-limit.ts, voice-error.ts)
   ai-patch.ts           AiPatch type, validatePatch(), reconcilePatch(), patchToActions(). Shared by server and client
   poster-editor.ts      Bounded non-destructive layer transforms and visibility/lock state for the SVG editor
@@ -224,6 +229,7 @@ nginx's default `client_max_body_size` is 1 MB. Voice clips are capped at 30 sec
 | `WHISPER_URL`, `WHISPER_ENABLED` | Optional local Whisper URL and opt-out switch; defaults to `http://127.0.0.1:8178` and enabled | same as above |
 | `DATABASE_URL` | TigerData/Timescale PostgreSQL connection string for anonymous instances, workspace state, chat, files, and the shared asset library | same as above |
 | `LIBRARY_WRITE_TOKEN` | Optional server-only token required to upload shared font/media assets; reads remain available without it | same as above |
+| `CURIO_AI_MOCK` | Development and CI only: `1` makes the pipeline answer from the deterministic mock (every response is labelled provider "mock"). **Never set it in production**; that would present mock output as AI | Playwright config; local shell |
 | `GEMINI_MODEL`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_STT_MODEL` | Optional model and voice overrides | same as above |
 | GitHub Actions secrets | `VULTR_HOST`, `VULTR_USER`, `VULTR_SSH_KEY`, `VULTR_KNOWN_HOSTS` | GitHub repo settings. App keys are intentionally **not** here |
 
@@ -289,6 +295,8 @@ In opencode, `/check` runs lint, typecheck, and build and fixes failures. `openc
 - The poster is fixed at 1080x1350 and long copy is not auto-shrunk (only the headline is fitted).
 - The PNG exporter needs the fonts loaded; it awaits `document.fonts` but a slow connection could still produce a fallback font.
 - The committed Playwright suite covers the public API contracts, no-database fallback, onboarding, start-to-director-to-editor navigation, mobile workspace, local director edits, a mocked Gemini-to-editor patch, panel switching, JSON export, JPG/PSD export, and warm tooltips. Voice hardware and production Gemini/Whisper flows still need separate integration coverage.
+- **The pipeline is the backend route for Gemini and data.** `lib/pipeline/` + `lib/ai/` (`/api/projects/*`) is where Gemini output, the TigerData design data and validation come together and flow into the app; the app UI is intentionally not changed by it. Until the UI is wired to it, the editor keeps calling `lib/gemini.ts` (`/api/creative-director`, `/api/creative-coach`). Both paths are server-only and validate model output before use; when wiring the UI to the pipeline, keep that validation (see the Gemini merge priority above).
+- **The pipeline adds 8 tables** (`curio_projects`, `curio_project_briefs`, `curio_project_concepts`, `curio_project_assets`, `curio_design_versions`, `curio_evaluations`, `curio_exports`, `curio_jobs`) to `db/schema.sql`. The app applies that file on its first database use after a deploy, so merging creates them in production. All are `CREATE ... IF NOT EXISTS` and hang off `curio_instances`.
 - Anonymous instance cookies identify a workspace but are not authentication. The future auth service must bind authenticated users to these instance records before exposing profile/password operations broadly.
 - Instance files are capped at 10 MB and shared library assets at 25 MB. Library writes require `LIBRARY_WRITE_TOKEN` until the auth service exists.
 
@@ -324,6 +332,7 @@ Newest at the bottom. Status: `in progress`, `PR open`, `merged`, `abandoned`.
 | `user-persistence-refresh` | 2026-10-10 | Add user identity and reliable workspace refresh persistence | merged | PR #11; deployed and production API verification passes |
 | `https-mic-access` | 2026-10-10 | Enable HTTPS for production microphone access | merged | Server nginx and Let's Encrypt configured; live HTTPS verified |
 | `ssl-cert` | 2026-10-10 | Add HTTPS for the custom domain `idkjustmakeitlookgood.gay` and clean up the duplicate nginx `server_name` entries it introduced | in progress | |
+| `creative-pipeline-backend` | 2026-10-10 | Build the AI creative director backend: brief interpretation, concepts, references, asset and composition planning, rendering, critique, revisions, versions and export | in progress | `main` merged in on 2026-10-11 (conflicts in db/schema.sql, package.json and this log, resolved by keeping both sides) |
 | `tldraw-voice-onboarding` | 2026-10-10 | Add start/director/editor screen states, Compositor-inspired editor chrome, supplied voice keyframes, Gemini-to-editor handoff, and multi-format exports | merged | PR #14 merged to `main`; the first production workflow run exposed stale E2E expectations for the current desktop flow; follow-up fix is on `e2e-current-flow` |
 | `e2e-current-flow` | 2026-10-11 | Align production E2E tests with the current home-to-app desktop flow | merged | PR #15 merged to `main`; all 17 E2E tests passed, then the server build exposed a separate next/font compatibility issue |
 | `server-local-fonts` | 2026-10-11 | Remove remote Google font build dependency from the production bundle | merged | PR #16 merged to `main`; server build, PM2 restart, and the canonical `/app` HTTPS route now pass; the workflow’s raw-host health check was the only remaining false failure |
