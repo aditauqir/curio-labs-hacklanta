@@ -19,7 +19,9 @@ import copy
 from typing import Any
 
 from curio.core.blend import BLEND_MODES
-from curio.core.color import is_hex
+import numpy as np
+
+from curio.core.color import delta_e_2000, is_hex, parse_hex, rgb_to_lab
 from curio.ops import get_op, has_op, validate_params
 from curio.ops.registry import param_errors
 
@@ -102,7 +104,13 @@ def _expect_number(data: dict, key: str, c: IssueCollector, default: float = 0, 
 
 
 def normalise_range(value: Any, c: IssueCollector) -> dict[str, Any] | None:
-    """Accepts ``[min, max]``, ``{"min": a, "max": b}`` or ``{"choices": [...]}``."""
+    """Accepts ``[min, max]``, ``{"min": a, "max": b}``, ``{"choices": [...]}`` or
+    ``{"center": "#RRGGBB", "max_delta_e": n}`` (a colour within CIEDE2000 distance n)."""
+    if isinstance(value, dict) and "center" in value:
+        if not is_hex(value["center"]) or not is_number(value.get("max_delta_e")) or value["max_delta_e"] < 0:
+            c.error('a colour range needs a #RRGGBB "center" and a non-negative "max_delta_e"')
+            return None
+        return {"center": value["center"].upper(), "max_delta_e": float(value["max_delta_e"])}
     if isinstance(value, (list, tuple)) and len(value) == 2 and all(is_number(v) for v in value):
         lo, hi = value
     elif isinstance(value, dict) and "choices" in value:
@@ -114,7 +122,7 @@ def normalise_range(value: Any, c: IssueCollector) -> dict[str, Any] | None:
     elif isinstance(value, dict) and is_number(value.get("min")) and is_number(value.get("max")):
         lo, hi = value["min"], value["max"]
     else:
-        c.error('range must be [min, max], {"min", "max"} or {"choices": [...]}')
+        c.error('range must be [min, max], {"min", "max"}, {"choices": [...]} or {"center", "max_delta_e"}')
         return None
     if lo > hi:
         c.error(f"range minimum {lo} is greater than maximum {hi}")
@@ -127,7 +135,7 @@ def flatten_ranges(mapping: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in mapping.items():
         path = f"{prefix}.{key}" if prefix else str(key)
-        is_spec = isinstance(value, dict) and ("choices" in value or ("min" in value and "max" in value))
+        is_spec = isinstance(value, dict) and ("choices" in value or "center" in value or ("min" in value and "max" in value))
         if isinstance(value, dict) and value and not is_spec:
             out.update(flatten_ranges(value, path))
         else:
@@ -135,7 +143,16 @@ def flatten_ranges(mapping: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     return out
 
 
+def color_distance(a: str, b: str) -> float:
+    """CIEDE2000 distance between two hex colours."""
+    la = rgb_to_lab(np.array(parse_hex(a), dtype=np.float32))
+    lb = rgb_to_lab(np.array(parse_hex(b), dtype=np.float32))
+    return float(delta_e_2000(la, lb))
+
+
 def in_range(value: Any, spec: dict[str, Any]) -> bool:
+    if "center" in spec:
+        return is_hex(value) and color_distance(value, spec["center"]) <= spec["max_delta_e"] + 1e-6
     if "choices" in spec:
         return value in spec["choices"]
     return is_number(value) and spec["min"] <= value <= spec["max"]

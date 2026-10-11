@@ -37,6 +37,9 @@ class Param:
     min_items: int | None = None
     max_items: int | None = None
     doc: str = ""
+    #: True when the value is a length in pixels at the reference size. Such values
+    #: are scaled by output size at render time (see curio/ops/units.py).
+    length: bool = False
 
     def describe(self) -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "type": self.type, "default": self.default}
@@ -46,6 +49,8 @@ class Param:
                 out[key] = value
         if self.doc:
             out["doc"] = self.doc
+        if self.length:
+            out["length"] = True
         return out
 
 

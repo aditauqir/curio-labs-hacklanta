@@ -33,8 +33,10 @@ from .registry import (
 )
 
 for _module in pkgutil.iter_modules(__path__):
-    if _module.name != "registry" and not _module.name.startswith("_"):
+    if _module.name not in ("registry", "units") and not _module.name.startswith("_"):
         importlib.import_module(f"{__name__}.{_module.name}")
+
+from . import units  # noqa: E402  (must run after every op module has registered)
 
 __all__ = [
     "Bool",

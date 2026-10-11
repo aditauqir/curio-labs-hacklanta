@@ -197,6 +197,8 @@ def _nested(overrides: dict[str, Any] | None) -> bool:
 def _show(spec: dict[str, Any] | None) -> str:
     if not spec:
         return "its limits"
+    if "center" in spec:
+        return f"within delta E {spec['max_delta_e']:g} of {spec['center']}"
     return f"{spec['choices']}" if "choices" in spec else f"{spec['min']}..{spec['max']}"
 
 
