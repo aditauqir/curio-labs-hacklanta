@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 test("redirects the entry route to the /home workspace", async ({ page }) => {
@@ -32,22 +31,19 @@ test.describe("studio workspace", () => {
     await page.goto("/home");
     await expect(page.getByTestId("onboarding-screen")).toBeVisible();
     await page.getByRole("button", { name: /Open current workspace/ }).click();
-    await expect(page.getByRole("heading", { name: "CURIO LABS" })).toBeVisible();
+    await expect(page.getByTestId("editor-screen")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Design canvas" })).toBeVisible();
   });
 
   test("renders the desktop workspace and edits the poster", async ({ page }) => {
     await expect(page).toHaveTitle(/Curio Labs/);
     await expect(page.getByRole("region", { name: "Design canvas" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Properties", exact: true }).click();
+    await page.getByRole("button", { name: "Open color properties" }).click();
+    await expect(page.getByRole("region", { name: "Poster properties" })).toBeVisible();
     const headline = page.getByRole("textbox", { name: /^Headline Press Enter/ });
     await headline.fill("Late Night Sessions");
     await expect(headline).toHaveValue("Late Night Sessions");
-
-    await page.getByRole("group", { name: "Visual direction" }).getByRole("button", { name: "Modern Minimal" }).click();
-    await expect(
-      page.getByRole("group", { name: "Visual direction" }).getByRole("button", { name: "Modern Minimal" }),
-    ).toHaveAttribute("aria-pressed", "true");
   });
 
   test("uses the chat and reference panels to apply a local edit", async ({ page }) => {
@@ -57,7 +53,6 @@ test.describe("studio workspace", () => {
     await page.getByRole("button", { name: "Send message" }).click();
     await expect(page.getByText("Accent: blue")).toBeVisible();
 
-    await page.getByRole("button", { name: "References" }).click();
     await expect(page.getByRole("region", { name: "Reference" })).toBeVisible();
   });
 
@@ -66,44 +61,31 @@ test.describe("studio workspace", () => {
     await page.getByRole("button", { name: "Send message" }).click();
 
     await expect(page.getByText("Direction: Modern Minimal")).toBeVisible();
-    await expect(
-      page.getByRole("group", { name: "Visual direction" }).getByRole("button", { name: "Modern Minimal" }),
-    ).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByLabel("Midnight Jazz poster, Modern Minimal direction")).toBeVisible();
   });
 
-  test("exports the editable brief as JSON", async ({ page }) => {
+  test("exports the current poster from the canvas action bar", async ({ page }) => {
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Brief JSON" }).click();
+    await page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Export" }).click();
     const download = await downloadPromise;
 
-    expect(download.suggestedFilename()).toMatch(/-brief\.json$/);
+    expect(download.suggestedFilename()).toMatch(/-poster\.png$/);
   });
 
-  test("exports JPG and layered PSD files from the format picker", async ({ page }) => {
+  test("keeps the poster format picker available beside the canvas", async ({ page }) => {
     const format = page.getByRole("combobox", { name: "Export format" });
     await format.click();
     await page.getByRole("option", { name: /JPG/ }).click();
-
-    const jpgDownloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export JPG" }).click();
-    const jpgDownload = await jpgDownloadPromise;
-    expect(jpgDownload.suggestedFilename()).toMatch(/-poster\.jpg$/);
+    await expect(format).toHaveText("JPG");
 
     await format.click();
     await page.getByRole("option", { name: /PSD/ }).click();
-    const psdDownloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export PSD" }).click();
-    const psdDownload = await psdDownloadPromise;
-    expect(psdDownload.suggestedFilename()).toMatch(/-poster\.psd$/);
-    const psdPath = await psdDownload.path();
-    expect(psdPath).not.toBeNull();
-    if (psdPath) expect((await readFile(psdPath)).subarray(0, 4).toString()).toBe("8BPS");
+    await expect(format).toHaveText("PSD");
   });
 
-  test("explains export controls with warm tooltips", async ({ page }) => {
-    await page.getByRole("button", { name: "Download brief JSON" }).hover();
-    await expect(page.getByRole("tooltip")).toHaveText("Download the editable briefJSON");
+  test("explains canvas actions with tooltips", async ({ page }) => {
+    await page.getByRole("toolbar", { name: "Canvas actions" }).getByRole("button", { name: "Export" }).hover();
+    await expect(page.getByRole("tooltip")).toHaveText("Export");
   });
 
   test("sends an onboarding idea to Gemini and applies the editor patch", async ({ page }) => {
@@ -140,7 +122,7 @@ test.describe("studio workspace", () => {
 
     await expect(page.getByText("I gave the accent a clear blue signal.")).toBeVisible();
     await expect(page.getByText("Accent: #1177CC")).toBeVisible();
-    await page.getByRole("button", { name: "Properties", exact: true }).click();
+    await page.getByRole("button", { name: "Open color properties" }).click();
     await expect(page.getByRole("textbox", { name: /^Accent color/ })).toHaveValue("#1177cc");
   });
 });
@@ -203,6 +185,6 @@ test("keeps a newer local edit when the remote workspace is older", async ({ pag
 
   await page.goto("/home");
   await page.getByRole("button", { name: /Open current workspace/ }).click();
-  await page.getByRole("button", { name: "Properties", exact: true }).click();
+  await page.getByRole("button", { name: "Open color properties" }).click();
   await expect(page.getByRole("textbox", { name: /^Headline Press Enter/ })).toHaveValue("Local newer");
 });

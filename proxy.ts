@@ -1,11 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { isAppHostname } from "@/lib/host-routing";
+import { NextResponse } from "next/server";
 
-export function proxy(request: NextRequest) {
-  if (isAppHostname(request.headers.get("host") ?? "") && request.nextUrl.pathname === "/") {
-    return NextResponse.rewrite(new URL("/app", request.url));
-  }
-
+export function proxy() {
   return NextResponse.next();
 }
 
