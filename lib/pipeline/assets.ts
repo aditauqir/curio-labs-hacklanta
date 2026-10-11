@@ -1,0 +1,145 @@
+// Stage D: turn a selected concept into a concrete asset plan.
+//
+// The planner is deterministic. Choosing whether a logo should be drawn by an
+// image model or placed from an upload is a routing decision with a correct
+// answer, so it is made in code rather than asked of a language model.
+//
+// Rule of thumb applied below: image generation is for interpretive artwork
+// only. Typography, charts, exact text and geometric devices are produced by
+// deterministic tools, because a generator cannot be trusted to set real text.
+import { aiCapabilities } from "../ai/provider.ts";
+import type { AssetType, Concept } from "./concepts.ts";
+import type { StructuredBrief } from "./brief.ts";
+import type { AssetSource } from "./document.ts";
+import { slug } from "./validate.ts";
+
+export const ASSET_STATUSES = ["planned", "ready", "unavailable"] as const;
+export type AssetStatus = (typeof ASSET_STATUSES)[number];
+
+export type PlannedAsset = {
+  id: string;
+  type: AssetType;
+  role: string;
+  description: string;
+  source: AssetSource;
+  status: AssetStatus;
+  /** Why this source was chosen, and what has to happen for it to be ready. */
+  note: string;
+  width: number;
+  height: number;
+  aspectRatio: string;
+  transparent: boolean;
+  priority: number;
+  license: string | null;
+  cleared: boolean;
+  generator: string | null;
+};
+
+/** Which production method is correct for each asset type. */
+const SOURCE_FOR_TYPE: Record<AssetType, AssetSource> = {
+  "hero-image": "generated",
+  "supporting-image": "generated",
+  texture: "procedural",
+  "vector-shape": "procedural",
+  typography: "procedural",
+  logo: "user-upload",
+  chart: "procedural",
+};
+
+const PRIORITY_FOR_TYPE: Record<AssetType, number> = {
+  "hero-image": 1,
+  logo: 2,
+  "supporting-image": 3,
+  chart: 3,
+  typography: 4,
+  "vector-shape": 5,
+  texture: 6,
+};
+
+function ratio(width: number, height: number) {
+  const divisor = (a: number, b: number): number => (b === 0 ? a : divisor(b, a % b));
+  const g = divisor(width, height) || 1;
+  return `${Math.round(width / g)}:${Math.round(height / g)}`;
+}
+
+function sizeFor(type: AssetType, brief: StructuredBrief) {
+  const { width, height } = brief.dimensions;
+  switch (type) {
+    case "hero-image":
+      return { width, height };
+    case "supporting-image":
+      return { width: Math.round(width / 2), height: Math.round(height / 3) };
+    case "texture":
+      return { width: 512, height: 512 };
+    case "logo":
+      return { width: Math.round(width / 4), height: Math.round(width / 4) };
+    case "chart":
+      return { width: Math.round(width * 0.8), height: Math.round(height * 0.4) };
+    default:
+      return { width, height };
+  }
+}
+
+export type AssetPlan = {
+  assets: PlannedAsset[];
+  /** Assets that cannot be produced in this deployment, and why. */
+  blocked: PlannedAsset[];
+  capabilities: ReturnType<typeof aiCapabilities>;
+};
+
+export function planAssets(input: { brief: StructuredBrief; concept: Concept }): AssetPlan {
+  const capabilities = aiCapabilities();
+  const assets: PlannedAsset[] = [];
+
+  const requirements = input.concept.assetRequirements.length > 0
+    ? input.concept.assetRequirements
+    : // A concept with no stated requirements still needs its headline set.
+      [{ type: "typography" as AssetType, role: "headline", description: "Primary headline setting" }];
+
+  requirements.forEach((requirement, index) => {
+    const source = SOURCE_FOR_TYPE[requirement.type];
+    const { width, height } = sizeFor(requirement.type, input.brief);
+
+    // Honesty gate: a generated asset is only "planned" if something can
+    // actually generate it. Otherwise it is explicitly unavailable.
+    const generatable = source !== "generated" || capabilities.imageGeneration.available;
+    const status: AssetStatus = source === "procedural" ? "ready" : generatable ? "planned" : "unavailable";
+
+    const note = (() => {
+      if (source === "generated" && !capabilities.imageGeneration.available) {
+        return capabilities.imageGeneration.reason ?? "No image generation provider is configured.";
+      }
+      if (source === "generated") return "Interpretive artwork, suitable for an image model.";
+      if (source === "user-upload") return "Brand-owned artwork must be supplied by the user; it cannot be invented.";
+      return "Produced deterministically by the renderer, so text and geometry stay exact.";
+    })();
+
+    assets.push({
+      id: `asset-${index + 1}-${slug(requirement.role, requirement.type)}`,
+      type: requirement.type,
+      role: requirement.role,
+      description: requirement.description,
+      source,
+      status,
+      note,
+      width,
+      height,
+      aspectRatio: ratio(width, height),
+      transparent: requirement.type === "logo" || requirement.type === "vector-shape",
+      priority: PRIORITY_FOR_TYPE[requirement.type],
+      license: source === "procedural" ? "Generated by Curio Labs renderer" : null,
+      // Only procedurally drawn assets are cleared by default. Anything
+      // external has to be cleared explicitly once its licence is known.
+      cleared: source === "procedural",
+      generator: null,
+    });
+  });
+
+  assets.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+
+  return {
+    assets,
+    blocked: assets.filter((asset) => asset.status === "unavailable"),
+    capabilities,
+  };
+}
