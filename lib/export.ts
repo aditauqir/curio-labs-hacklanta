@@ -1,4 +1,4 @@
-import { writePsd } from "ag-psd";
+import { writePsd, type BlendMode } from "ag-psd";
 import type { DesignState } from "./design-types";
 import { getBrief } from "./design-state";
 import { createPosterLayerEdit, type PosterEdits, type PosterLayerEdit } from "./poster-editor";
@@ -11,6 +11,15 @@ import {
   type PosterShape,
   type PosterText,
 } from "./poster-layout";
+import { drawLookFinish, loadLookFinish, renderLookPlate, type LookFinishLayer } from "./look-render";
+
+/** A reference look rendered for export: the screened plate and the texture finish. */
+type LookAssets = { plate: HTMLCanvasElement | null; finish: LookFinishLayer[] };
+
+async function prepareLook(design: DesignState): Promise<LookAssets> {
+  const [plate, finish] = await Promise.all([renderLookPlate(design), loadLookFinish(design)]);
+  return { plate, finish };
+}
 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "studio";
@@ -162,6 +171,8 @@ type PosterLayers = {
   background: HTMLCanvasElement;
   graphics: HTMLCanvasElement;
   typography: HTMLCanvasElement;
+  /** One canvas per finish texture, for the PSD; the composite already includes them. */
+  textures: { canvas: HTMLCanvasElement; finish: LookFinishLayer }[];
 };
 
 function createCanvas(design: DesignState) {
@@ -192,6 +203,7 @@ function drawPosterLayers(
   bodyStack: string,
   edits: PosterEdits = {},
   layerOrder: readonly string[] = [],
+  look: LookAssets = { plate: null, finish: [] },
 ): PosterLayers {
   const composite = createCanvas(design);
   const background = createCanvas(design);
@@ -218,6 +230,7 @@ function drawPosterLayers(
   if (backgroundEdit.visible) {
     backgroundContext.fillStyle = design.colors.background;
     backgroundContext.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+    if (look.plate) backgroundContext.drawImage(look.plate, 0, 0, POSTER_WIDTH, POSTER_HEIGHT);
   }
 
   const shapeById = new Map(shapes.map((shape) => [shape.id, shape]));
@@ -249,7 +262,15 @@ function drawPosterLayers(
     drawText(compositeContext, item, headingStack, bodyStack, edit);
   }
 
-  return { composite, background, graphics, typography };
+  drawLookFinish(compositeContext, look.finish);
+  const textures = look.finish.map((finish) => {
+    const canvas = createCanvas(design);
+    const context = canvas.getContext("2d");
+    context?.drawImage(finish.image, 0, 0, canvas.width, canvas.height);
+    return { canvas, finish };
+  });
+
+  return { composite, background, graphics, typography, textures };
 }
 
 function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
@@ -263,8 +284,8 @@ export async function exportPosterAsImage(
   edits: PosterEdits = {},
   layerOrder: readonly string[] = [],
 ) {
-  const { headingStack, bodyStack } = await prepareFonts(design);
-  const { composite } = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder);
+  const [{ headingStack, bodyStack }, look] = await Promise.all([prepareFonts(design), prepareLook(design)]);
+  const { composite } = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder, look);
   const mime = format === "jpg" ? "image/jpeg" : "image/png";
   const blob = await canvasBlob(composite, mime, format === "jpg" ? 0.92 : undefined);
   if (!blob) throw new Error(`Could not create a ${format.toUpperCase()} from the poster.`);
@@ -278,17 +299,24 @@ export async function exportPosterAsPsd(
   edits: PosterEdits = {},
   layerOrder: readonly string[] = [],
 ) {
-  const { headingStack, bodyStack } = await prepareFonts(design);
-  const layers = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder);
+  const [{ headingStack, bodyStack }, look] = await Promise.all([prepareFonts(design), prepareLook(design)]);
+  const layers = drawPosterLayers(design, headingStack, bodyStack, edits, layerOrder, look);
   const { width, height } = getPosterDimensions(design);
   const buffer = writePsd({
     width,
     height,
     canvas: layers.composite,
+    // ag-psd lists layers bottom to top. Texture layers keep their blend mode and opacity.
     children: [
-      { name: "Typography", canvas: layers.typography },
+      { name: "Background", canvas: layers.background },
       { name: "Graphics", canvas: layers.graphics },
-      { name: "Background", canvas: layers.background }
+      { name: "Typography", canvas: layers.typography },
+      ...layers.textures.map(({ canvas, finish }) => ({
+        name: `Texture: ${finish.label}`,
+        canvas,
+        blendMode: finish.blend.replace("-", " ") as BlendMode,
+        opacity: finish.opacity,
+      })),
     ]
   });
 

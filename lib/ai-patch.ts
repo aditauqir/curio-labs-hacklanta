@@ -14,6 +14,7 @@ import {
 } from "./design-presets";
 import { HEX_COLOR, type StudioAction } from "./design-state";
 import { buildPoster } from "./poster-layout";
+import { NO_LOOK, getReferenceLook, referenceLookIds } from "./reference-looks";
 
 export type AiLayerEdit = {
   /** Exact layer id from the canvas model. x/y are absolute transform offsets. */
@@ -33,6 +34,8 @@ export type AiLayerEdit = {
  */
 export type AiPatch = {
   direction?: DesignDirection;
+  /** Analysed reference look id (lib/reference-looks.ts), or "none" for flat colour. */
+  lookId?: string;
   paletteId?: string;
   fontPairId?: string;
   accent?: string;
@@ -48,6 +51,7 @@ export type AiPatch = {
 
 export const PATCH_KEYS = [
   "direction",
+  "lookId",
   "paletteId",
   "fontPairId",
   "accent",
@@ -105,6 +109,13 @@ export function validatePatch(raw: unknown): { patch: AiPatch; skipped: string[]
     if (typeof value === "string" && (directionOrder as string[]).includes(value)) {
       patch.direction = value as DesignDirection;
     } else skipped.push("direction");
+  }
+
+  if (present("lookId")) {
+    const value = raw.lookId;
+    if (typeof value === "string" && [...referenceLookIds, NO_LOOK].includes(value)) {
+      patch.lookId = value;
+    } else skipped.push("lookId");
   }
 
   if (present("paletteId")) {
@@ -263,6 +274,7 @@ export function reconcilePatch(
   if (wantsLayoutKept(message)) {
     if (next.direction) {
       const config = directionConfigs[next.direction];
+      next.lookId ??= config.lookId;
       next.paletteId ??= config.paletteId;
       next.fontPairId ??= config.fontPairId;
     }
@@ -272,6 +284,8 @@ export function reconcilePatch(
   }
 
   if (next.direction === design.direction) delete next.direction;
+  // A direction resets the look, so an explicit "keep this look" must survive alongside one.
+  if (next.lookId === design.lookId && !next.direction) delete next.lookId;
   if (next.fontPairId === design.typography.id) delete next.fontPairId;
   if (next.alignment === design.layout.alignment) delete next.alignment;
   if (next.spacing === design.layout.spacing) delete next.spacing;
@@ -317,6 +331,8 @@ export function patchToActions(patch: AiPatch): StudioAction[] {
   const actions: StudioAction[] = [];
 
   if (patch.direction) actions.push({ type: "setDirection", direction: patch.direction });
+  // A look sets its own palette and fonts; explicit palette, font and colour fields below still win.
+  if (patch.lookId) actions.push({ type: "setLook", id: patch.lookId });
   if (patch.paletteId) actions.push({ type: "setPalette", id: patch.paletteId });
   if (patch.fontPairId) actions.push({ type: "setFontPair", id: patch.fontPairId });
   if (patch.background) actions.push({ type: "setColor", key: "background", value: patch.background });
@@ -340,6 +356,7 @@ export function describePatch(patch: AiPatch): string[] {
   const changes: string[] = [];
 
   if (patch.direction) changes.push(`Direction: ${directionConfigs[patch.direction].label}`);
+  if (patch.lookId) changes.push(`Look: ${getReferenceLook(patch.lookId)?.name ?? "Flat colour"}`);
   if (patch.paletteId) changes.push(`Palette: ${getPalette(patch.paletteId)?.name ?? patch.paletteId}`);
   if (patch.fontPairId) changes.push(`Typography: ${getFontPair(patch.fontPairId).name}`);
   if (patch.background) changes.push(`Background: ${patch.background}`);

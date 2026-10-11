@@ -6,6 +6,7 @@
     "promise": "Turn vague intent into a clear, editable visual direction without taking control away from the maker."
   },
   "nonNegotiables": [
+    "Every poster sits on one of Curio's reference looks (the analysed example renders) and should look like it belongs in that set.",
     "Hierarchy should be readable before it is expressive.",
     "One strong focal point is better than many competing accents.",
     "Typography, spacing, and alignment should feel intentional and repeatable.",
@@ -23,6 +24,11 @@
       "specificity": 0.1
     },
     "checks": [
+      {
+        "id": "lookFidelity",
+        "question": "Would this poster sit convincingly beside its reference look's example render?",
+        "preferredFix": "Move to the closest reference look before adjusting individual colours or fonts."
+      },
       {
         "id": "hierarchy",
         "question": "Can the viewer tell what to read first, second, and third?",
@@ -73,6 +79,7 @@
     },
     "editableFields": [
       "direction",
+      "lookId",
       "paletteId",
       "fontPairId",
       "accent",
@@ -110,6 +117,7 @@
     "note": "The current request is authoritative for the actual layer ids. Examples are not permission to invent a layer."
   },
   "languageToAction": {
+    "make it look like [genre, era, scene, mood]": "set lookId to the closest reference look",
     "use this font": "set fontPairId to one allowed available pair",
     "move [specific object]": "find the matching current layer id and update layerEdits.x or layerEdits.y",
     "make [specific object] bigger or smaller": "update that layer's absolute scale",
@@ -117,5 +125,25 @@
     "hide or show [specific object]": "update that layer's visible boolean",
     "center or align everything": "use the global alignment field",
     "change the wording": "update only headline or subtitle"
+  },
+  "referenceLooks": {
+    "source": "lib/reference-looks.ts, built from curio/assets/style_links.json and the engine's demo recipes",
+    "ids": [
+      "aged-broadsheet",
+      "swiss-ivory",
+      "acid-duotone",
+      "newsprint",
+      "crimson-photocopy",
+      "amber-crt",
+      "cosmic-cobalt",
+      "thermal-rings"
+    ],
+    "policy": [
+      "Style, mood, genre, era, energy, texture or finish requests set lookId to the closest look; never answer them with colours alone.",
+      "Every reply names the active or proposed look and cites one concrete finish detail: the screen and its pitch or angle, the paper, the grain, or an overlay.",
+      "A clarifying question offers two looks by name and still applies the closer one.",
+      "Colour and font overrides stay inside the active look's palette and font pair unless the user names a specific colour or font.",
+      "Type sits on a screened plate with grain and overlays, so check legibility against the halftone field before anything else."
+    ]
   }
 }

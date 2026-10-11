@@ -10,6 +10,7 @@ import type {
 } from "./design-types";
 import {
   applyDirection,
+  applyLook,
   colorPalettes,
   directionConfigs,
   directionOrder,
@@ -21,6 +22,7 @@ import {
   posterSizes,
   typographyFromPair,
 } from "./design-presets";
+import { NO_LOOK, getReferenceLook, lookPaletteId, referenceLookIds } from "./reference-looks";
 import { sanitizePosterEdits, type PosterLayerEdit } from "./poster-editor";
 import { buildPoster, getDefaultLayerOrder, normalizeLayerOrder, sanitizeLayerOrder } from "./poster-layout";
 
@@ -39,6 +41,7 @@ export type ColorKey = "background" | "foreground" | "accent";
 
 export type StudioAction =
   | { type: "setDirection"; direction: DesignDirection }
+  | { type: "setLook"; id: string }
   | { type: "setPosterSize"; value: PosterSize }
   | { type: "setFontPair"; id: string }
   | { type: "setPalette"; id: string }
@@ -69,14 +72,14 @@ const seedMessages: ChatMessage[] = [
     id: "seed-user",
     role: "user",
     content:
-      "I need a poster for my coffee shop's jazz night. Something vintage but modern.",
+      "I need a poster for a warehouse night. Something printed and raw, not glossy.",
   },
   {
     id: "seed-assistant",
     role: "assistant",
     source: "example",
     content:
-      "Let's narrow that down. Are you imagining a warm, textured 1970s jazz-poster aesthetic, or something more minimal and contemporary?",
+      "Let's narrow that down. Should it feel like a newsprint broadsheet with a line screen and silver grain, or a cleaner Berlin Swiss grid on ivory stock?",
     suggestions: [...directionOrder],
     checkpoint: {
       design: initialDesign,
@@ -108,6 +111,15 @@ export function studioReducer(
         design: applyDirection(state.design, action.direction),
         selectedPaletteId: directionConfigs[action.direction].paletteId,
       };
+    case "setLook": {
+      const look = getReferenceLook(action.id);
+      if (!look && action.id !== NO_LOOK) return state;
+      return {
+        ...state,
+        design: applyLook(state.design, action.id),
+        selectedPaletteId: look ? lookPaletteId(look) : state.selectedPaletteId,
+      };
+    }
     case "setPosterSize":
       if (!posterSizes.some((size) => size.id === action.value)) return state;
       return {
@@ -244,7 +256,13 @@ export function getBrief(
   const palette = selectedPaletteId ? getPalette(selectedPaletteId) : undefined;
 
   return [
-    { id: "style", label: "Style", value: design.styleLabel },
+    {
+      id: "style",
+      label: "Style",
+      value: getReferenceLook(design.lookId)
+        ? `${design.styleLabel} · ${getReferenceLook(design.lookId)?.name}`
+        : design.styleLabel,
+    },
     {
       id: "typography",
       label: "Typography",
@@ -303,6 +321,8 @@ function sanitizeDesign(raw: unknown): DesignState {
     time: text(raw.time, initialDesign.time),
     footer: text(raw.footer, initialDesign.footer),
     direction,
+    // Stored designs from before looks existed keep their flat colours.
+    lookId: oneOf(raw.lookId, [...referenceLookIds, NO_LOOK], NO_LOOK),
     posterSize: oneOf(raw.posterSize, posterSizes.map((size) => size.id), initialDesign.posterSize),
     styleLabel: text(raw.styleLabel, directionConfigs[direction].label, 60),
     mood: text(raw.mood, directionConfigs[direction].mood, 80),

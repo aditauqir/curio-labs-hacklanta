@@ -6,69 +6,21 @@ import type { DesignState } from "@/lib/design-types";
 import { getFontPair, referenceCards } from "@/lib/design-presets";
 import type { StudioAction } from "@/lib/design-state";
 import type { ImportedReference } from "@/lib/image-import-client";
+import { referenceLooks, type ReferenceLook } from "@/lib/reference-looks";
 import { ColorPaletteSelector } from "./color-palette-selector";
 import { CreativeBrief } from "./creative-brief";
 import { TypographySelector } from "./typography-selector";
 
-const THUMBNAIL_THEMES = [
-  { background: "#E8D9BF", ink: "#2B2723", accent: "#D8784C" },
-  { background: "#F7F7F4", ink: "#171717", accent: "#171717" },
-  { background: "#151719", ink: "#F2EEE6", accent: "#C9F05D" },
-  { background: "#E9E0F2", ink: "#1C1724", accent: "#7D45B7" },
-  { background: "#D8E5EB", ink: "#10212A", accent: "#D44B3D" },
-  { background: "#F0D8D2", ink: "#351D1B", accent: "#C52F54" },
-];
-
-const TEXTURE_STUDIES = [
-  { id: "paper", label: "Paper grain", className: "is-paper" },
-  { id: "ink", label: "Ink wash", className: "is-ink" },
-  { id: "signal", label: "Signal noise", className: "is-signal" },
-];
-
-function ReferenceThumb({ index }: { index: number }) {
-  const theme = THUMBNAIL_THEMES[index % THUMBNAIL_THEMES.length];
-  const geometry = index % 4;
-
-  return (
-    <svg
-      viewBox="0 0 160 110"
-      aria-hidden="true"
-      className="block h-auto w-full"
-      preserveAspectRatio="xMidYMid slice"
-    >
-      <rect width="160" height="110" fill={theme.background} />
-      <rect x="8" y="8" width="144" height="94" fill="none" stroke={theme.ink} strokeWidth="1" opacity="0.5" />
-      <rect x="16" y="18" width={32 + (index % 3) * 11} height="5" fill={theme.ink} />
-      <rect x="16" y="29" width={66 + (index % 4) * 12} height="3" fill={theme.ink} opacity="0.55" />
-      {geometry === 0 ? (
-        <>
-          <circle cx="116" cy="61" r={25 + (index % 3) * 5} fill="none" stroke={theme.accent} strokeWidth="4" />
-          <circle cx="116" cy="61" r="7" fill={theme.accent} />
-        </>
-      ) : null}
-      {geometry === 1 ? (
-        <>
-          <rect x="18" y="49" width="74" height="13" fill={theme.ink} />
-          <rect x="18" y="68" width="47" height="13" fill={theme.accent} />
-          <rect x="104" y="40" width="23" height="48" fill={theme.accent} opacity="0.85" />
-        </>
-      ) : null}
-      {geometry === 2 ? (
-        <>
-          <rect x="16" y="45" width="6" height="49" fill={theme.accent} />
-          <path d="M34 88 L78 36 L126 88 Z" fill="none" stroke={theme.accent} strokeWidth="4" />
-          <circle cx="126" cy="22" r="13" fill={theme.ink} />
-        </>
-      ) : null}
-      {geometry === 3 ? (
-        <>
-          <rect x="17" y="46" width="115" height="37" fill={theme.accent} opacity="0.9" />
-          <rect x="27" y="55" width="92" height="8" fill={theme.background} />
-          <rect x="27" y="69" width="55" height="5" fill={theme.ink} />
-        </>
-      ) : null}
-    </svg>
-  );
+/** A CSS preview of a look: its screen as a dot or line field, or its gradient map. */
+function lookSwatchStyle(look: ReferenceLook) {
+  const { background, foreground, accent } = look.palette;
+  if (!look.screen) {
+    return { background: `radial-gradient(circle at 68% 62%, ${foreground} 0 12%, ${accent} 30%, ${background} 62%)` };
+  }
+  const field = look.screen.asset.includes("line")
+    ? `repeating-linear-gradient(0deg, ${foreground} 0 1px, transparent 1px 4px)`
+    : `radial-gradient(circle, ${foreground} 0 32%, transparent 36%) 0 0 / 5px 5px`;
+  return { background: `${field}, ${background}` };
 }
 
 function Section({
@@ -146,13 +98,14 @@ export function InspirationBoard({
         <div className="studio-compact-reference-section" aria-labelledby="compact-references-heading">
           <div className="studio-compact-reference-section-heading">
             <span id="compact-references-heading">References</span>
-            <span>Studies</span>
+            <span>Image assets</span>
           </div>
-          <ul className="studio-compact-reference-grid" aria-label="Reference studies">
-            {referenceCards.slice(0, 4).map((card) => (
+          <ul className="studio-compact-reference-grid" aria-label="Reference image assets">
+            {referenceCards.map((card) => (
               <li key={card.id}>
-                <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`}>
-                  <span className="studio-compact-reference-placeholder" aria-hidden="true" />
+                <a href={card.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${card.title}`} title={`${card.title} · ${card.category}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- static native-scale crop; resizing would smear the screen */}
+                  <img className="studio-compact-reference-placeholder" src={card.thumbnail} alt="" loading="lazy" />
                 </a>
               </li>
             ))}
@@ -160,14 +113,22 @@ export function InspirationBoard({
         </div>
         <div className="studio-compact-reference-section" aria-labelledby="compact-textures-heading">
           <div className="studio-compact-reference-section-heading">
-            <span id="compact-textures-heading">Textures</span>
-            <span>Surface cues</span>
+            <span id="compact-textures-heading">Looks</span>
+            <span>Screen, paper, grain</span>
           </div>
-          <ul className="studio-compact-texture-grid" aria-label="Texture studies">
-            {TEXTURE_STUDIES.map((texture) => (
-              <li key={texture.id}>
-                <span className={`studio-compact-texture-swatch ${texture.className}`} aria-hidden="true" />
-                <span>{texture.label}</span>
+          <ul className="studio-compact-texture-grid" aria-label="Reference looks">
+            {referenceLooks.map((look) => (
+              <li key={look.id}>
+                <button
+                  type="button"
+                  className="studio-compact-look"
+                  aria-pressed={design.lookId === look.id}
+                  title={look.summary}
+                  onClick={() => dispatch({ type: "setLook", id: look.id })}
+                >
+                  <span className="studio-compact-texture-swatch" style={lookSwatchStyle(look)} aria-hidden="true" />
+                  <span>{look.name}</span>
+                </button>
               </li>
             ))}
           </ul>
@@ -213,12 +174,13 @@ export function InspirationBoard({
       <Section
         id="references-heading"
         title="Visual references"
-        note={`${referenceCards.length} Pinterest poster studies. Curio uses its own thumbnails; open a card for the source search.`}
+        note={`${referenceCards.length} image assets from curio/assets that the reference looks are built from. Open a card for the full-size file.`}
       >
         <ul className="grid gap-3">
-          {referenceCards.map((card, index) => (
+          {referenceCards.map((card) => (
             <li key={card.id} className="overflow-hidden rounded-md border border-line bg-paper">
-              <ReferenceThumb index={index} />
+              {/* eslint-disable-next-line @next/next/no-img-element -- static native-scale crop; resizing would smear the screen */}
+              <img src={card.thumbnail} alt="" loading="lazy" className="block aspect-[16/11] w-full object-cover" />
               <div className="border-t border-line px-3 py-2.5">
                 <p className="text-sm font-medium">{card.title}</p>
                 <p className="text-xs text-muted">{card.category}</p>

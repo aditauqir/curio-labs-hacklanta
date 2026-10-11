@@ -11,7 +11,7 @@ import { useVoice } from "./use-voice";
 import { VoiceMascot } from "./voice-keyframes";
 
 const FALLBACK_STARTER_PROMPTS = [
-  "A poster for a late-night jazz set",
+  "A newsprint broadsheet for a warehouse night",
   "A warm identity for my small business",
   "Something strange, loud, and editorial",
 ];
@@ -84,7 +84,7 @@ export function OnboardingStudio({
   onStart,
   onImportImage,
   importedReference,
-  projectName = "Midnight Jazz",
+  projectName = "After Image",
 }: {
   onStart: (prompt?: string) => void;
   onImportImage: (file: File) => Promise<ImportedReference>;
@@ -235,7 +235,7 @@ export function OnboardingStudio({
             >
               <span className="onboarding-project-index">01</span>
               <span>
-                <strong>{projectName || "Midnight Jazz"}</strong>
+                <strong>{projectName || "After Image"}</strong>
                 <small>Open current workspace</small>
               </span>
               <span aria-hidden="true">↗</span>
